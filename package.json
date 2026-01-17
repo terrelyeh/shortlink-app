@@ -19,10 +19,12 @@
     "next-intl": "^4.7.0",
     "prisma": "^7.2.0",
     "qrcode": "^1.5.4",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-qrcode-logo": "^4.0.0",
-    "recharts": "^3.6.0"
+    "recharts": "^3.6.0",
+    "zod": "^4.3.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
