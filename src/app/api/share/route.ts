@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 400 });
+      return NextResponse.json({ error: error.issues }, { status: 400 });
     }
     console.error("Failed to create share token:", error);
     return NextResponse.json({ error: "Failed to create share token" }, { status: 500 });
