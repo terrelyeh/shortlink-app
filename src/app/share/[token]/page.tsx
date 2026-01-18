@@ -220,7 +220,7 @@ export default function SharedReportPage({
                     outerRadius={80}
                     dataKey="value"
                     label={({ name, percent }) =>
-                      `${name} ${(percent * 100).toFixed(0)}%`
+                      `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
                     }
                   >
                     {data.analytics.devices.map((_, index) => (
@@ -253,7 +253,7 @@ export default function SharedReportPage({
                     outerRadius={80}
                     dataKey="value"
                     label={({ name, percent }) =>
-                      `${name} ${(percent * 100).toFixed(0)}%`
+                      `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
                     }
                   >
                     {data.analytics.browsers.map((_, index) => (
