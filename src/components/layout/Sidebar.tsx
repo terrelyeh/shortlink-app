@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 interface NavItem {
   href: string;
@@ -107,6 +108,9 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       </nav>
 
       <div className="p-4 border-t border-gray-200">
+        <div className="mb-3">
+          <LanguageSwitcher />
+        </div>
         <div className="flex items-center gap-3 mb-3">
           {userImage ? (
             <img
