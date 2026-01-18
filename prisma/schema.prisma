@@ -1,0 +1,268 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User & Authentication
+// ============================================
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  MEMBER
+  VIEWER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(MEMBER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts   Account[]
+  sessions   Session[]
+  shortLinks ShortLink[]
+  templates  UTMTemplate[]
+  auditLogs  AuditLog[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================
+// Short Link & Related
+// ============================================
+
+enum RedirectType {
+  PERMANENT // 301
+  TEMPORARY // 302
+}
+
+enum LinkStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+model ShortLink {
+  id           String       @id @default(cuid())
+  code         String       @unique // The short code (e.g., "abc123")
+  originalUrl  String       @db.Text
+  title        String?      // Optional title for the link
+  description  String?      // Optional description
+  redirectType RedirectType @default(TEMPORARY)
+  status       LinkStatus   @default(ACTIVE)
+
+  // UTM Parameters (stored separately for reporting)
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmContent  String?
+  utmTerm     String?
+
+  // Limits & Expiration
+  expiresAt DateTime?
+  maxClicks Int?
+
+  // Metadata
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  // Relations
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clicks      Click[]
+  tags        TagOnLink[]
+  shareTokens ShareToken[]
+  group       LinkGroup?   @relation(fields: [groupId], references: [id])
+  groupId     String?      @map("group_id")
+
+  @@index([code])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("short_links")
+}
+
+model Click {
+  id          String   @id @default(cuid())
+  shortLinkId String   @map("short_link_id")
+  timestamp   DateTime @default(now())
+  ipHash      String?  @map("ip_hash") // SHA-256 hashed IP
+  userAgent   String?  @db.Text
+  referrer    String?
+  country     String?
+  city        String?
+  device      String?  // mobile, tablet, desktop
+  os          String?  // iOS, Android, Windows, macOS, Linux
+  browser     String?  // Chrome, Safari, Firefox, etc.
+
+  shortLink ShortLink @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
+
+  @@index([shortLinkId])
+  @@index([timestamp])
+  @@map("clicks")
+}
+
+// ============================================
+// Organization & Grouping
+// ============================================
+
+model LinkGroup {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  color       String?  // Hex color for UI
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  links ShortLink[]
+
+  @@map("link_groups")
+}
+
+model Tag {
+  id    String      @id @default(cuid())
+  name  String      @unique
+  color String?     // Hex color for UI
+  links TagOnLink[]
+
+  @@map("tags")
+}
+
+model TagOnLink {
+  shortLinkId String    @map("short_link_id")
+  tagId       String    @map("tag_id")
+  assignedAt  DateTime  @default(now())
+
+  shortLink ShortLink @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
+  tag       Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([shortLinkId, tagId])
+  @@map("tags_on_links")
+}
+
+// ============================================
+// UTM Templates
+// ============================================
+
+model UTMTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  source    String?
+  medium    String?
+  campaign  String?
+  content   String?
+  term      String?
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("utm_templates")
+}
+
+// ============================================
+// Share & Public Reports
+// ============================================
+
+model ShareToken {
+  id          String    @id @default(cuid())
+  shortLinkId String    @map("short_link_id")
+  token       String    @unique
+  password    String?   // Optional bcrypt hashed password
+  expiresAt   DateTime?
+  maxViews    Int?
+  viewCount   Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  shortLink ShortLink @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@map("share_tokens")
+}
+
+// ============================================
+// Audit Log
+// ============================================
+
+enum AuditAction {
+  CREATE_LINK
+  UPDATE_LINK
+  DELETE_LINK
+  RESTORE_LINK
+  CREATE_TEMPLATE
+  UPDATE_TEMPLATE
+  DELETE_TEMPLATE
+  SHARE_LINK
+  REVOKE_SHARE
+}
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  userId    String      @map("user_id")
+  action    AuditAction
+  targetId  String?     @map("target_id") // ID of the affected resource
+  metadata  Json?       // Additional context
+  ipAddress String?     @map("ip_address")
+  createdAt DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
