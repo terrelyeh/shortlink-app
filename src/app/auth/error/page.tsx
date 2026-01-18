@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 const errorMessages: Record<string, string> = {
   Configuration: "There is a problem with the server configuration.",
@@ -10,11 +11,31 @@ const errorMessages: Record<string, string> = {
   Default: "An error occurred during authentication.",
 };
 
-export default function AuthErrorPage() {
+function ErrorContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error") || "Default";
   const errorMessage = errorMessages[error] || errorMessages.Default;
 
+  return (
+    <>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Authentication Error
+        </h1>
+        <p className="mt-2 text-gray-600">{errorMessage}</p>
+      </div>
+
+      <Link
+        href="/auth/signin"
+        className="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        Try Again
+      </Link>
+    </>
+  );
+}
+
+export default function AuthErrorPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-6 p-8 bg-white rounded-xl shadow-lg text-center">
@@ -34,19 +55,9 @@ export default function AuthErrorPage() {
           </svg>
         </div>
 
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Authentication Error
-          </h1>
-          <p className="mt-2 text-gray-600">{errorMessage}</p>
-        </div>
-
-        <Link
-          href="/auth/signin"
-          className="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Try Again
-        </Link>
+        <Suspense fallback={<div className="text-gray-500">Loading...</div>}>
+          <ErrorContent />
+        </Suspense>
       </div>
     </div>
   );
