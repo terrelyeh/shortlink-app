@@ -15,12 +15,18 @@ import {
   ChevronDown,
 } from "lucide-react";
 
+interface AuditLogMetadata {
+  code?: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
 interface AuditLog {
   id: string;
   userId: string;
   action: string;
   targetId: string | null;
-  metadata: Record<string, unknown> | null;
+  metadata: AuditLogMetadata | null;
   createdAt: string;
   user: {
     name: string | null;
