@@ -3,10 +3,22 @@ import { prisma } from "@/lib/prisma";
 import { createHash } from "crypto";
 import { headers } from "next/headers";
 
+// Validate IP_HASH_SALT at module load time
+const IP_HASH_SALT = process.env.IP_HASH_SALT;
+if (!IP_HASH_SALT) {
+  console.warn(
+    "WARNING: IP_HASH_SALT environment variable is not set. " +
+    "IP addresses will not be properly anonymized. " +
+    "Please set IP_HASH_SALT in production."
+  );
+}
+
 // Helper to hash IP address
 function hashIP(ip: string): string {
-  const salt = process.env.IP_HASH_SALT || "default-salt";
-  return createHash("sha256").update(ip + salt).digest("hex");
+  if (!IP_HASH_SALT) {
+    throw new Error("IP_HASH_SALT environment variable is required");
+  }
+  return createHash("sha256").update(ip + IP_HASH_SALT).digest("hex");
 }
 
 // Helper to parse User Agent
@@ -90,9 +102,9 @@ export async function GET(
     const referrer = headersList.get("referer");
     const { device, os, browser } = parseUserAgent(userAgent);
 
-    // Record the click (async, don't wait)
-    prisma.click
-      .create({
+    // Record the click - await to ensure data is saved before response
+    try {
+      await prisma.click.create({
         data: {
           shortLinkId: shortLink.id,
           ipHash: hashIP(ip),
@@ -103,10 +115,11 @@ export async function GET(
           browser,
           // Note: Country/City would require a GeoIP service
         },
-      })
-      .catch((error) => {
-        console.error("Failed to record click:", error);
       });
+    } catch (clickError) {
+      // Log but don't fail the redirect if click recording fails
+      console.error("Failed to record click:", clickError);
+    }
 
     // Redirect
     const redirectStatus = shortLink.redirectType === "PERMANENT" ? 301 : 302;
