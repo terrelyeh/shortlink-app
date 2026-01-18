@@ -58,10 +58,13 @@ export function PieChartComponent({ data, title }: PieChartProps) {
             ))}
           </Pie>
           <Tooltip
-            formatter={(value: number) => [
-              `${value.toLocaleString()} (${((value / total) * 100).toFixed(1)}%)`,
-              "Clicks",
-            ]}
+            formatter={(value) => {
+              const numValue = typeof value === 'number' ? value : Number(value);
+              return [
+                `${numValue.toLocaleString()} (${((numValue / total) * 100).toFixed(1)}%)`,
+                "Clicks",
+              ];
+            }}
             contentStyle={{
               backgroundColor: "#fff",
               border: "1px solid #e5e7eb",
