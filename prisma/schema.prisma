@@ -36,6 +36,7 @@ model User {
   sessions   Session[]
   shortLinks ShortLink[]
   templates  UTMTemplate[]
+  campaigns  Campaign[]
   auditLogs  AuditLog[]
 
   @@map("users")
@@ -129,6 +130,8 @@ model ShortLink {
   shareTokens ShareToken[]
   group       LinkGroup?   @relation(fields: [groupId], references: [id])
   groupId     String?      @map("group_id")
+  campaign    Campaign?    @relation(fields: [campaignId], references: [id])
+  campaignId  String?      @map("campaign_id")
 
   @@index([code])
   @@index([userId])
@@ -195,6 +198,67 @@ model TagOnLink {
 }
 
 // ============================================
+// Campaign Management
+// ============================================
+
+enum CampaignStatus {
+  DRAFT      // Still preparing
+  ACTIVE     // Currently running
+  COMPLETED  // Ended (keep for viewing)
+  ARCHIVED   // Hidden by default
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  name        String         // Used as utm_campaign value (e.g., "spring_sale_2026")
+  displayName String?        @map("display_name") // Human-readable name
+  description String?
+  status      CampaignStatus @default(ACTIVE)
+  startDate   DateTime?      @map("start_date")
+  endDate     DateTime?      @map("end_date")
+
+  // Default UTM values for links in this campaign
+  defaultSource String?      @map("default_source")
+  defaultMedium String?      @map("default_medium")
+
+  // Metadata
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  links ShortLink[]
+  tags  TagOnCampaign[]
+
+  @@unique([name, userId])
+  @@index([userId])
+  @@index([status])
+  @@map("campaigns")
+}
+
+model CampaignTag {
+  id        String          @id @default(cuid())
+  name      String          @unique
+  color     String?         // Hex color for UI
+  campaigns TagOnCampaign[]
+
+  @@map("campaign_tags")
+}
+
+model TagOnCampaign {
+  campaignId String   @map("campaign_id")
+  tagId      String   @map("tag_id")
+  assignedAt DateTime @default(now())
+
+  campaign Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  tag      CampaignTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, tagId])
+  @@map("tags_on_campaigns")
+}
+
+// ============================================
 // UTM Templates
 // ============================================
 
@@ -249,6 +313,9 @@ enum AuditAction {
   DELETE_TEMPLATE
   SHARE_LINK
   REVOKE_SHARE
+  CREATE_CAMPAIGN
+  UPDATE_CAMPAIGN
+  DELETE_CAMPAIGN
 }
 
 model AuditLog {
