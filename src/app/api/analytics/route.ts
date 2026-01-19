@@ -68,17 +68,23 @@ export async function GET(request: NextRequest) {
       where: whereClicks,
     });
 
-    // Get clicks by day
-    const clicksByDay = await prisma.$queryRaw<{ date: string; count: bigint }[]>`
-      SELECT
-        DATE(timestamp) as date,
-        COUNT(*) as count
-      FROM clicks
-      WHERE timestamp >= ${startDate}
-        ${linkId ? prisma.$queryRaw`AND short_link_id = ${linkId}` : prisma.$queryRaw``}
-      GROUP BY DATE(timestamp)
-      ORDER BY date ASC
-    `;
+    // Get clicks by day using Prisma's groupBy instead of raw SQL
+    const clicksByDayRaw = await prisma.click.groupBy({
+      by: ["timestamp"],
+      where: whereClicks,
+      _count: true,
+    });
+
+    // Aggregate by date
+    const clicksByDayMap = new Map<string, number>();
+    clicksByDayRaw.forEach((c) => {
+      const dateStr = c.timestamp.toISOString().split("T")[0];
+      clicksByDayMap.set(dateStr, (clicksByDayMap.get(dateStr) || 0) + c._count);
+    });
+
+    const clicksByDay = Array.from(clicksByDayMap.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
 
     // Get device distribution
     const deviceStats = await prisma.click.groupBy({
@@ -147,7 +153,7 @@ export async function GET(request: NextRequest) {
       },
       clicksByDay: clicksByDay.map((d) => ({
         date: d.date,
-        clicks: Number(d.count),
+        clicks: d.count,
       })),
       devices: deviceStats.map((d) => ({
         name: d.device || "Unknown",

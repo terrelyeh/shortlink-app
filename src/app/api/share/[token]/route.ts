@@ -59,15 +59,15 @@ export async function POST(
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const [clicksByDay, deviceStats, browserStats, countryStats, totalClicks] = await Promise.all([
-      prisma.$queryRaw<{ date: string; count: bigint }[]>`
-        SELECT DATE(timestamp) as date, COUNT(*) as count
-        FROM clicks
-        WHERE short_link_id = ${shareToken.shortLinkId}
-          AND timestamp >= ${thirtyDaysAgo}
-        GROUP BY DATE(timestamp)
-        ORDER BY date ASC
-      `,
+    const [clicksByDayRaw, deviceStats, browserStats, countryStats, totalClicks] = await Promise.all([
+      prisma.click.groupBy({
+        by: ["timestamp"],
+        where: {
+          shortLinkId: shareToken.shortLinkId,
+          timestamp: { gte: thirtyDaysAgo },
+        },
+        _count: true,
+      }),
       prisma.click.groupBy({
         by: ["device"],
         where: { shortLinkId: shareToken.shortLinkId },
@@ -91,6 +91,17 @@ export async function POST(
       prisma.click.count({ where: { shortLinkId: shareToken.shortLinkId } }),
     ]);
 
+    // Aggregate clicks by date
+    const clicksByDayMap = new Map<string, number>();
+    clicksByDayRaw.forEach((c) => {
+      const dateStr = c.timestamp.toISOString().split("T")[0];
+      clicksByDayMap.set(dateStr, (clicksByDayMap.get(dateStr) || 0) + c._count);
+    });
+
+    const clicksByDay = Array.from(clicksByDayMap.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
     return NextResponse.json({
       link: {
         code: shareToken.shortLink.code,
@@ -101,7 +112,7 @@ export async function POST(
         totalClicks,
         clicksByDay: clicksByDay.map((d) => ({
           date: d.date,
-          clicks: Number(d.count),
+          clicks: d.count,
         })),
         devices: deviceStats.map((d) => ({
           name: d.device || "Unknown",
