@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
-import { SessionProvider } from "next-auth/react";
+import { Providers } from "@/components/providers/Providers";
 
 export default async function DashboardLayout({
   children,
@@ -15,7 +15,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <SessionProvider session={session}>
+    <Providers session={session}>
       <div className="min-h-screen bg-gray-50">
         <Sidebar
           userRole={session.user.role}
@@ -26,6 +26,6 @@ export default async function DashboardLayout({
           <div className="p-6 lg:p-10">{children}</div>
         </main>
       </div>
-    </SessionProvider>
+    </Providers>
   );
 }
