@@ -137,7 +137,13 @@
       "noCampaignData": "No campaign data",
       "noSourceData": "No source data",
       "noMediumData": "No medium data",
-      "performance": "Performance"
+      "performance": "Performance",
+      "emptyState": {
+        "title": "No UTM data yet",
+        "description": "Add UTM parameters when creating short links to track your marketing campaigns. You can also create a Campaign to auto-fill UTM values.",
+        "createLink": "Create Link with UTM",
+        "manageCampaigns": "Manage Campaigns"
+      }
     }
   },
   "share": {
@@ -175,11 +181,18 @@
   "campaigns": {
     "title": "Campaigns",
     "subtitle": "Manage your marketing campaigns and track performance",
+    "linkToCampaign": "Link to a marketing campaign",
+    "noCampaign": "No campaign (optional)",
     "createCampaign": "Create Campaign",
     "editCampaign": "Edit Campaign",
     "noCampaigns": "No campaigns yet",
     "createFirst": "Create your first campaign",
     "deleteConfirm": "Are you sure you want to delete this campaign? Links will be unlinked but not deleted.",
+    "emptyState": {
+      "title": "No campaigns yet",
+      "description": "Campaigns help you manage multiple links for the same marketing activity with consistent UTM parameters.",
+      "createFirst": "Create your first campaign"
+    },
     "searchPlaceholder": "Search campaigns...",
     "allStatuses": "All Statuses",
     "allTags": "All Tags",
@@ -215,5 +228,57 @@
     "unauthorized": "You are not authorized to perform this action",
     "notFound": "Resource not found",
     "serverError": "Server error, please try again later"
+  },
+  "workspace": {
+    "title": "Workspace",
+    "workspaces": "Workspaces",
+    "createWorkspace": "Create Workspace",
+    "createWorkspaceDesc": "Set up a new workspace for your team or organization",
+    "workspaceName": "Workspace Name",
+    "workspaceNamePlaceholder": "e.g., TW Marketing Team",
+    "workspaceSlug": "Workspace URL",
+    "slugHint": "Only lowercase letters, numbers, and hyphens. This will be used in URLs.",
+    "description": "Description",
+    "descriptionPlaceholder": "Describe what this workspace is for",
+    "whatHappensNext": "What happens next?",
+    "nextStep1": "You'll be the owner of this workspace with full control",
+    "nextStep2": "You can invite team members and assign roles",
+    "nextStep3": "All links and campaigns will be organized in this workspace",
+    "cancel": "Cancel",
+    "creating": "Creating...",
+    "members": "Members",
+    "inviteMembers": "Invite Members",
+    "inviteMember": "Invite Member",
+    "inviteEmail": "Email Address",
+    "inviteEmailPlaceholder": "colleague@company.com",
+    "inviteRole": "Role",
+    "sendInvitation": "Send Invitation",
+    "pendingInvitations": "Pending Invitations",
+    "noInvitations": "No pending invitations",
+    "invitationSent": "Invitation sent to {email}",
+    "copyInviteLink": "Copy Invite Link",
+    "cancelInvitation": "Cancel Invitation",
+    "removeMember": "Remove Member",
+    "removeMemberConfirm": "Are you sure you want to remove this member from the workspace?",
+    "changeRole": "Change Role",
+    "leaveWorkspace": "Leave Workspace",
+    "leaveWorkspaceConfirm": "Are you sure you want to leave this workspace?",
+    "settings": "Workspace Settings",
+    "dangerZone": "Danger Zone",
+    "deleteWorkspace": "Delete Workspace",
+    "deleteWorkspaceDesc": "Permanently delete this workspace and all its data",
+    "deleteWorkspaceConfirm": "This action cannot be undone. Type the workspace name to confirm:",
+    "roles": {
+      "OWNER": "Owner",
+      "ADMIN": "Admin",
+      "MEMBER": "Member",
+      "VIEWER": "Viewer"
+    },
+    "roleDescriptions": {
+      "OWNER": "Full control including deleting workspace",
+      "ADMIN": "Manage members and all resources",
+      "MEMBER": "Create and manage own resources",
+      "VIEWER": "View only access"
+    }
   }
 }

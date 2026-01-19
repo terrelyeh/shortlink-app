@@ -32,12 +32,11 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  accounts   Account[]
-  sessions   Session[]
-  shortLinks ShortLink[]
-  templates  UTMTemplate[]
-  campaigns  Campaign[]
-  auditLogs  AuditLog[]
+  accounts            Account[]
+  sessions            Session[]
+  workspaceMembers    WorkspaceMember[]
+  sentInvitations     WorkspaceInvitation[] @relation("InvitedBy")
+  auditLogs           AuditLog[]
 
   @@map("users")
 }
@@ -83,6 +82,82 @@ model VerificationToken {
 }
 
 // ============================================
+// Workspace & Team Management
+// ============================================
+
+enum WorkspaceRole {
+  OWNER   // Full control, can delete workspace
+  ADMIN   // Manage members, all resource operations
+  MEMBER  // Create and manage own resources
+  VIEWER  // Read-only access
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+model Workspace {
+  id          String   @id @default(cuid())
+  name        String   // Display name (e.g., "TW Marketing Team")
+  slug        String   @unique // URL-friendly identifier (e.g., "tw-marketing")
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  members     WorkspaceMember[]
+  invitations WorkspaceInvitation[]
+  shortLinks  ShortLink[]
+  campaigns   Campaign[]
+  linkGroups  LinkGroup[]
+  templates   UTMTemplate[]
+  tags        Tag[]
+  campaignTags CampaignTag[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  userId      String        @map("user_id")
+  role        WorkspaceRole @default(MEMBER)
+  joinedAt    DateTime      @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+  @@map("workspace_members")
+}
+
+model WorkspaceInvitation {
+  id          String           @id @default(cuid())
+  workspaceId String           @map("workspace_id")
+  email       String           // Email to invite
+  role        WorkspaceRole    @default(MEMBER)
+  token       String           @unique // Unique token for invitation link
+  status      InvitationStatus @default(PENDING)
+  invitedById String           @map("invited_by_id")
+  expiresAt   DateTime         // Invitation expiry
+  createdAt   DateTime         @default(now())
+  acceptedAt  DateTime?        @map("accepted_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy User      @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([email])
+  @@index([token])
+  @@map("workspace_invitations")
+}
+
+// ============================================
 // Short Link & Related
 // ============================================
 
@@ -118,13 +193,14 @@ model ShortLink {
   maxClicks Int?
 
   // Metadata
-  userId    String   @map("user_id")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime? // Soft delete
+  workspaceId String   @map("workspace_id")
+  createdById String   @map("created_by_id") // User who created the link
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // Soft delete
 
   // Relations
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   clicks      Click[]
   tags        TagOnLink[]
   shareTokens ShareToken[]
@@ -134,7 +210,7 @@ model ShortLink {
   campaignId  String?      @map("campaign_id")
 
   @@index([code])
-  @@index([userId])
+  @@index([workspaceId])
   @@index([createdAt])
   @@map("short_links")
 }
@@ -168,20 +244,28 @@ model LinkGroup {
   name        String
   description String?
   color       String?  // Hex color for UI
+  workspaceId String   @map("workspace_id")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  links ShortLink[]
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  links     ShortLink[]
 
+  @@index([workspaceId])
   @@map("link_groups")
 }
 
 model Tag {
-  id    String      @id @default(cuid())
-  name  String      @unique
-  color String?     // Hex color for UI
-  links TagOnLink[]
+  id          String      @id @default(cuid())
+  name        String
+  color       String?     // Hex color for UI
+  workspaceId String      @map("workspace_id")
+  links       TagOnLink[]
 
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([name, workspaceId])
+  @@index([workspaceId])
   @@map("tags")
 }
 
@@ -222,27 +306,33 @@ model Campaign {
   defaultMedium String?      @map("default_medium")
 
   // Metadata
-  userId    String   @map("user_id")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  workspaceId String   @map("workspace_id")
+  createdById String   @map("created_by_id") // User who created the campaign
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  user  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  links ShortLink[]
-  tags  TagOnCampaign[]
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  links     ShortLink[]
+  tags      TagOnCampaign[]
 
-  @@unique([name, userId])
-  @@index([userId])
+  @@unique([name, workspaceId])
+  @@index([workspaceId])
   @@index([status])
   @@map("campaigns")
 }
 
 model CampaignTag {
-  id        String          @id @default(cuid())
-  name      String          @unique
-  color     String?         // Hex color for UI
-  campaigns TagOnCampaign[]
+  id          String          @id @default(cuid())
+  name        String
+  color       String?         // Hex color for UI
+  workspaceId String          @map("workspace_id")
+  campaigns   TagOnCampaign[]
 
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([name, workspaceId])
+  @@index([workspaceId])
   @@map("campaign_tags")
 }
 
@@ -263,19 +353,21 @@ model TagOnCampaign {
 // ============================================
 
 model UTMTemplate {
-  id        String   @id @default(cuid())
-  name      String
-  source    String?
-  medium    String?
-  campaign  String?
-  content   String?
-  term      String?
-  userId    String   @map("user_id")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  source      String?
+  medium      String?
+  campaign    String?
+  content     String?
+  term        String?
+  workspaceId String   @map("workspace_id")
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  @@index([workspaceId])
   @@map("utm_templates")
 }
 
@@ -304,18 +396,30 @@ model ShareToken {
 // ============================================
 
 enum AuditAction {
+  // Link actions
   CREATE_LINK
   UPDATE_LINK
   DELETE_LINK
   RESTORE_LINK
+  // Template actions
   CREATE_TEMPLATE
   UPDATE_TEMPLATE
   DELETE_TEMPLATE
+  // Share actions
   SHARE_LINK
   REVOKE_SHARE
+  // Campaign actions
   CREATE_CAMPAIGN
   UPDATE_CAMPAIGN
   DELETE_CAMPAIGN
+  // Workspace actions
+  CREATE_WORKSPACE
+  UPDATE_WORKSPACE
+  DELETE_WORKSPACE
+  INVITE_MEMBER
+  REMOVE_MEMBER
+  UPDATE_MEMBER_ROLE
+  ACCEPT_INVITATION
 }
 
 model AuditLog {

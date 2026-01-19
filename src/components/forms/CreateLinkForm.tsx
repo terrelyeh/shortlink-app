@@ -246,42 +246,59 @@ export function CreateLinkForm() {
       </div>
 
       {/* Campaign Selector */}
-      {campaigns.length > 0 && (
-        <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
-          <div className="px-5 py-4">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center">
-                <Megaphone className="w-5 h-5 text-white" />
-              </div>
-              <div className="text-left">
-                <span className="font-semibold text-slate-700 block">{tCampaigns("title")}</span>
-                <span className="text-xs text-slate-500">Link to a marketing campaign</span>
-              </div>
+      <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+        <div className="px-5 py-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center">
+              <Megaphone className="w-5 h-5 text-white" />
             </div>
-            <div className="relative">
-              <select
-                value={formData.campaignId}
-                onChange={(e) => handleCampaignChange(e.target.value)}
-                disabled={loadingCampaigns}
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 appearance-none bg-white text-slate-700 disabled:opacity-50"
-              >
-                <option value="">No campaign (optional)</option>
-                {campaigns.map((campaign) => (
-                  <option key={campaign.id} value={campaign.id}>
-                    {campaign.displayName || campaign.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+            <div className="text-left">
+              <span className="font-semibold text-slate-700 block">{tCampaigns("title")}</span>
+              <span className="text-xs text-slate-500">{tCampaigns("linkToCampaign")}</span>
             </div>
-            {formData.campaignId && (
-              <p className="mt-2 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
-                utm_campaign will be set to: <span className="font-mono font-medium">{formData.utmCampaign}</span>
-              </p>
-            )}
           </div>
+
+          {loadingCampaigns ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+            </div>
+          ) : campaigns.length > 0 ? (
+            <>
+              <div className="relative">
+                <select
+                  value={formData.campaignId}
+                  onChange={(e) => handleCampaignChange(e.target.value)}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 appearance-none bg-white text-slate-700"
+                >
+                  <option value="">{tCampaigns("noCampaign")}</option>
+                  {campaigns.map((campaign) => (
+                    <option key={campaign.id} value={campaign.id}>
+                      {campaign.displayName || campaign.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+              </div>
+              {formData.campaignId && (
+                <p className="mt-2 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+                  utm_campaign will be set to: <span className="font-mono font-medium">{formData.utmCampaign}</span>
+                </p>
+              )}
+            </>
+          ) : (
+            <div className="bg-slate-50 rounded-xl p-4">
+              <p className="text-sm text-slate-600 mb-2">{tCampaigns("emptyState.title")}</p>
+              <p className="text-xs text-slate-500 mb-3">{tCampaigns("emptyState.description")}</p>
+              <a
+                href="/campaigns"
+                className="inline-flex items-center gap-2 text-sm font-medium text-amber-600 hover:text-amber-700 transition-colors"
+              >
+                <span>+ {tCampaigns("emptyState.createFirst")}</span>
+              </a>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* UTM Builder Toggle */}
       <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
