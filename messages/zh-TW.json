@@ -123,7 +123,21 @@
     "operatingSystems": "作業系統",
     "countries": "國家/地區",
     "cities": "城市",
-    "noData": "此期間無數據"
+    "noData": "此期間無數據",
+    "utm": {
+      "title": "UTM 行銷活動分析",
+      "subtitle": "一眼掌握行銷活動成效",
+      "byCampaign": "依活動",
+      "bySource": "依來源",
+      "byMedium": "依媒介",
+      "campaignSource": "活動 × 來源 明細",
+      "campaignContent": "活動 × 內容 明細",
+      "campaignContentDesc": "比較同一活動中不同內容變體的表現",
+      "noCampaignData": "無活動數據",
+      "noSourceData": "無來源數據",
+      "noMediumData": "無媒介數據",
+      "performance": "表現"
+    }
   },
   "share": {
     "title": "分享報表",
