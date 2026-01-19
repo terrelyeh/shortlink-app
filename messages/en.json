@@ -137,7 +137,13 @@
       "noCampaignData": "No campaign data",
       "noSourceData": "No source data",
       "noMediumData": "No medium data",
-      "performance": "Performance"
+      "performance": "Performance",
+      "emptyState": {
+        "title": "No UTM data yet",
+        "description": "Add UTM parameters when creating short links to track your marketing campaigns. You can also create a Campaign to auto-fill UTM values.",
+        "createLink": "Create Link with UTM",
+        "manageCampaigns": "Manage Campaigns"
+      }
     }
   },
   "share": {
@@ -175,11 +181,18 @@
   "campaigns": {
     "title": "Campaigns",
     "subtitle": "Manage your marketing campaigns and track performance",
+    "linkToCampaign": "Link to a marketing campaign",
+    "noCampaign": "No campaign (optional)",
     "createCampaign": "Create Campaign",
     "editCampaign": "Edit Campaign",
     "noCampaigns": "No campaigns yet",
     "createFirst": "Create your first campaign",
     "deleteConfirm": "Are you sure you want to delete this campaign? Links will be unlinked but not deleted.",
+    "emptyState": {
+      "title": "No campaigns yet",
+      "description": "Campaigns help you manage multiple links for the same marketing activity with consistent UTM parameters.",
+      "createFirst": "Create your first campaign"
+    },
     "searchPlaceholder": "Search campaigns...",
     "allStatuses": "All Statuses",
     "allTags": "All Tags",

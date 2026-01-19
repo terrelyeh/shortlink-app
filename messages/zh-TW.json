@@ -137,7 +137,13 @@
       "noCampaignData": "無活動數據",
       "noSourceData": "無來源數據",
       "noMediumData": "無媒介數據",
-      "performance": "表現"
+      "performance": "表現",
+      "emptyState": {
+        "title": "尚無 UTM 數據",
+        "description": "在建立短連結時加入 UTM 參數，即可追蹤行銷活動成效。您也可以建立行銷活動來自動填入 UTM 參數。",
+        "createLink": "建立帶有 UTM 的連結",
+        "manageCampaigns": "管理行銷活動"
+      }
     }
   },
   "share": {
@@ -175,11 +181,18 @@
   "campaigns": {
     "title": "行銷活動",
     "subtitle": "管理行銷活動並追蹤成效",
+    "linkToCampaign": "連結至行銷活動",
+    "noCampaign": "不選擇活動（選填）",
     "createCampaign": "建立活動",
     "editCampaign": "編輯活動",
     "noCampaigns": "尚無行銷活動",
     "createFirst": "建立您的第一個活動",
     "deleteConfirm": "確定要刪除此活動嗎？連結將會取消關聯但不會被刪除。",
+    "emptyState": {
+      "title": "尚未建立任何活動",
+      "description": "建立行銷活動可以幫助您統一管理同一檔期的多個短連結，並確保 UTM 參數的一致性。",
+      "createFirst": "建立第一個活動"
+    },
     "searchPlaceholder": "搜尋活動...",
     "allStatuses": "所有狀態",
     "allTags": "所有標籤",

@@ -398,18 +398,47 @@ export default function AnalyticsPage() {
           )}
 
           {/* UTM Analytics Section */}
-          {data.utm && (data.utm.campaigns.length > 0 || data.utm.sources.length > 0) && (
-            <div className="space-y-6">
-              {/* UTM Section Header */}
-              <div className="flex items-center gap-3 pt-4">
-                <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 text-white">
-                  <Target className="w-5 h-5" />
+          <div className="space-y-6">
+            {/* UTM Section Header */}
+            <div className="flex items-center gap-3 pt-4">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 text-white">
+                <Target className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">{t("utm.title")}</h2>
+                <p className="text-sm text-slate-500">{t("utm.subtitle")}</p>
+              </div>
+            </div>
+
+            {/* Empty State when no UTM data */}
+            {(!data.utm || (data.utm.campaigns.length === 0 && data.utm.sources.length === 0)) && (
+              <div className="bg-white rounded-xl p-8 shadow-sm border border-slate-100 text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Target className="w-8 h-8 text-amber-600" />
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900">{t("utm.title")}</h2>
-                  <p className="text-sm text-slate-500">{t("utm.subtitle")}</p>
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">{t("utm.emptyState.title")}</h3>
+                <p className="text-sm text-slate-500 mb-4 max-w-md mx-auto">{t("utm.emptyState.description")}</p>
+                <div className="flex items-center justify-center gap-3">
+                  <a
+                    href="/links/new"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg hover:from-amber-600 hover:to-orange-600 transition-all font-medium text-sm"
+                  >
+                    {t("utm.emptyState.createLink")}
+                  </a>
+                  <a
+                    href="/campaigns"
+                    className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-all font-medium text-sm"
+                  >
+                    <Megaphone className="w-4 h-4" />
+                    {t("utm.emptyState.manageCampaigns")}
+                  </a>
                 </div>
               </div>
+            )}
+
+            {/* Show UTM data when available */}
+            {data.utm && (data.utm.campaigns.length > 0 || data.utm.sources.length > 0) && (
+              <>
 
               {/* Campaign, Source, Medium Cards */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -622,8 +651,9 @@ export default function AnalyticsPage() {
                   </div>
                 </div>
               )}
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </>
       ) : null}
     </div>
