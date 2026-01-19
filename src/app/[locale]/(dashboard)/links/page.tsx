@@ -117,7 +117,7 @@ export default function LinksPage() {
           </Link>
           <Link
             href="/links/new"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-blue-500/25"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 transition-all duration-200 shadow-lg shadow-emerald-500/25"
           >
             <Plus className="w-4 h-4" />
             <span className="font-medium">{t("createNew")}</span>
@@ -135,7 +135,7 @@ export default function LinksPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={tCommon("search")}
-              className="w-full pl-12 pr-4 py-3 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all duration-200 placeholder:text-slate-400"
+              className="w-full pl-12 pr-4 py-3 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-violet-500 focus:bg-white transition-all duration-200 placeholder:text-slate-400"
             />
           </form>
           <div className="flex gap-2">
@@ -159,14 +159,14 @@ export default function LinksPage() {
       {/* Links List */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mb-4">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <div className="w-16 h-16 bg-gradient-to-br from-violet-100 to-purple-100 rounded-2xl flex items-center justify-center mb-4">
+            <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
           </div>
           <p className="text-slate-500">Loading your links...</p>
         </div>
       ) : links.length === 0 ? (
-        <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl border border-slate-200 p-12 text-center">
-          <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-500/30">
+        <div className="bg-gradient-to-br from-slate-50 to-violet-50 rounded-2xl border border-slate-200 p-12 text-center">
+          <div className="w-20 h-20 mx-auto bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-violet-500/30">
             <Link2 className="w-10 h-10 text-white" />
           </div>
           <h3 className="text-xl font-semibold text-slate-900 mb-2">No links yet</h3>
@@ -175,7 +175,7 @@ export default function LinksPage() {
           </p>
           <Link
             href="/links/new"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-blue-500/25"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 transition-all duration-200 shadow-lg shadow-emerald-500/25"
           >
             <Sparkles className="w-5 h-5" />
             {t("createFirst")}
