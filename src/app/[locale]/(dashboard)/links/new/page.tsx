@@ -27,7 +27,7 @@ export default async function NewLinkPage() {
 
       <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
         {/* Header with gradient */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6">
+        <div className="bg-gradient-to-r from-emerald-500 to-teal-500 px-8 py-6">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
               <Sparkles className="w-6 h-6 text-white" />
@@ -36,7 +36,7 @@ export default async function NewLinkPage() {
               <h1 className="text-2xl font-bold text-white">
                 {t("createNew")}
               </h1>
-              <p className="text-blue-100 text-sm mt-0.5">
+              <p className="text-emerald-100 text-sm mt-0.5">
                 Create a short link to share with the world
               </p>
             </div>

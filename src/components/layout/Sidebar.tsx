@@ -86,12 +86,12 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       {/* Logo */}
       <div className="p-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+          <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/25">
             <Sparkles className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-white">ShortLink</h1>
-            <p className="text-xs text-slate-400">URL Manager</p>
+            <h1 className="text-lg font-bold text-white">EnGenius</h1>
+            <p className="text-xs text-slate-400">ShortLink</p>
           </div>
         </div>
       </div>
@@ -109,7 +109,7 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
                 isActive
-                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25"
+                  ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-500/25"
                   : "text-slate-400 hover:text-white hover:bg-white/5"
               }`}
               onClick={() => setMobileOpen(false)}
@@ -134,7 +134,7 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
               className="w-10 h-10 rounded-xl object-cover ring-2 ring-slate-700"
             />
           ) : (
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
               <span className="text-sm font-bold text-white">
                 {userName?.charAt(0)?.toUpperCase() || "U"}
               </span>

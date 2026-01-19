@@ -22,8 +22,8 @@ export default async function DashboardLayout({
           userName={session.user.name}
           userImage={session.user.image}
         />
-        <main className="lg:pl-64">
-          <div className="p-4 lg:p-8">{children}</div>
+        <main className="lg:pl-72">
+          <div className="p-6 lg:p-10">{children}</div>
         </main>
       </div>
     </SessionProvider>

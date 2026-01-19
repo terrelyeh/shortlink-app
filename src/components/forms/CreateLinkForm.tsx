@@ -138,7 +138,7 @@ export function CreateLinkForm() {
           {t("originalUrl")} <span className="text-red-500">*</span>
         </label>
         <div className="relative">
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center">
             <Link2 className="w-5 h-5 text-white" />
           </div>
           <input
@@ -146,7 +146,7 @@ export function CreateLinkForm() {
             value={formData.originalUrl}
             onChange={(e) => handleChange("originalUrl", e.target.value)}
             placeholder="https://example.com/your-long-url"
-            className="w-full pl-18 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200 placeholder:text-slate-400"
+            className="w-full pl-18 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 focus:bg-white transition-all duration-200 placeholder:text-slate-400"
             style={{ paddingLeft: "4.5rem" }}
             required
           />
@@ -167,7 +167,7 @@ export function CreateLinkForm() {
             value={formData.customCode}
             onChange={(e) => handleChange("customCode", e.target.value)}
             placeholder={t("customCodePlaceholder")}
-            className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200 placeholder:text-slate-400"
+            className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 focus:bg-white transition-all duration-200 placeholder:text-slate-400"
             pattern="^[a-zA-Z0-9_-]{3,50}$"
           />
         </div>
@@ -186,7 +186,7 @@ export function CreateLinkForm() {
           value={formData.title}
           onChange={(e) => handleChange("title", e.target.value)}
           placeholder="Optional title for this link"
-          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200 placeholder:text-slate-400"
+          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 focus:bg-white transition-all duration-200 placeholder:text-slate-400"
         />
       </div>
 
@@ -265,7 +265,7 @@ export function CreateLinkForm() {
               <div className="flex gap-3">
                 <label className={`flex-1 flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${
                   formData.redirectType === "TEMPORARY"
-                    ? "border-blue-500 bg-blue-50"
+                    ? "border-violet-500 bg-violet-50"
                     : "border-slate-200 bg-white hover:border-slate-300"
                 }`}>
                   <input
@@ -274,19 +274,19 @@ export function CreateLinkForm() {
                     value="TEMPORARY"
                     checked={formData.redirectType === "TEMPORARY"}
                     onChange={(e) => handleChange("redirectType", e.target.value as "TEMPORARY")}
-                    className="w-4 h-4 text-blue-600"
+                    className="w-4 h-4 text-violet-600"
                   />
                   <div>
                     <span className="text-sm font-medium text-slate-700 block">{t("temporary")}</span>
                     <span className="text-xs text-slate-500">302 redirect</span>
                   </div>
                   {formData.redirectType === "TEMPORARY" && (
-                    <CheckCircle className="w-5 h-5 text-blue-500 ml-auto" />
+                    <CheckCircle className="w-5 h-5 text-violet-500 ml-auto" />
                   )}
                 </label>
                 <label className={`flex-1 flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${
                   formData.redirectType === "PERMANENT"
-                    ? "border-blue-500 bg-blue-50"
+                    ? "border-violet-500 bg-violet-50"
                     : "border-slate-200 bg-white hover:border-slate-300"
                 }`}>
                   <input
@@ -295,14 +295,14 @@ export function CreateLinkForm() {
                     value="PERMANENT"
                     checked={formData.redirectType === "PERMANENT"}
                     onChange={(e) => handleChange("redirectType", e.target.value as "PERMANENT")}
-                    className="w-4 h-4 text-blue-600"
+                    className="w-4 h-4 text-violet-600"
                   />
                   <div>
                     <span className="text-sm font-medium text-slate-700 block">{t("permanent")}</span>
                     <span className="text-xs text-slate-500">301 redirect</span>
                   </div>
                   {formData.redirectType === "PERMANENT" && (
-                    <CheckCircle className="w-5 h-5 text-blue-500 ml-auto" />
+                    <CheckCircle className="w-5 h-5 text-violet-500 ml-auto" />
                   )}
                 </label>
               </div>
@@ -317,7 +317,7 @@ export function CreateLinkForm() {
                 type="datetime-local"
                 value={formData.expiresAt}
                 onChange={(e) => handleChange("expiresAt", e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-all duration-200"
               />
               <p className="mt-2 text-xs text-slate-500">{t("noExpiry")}</p>
             </div>
@@ -333,7 +333,7 @@ export function CreateLinkForm() {
                 value={formData.maxClicks}
                 onChange={(e) => handleChange("maxClicks", e.target.value)}
                 placeholder={t("noLimit")}
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 placeholder:text-slate-400"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-all duration-200 placeholder:text-slate-400"
               />
             </div>
           </div>
@@ -352,7 +352,7 @@ export function CreateLinkForm() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg shadow-blue-500/25"
+          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg shadow-emerald-500/25"
         >
           {isSubmitting ? (
             <>
