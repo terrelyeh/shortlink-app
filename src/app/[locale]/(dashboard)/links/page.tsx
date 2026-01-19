@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { LinkCard } from "@/components/links/LinkCard";
-import { Plus, Search, Filter, Loader2, Link2, Layers } from "lucide-react";
+import { Plus, Search, Loader2, Link2, Layers, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 
 interface ShortLink {
   id: string;
@@ -95,66 +95,89 @@ export default function LinksPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header with gradient title */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-900">{t("title")}</h1>
-        <div className="flex gap-2">
+        <div>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 via-slate-700 to-slate-900 bg-clip-text text-transparent">
+            {t("title")}
+          </h1>
+          {pagination && (
+            <p className="text-sm text-slate-500 mt-1">
+              {pagination.total} {pagination.total === 1 ? "link" : "links"} total
+            </p>
+          )}
+        </div>
+        <div className="flex gap-3">
           <Link
             href="/links/batch"
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 shadow-sm"
           >
-            <Layers className="w-5 h-5" />
-            Batch Create
+            <Layers className="w-4 h-4" />
+            <span className="font-medium">Batch</span>
           </Link>
           <Link
             href="/links/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-blue-500/25"
           >
-            <Plus className="w-5 h-5" />
-            {t("createNew")}
+            <Plus className="w-4 h-4" />
+            <span className="font-medium">{t("createNew")}</span>
           </Link>
         </div>
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <form onSubmit={handleSearch} className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={tCommon("search")}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </form>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-        >
-          <option value="">{tCommon("all")} Status</option>
-          <option value="ACTIVE">{t("active")}</option>
-          <option value="PAUSED">{t("paused")}</option>
-          <option value="ARCHIVED">{t("archived")}</option>
-        </select>
+      {/* Search and Filters - Modern card design */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <form onSubmit={handleSearch} className="flex-1 relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={tCommon("search")}
+              className="w-full pl-12 pr-4 py-3 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all duration-200 placeholder:text-slate-400"
+            />
+          </form>
+          <div className="flex gap-2">
+            {["", "ACTIVE", "PAUSED", "ARCHIVED"].map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  statusFilter === status
+                    ? "bg-slate-900 text-white shadow-lg"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {status === "" ? tCommon("all") : status === "ACTIVE" ? t("active") : status === "PAUSED" ? t("paused") : t("archived")}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Links List */}
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <div className="flex flex-col items-center justify-center py-16">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mb-4">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          </div>
+          <p className="text-slate-500">Loading your links...</p>
         </div>
       ) : links.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <Link2 className="w-8 h-8 text-gray-400" />
+        <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl border border-slate-200 p-12 text-center">
+          <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-500/30">
+            <Link2 className="w-10 h-10 text-white" />
           </div>
-          <p className="text-gray-500 mb-4">{t("noLinks")}</p>
+          <h3 className="text-xl font-semibold text-slate-900 mb-2">No links yet</h3>
+          <p className="text-slate-500 mb-6 max-w-md mx-auto">
+            {t("noLinks")}
+          </p>
           <Link
             href="/links/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-blue-500/25"
           >
-            <Plus className="w-5 h-5" />
+            <Sparkles className="w-5 h-5" />
             {t("createFirst")}
           </Link>
         </div>
@@ -172,25 +195,53 @@ export default function LinksPage() {
         </div>
       )}
 
-      {/* Pagination */}
+      {/* Pagination - Modern design */}
       {pagination && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-between bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
           <button
             onClick={() => fetchLinks(pagination.page - 1)}
             disabled={pagination.page === 1}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:hover:bg-slate-100"
           >
+            <ChevronLeft className="w-4 h-4" />
             {tCommon("previous")}
           </button>
-          <span className="text-sm text-gray-600">
-            Page {pagination.page} of {pagination.totalPages}
-          </span>
+
+          <div className="flex items-center gap-2">
+            {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+              let pageNum;
+              if (pagination.totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (pagination.page <= 3) {
+                pageNum = i + 1;
+              } else if (pagination.page >= pagination.totalPages - 2) {
+                pageNum = pagination.totalPages - 4 + i;
+              } else {
+                pageNum = pagination.page - 2 + i;
+              }
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => fetchLinks(pageNum)}
+                  className={`w-10 h-10 rounded-xl text-sm font-medium transition-all duration-200 ${
+                    pagination.page === pageNum
+                      ? "bg-slate-900 text-white shadow-lg"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+          </div>
+
           <button
             onClick={() => fetchLinks(pagination.page + 1)}
             disabled={pagination.page === pagination.totalPages}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:hover:bg-slate-100"
           >
             {tCommon("next")}
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       )}

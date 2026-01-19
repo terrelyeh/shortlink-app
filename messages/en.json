@@ -48,7 +48,12 @@
     "activeLinks": "Active Links",
     "recentLinks": "Recent Links",
     "topLinks": "Top Links",
-    "clicksTrend": "Clicks Trend"
+    "clicksTrend": "Clicks Trend",
+    "emptyState": {
+      "title": "Welcome to Short Link Manager!",
+      "description": "Create your first short link to start tracking clicks and analyzing your traffic.",
+      "createButton": "Create Your First Link"
+    }
   },
   "links": {
     "title": "Link Management",
