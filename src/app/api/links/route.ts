@@ -12,6 +12,7 @@ const createLinkSchema = z.object({
   redirectType: z.enum(["PERMANENT", "TEMPORARY"]).default("TEMPORARY"),
   expiresAt: z.string().datetime().optional().nullable(),
   maxClicks: z.number().int().positive().optional().nullable(),
+  campaignId: z.string().optional(),
   utmSource: z.string().optional(),
   utmMedium: z.string().optional(),
   utmCampaign: z.string().optional(),
@@ -170,6 +171,7 @@ export async function POST(request: NextRequest) {
         utmTerm: validated.utmTerm,
         userId: session.user.id,
         groupId: validated.groupId,
+        campaignId: validated.campaignId,
       },
     });
 

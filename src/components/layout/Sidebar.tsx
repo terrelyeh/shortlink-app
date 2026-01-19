@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Sparkles,
+  Megaphone,
 } from "lucide-react";
 import { useState } from "react";
 import { LanguageSwitcher } from "./LanguageSwitcher";
@@ -47,6 +48,11 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       href: "/links",
       labelKey: "links",
       icon: <Link2 className="w-5 h-5" />,
+    },
+    {
+      href: "/campaigns",
+      labelKey: "campaigns",
+      icon: <Megaphone className="w-5 h-5" />,
     },
     {
       href: "/templates",

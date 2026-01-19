@@ -1,10 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { UTMBuilder } from "./UTMBuilder";
-import { Link2, ChevronDown, ChevronUp, Loader2, Settings2, Target, AlertCircle, CheckCircle } from "lucide-react";
+import { Link2, ChevronDown, ChevronUp, Loader2, Settings2, Target, AlertCircle, CheckCircle, Megaphone } from "lucide-react";
+
+interface Campaign {
+  id: string;
+  name: string;
+  displayName: string | null;
+  status: string;
+  defaultSource: string | null;
+  defaultMedium: string | null;
+}
 
 interface FormData {
   originalUrl: string;
@@ -13,6 +22,7 @@ interface FormData {
   redirectType: "PERMANENT" | "TEMPORARY";
   expiresAt: string;
   maxClicks: string;
+  campaignId: string;
   utmSource: string;
   utmMedium: string;
   utmCampaign: string;
@@ -27,6 +37,7 @@ const initialFormData: FormData = {
   redirectType: "TEMPORARY",
   expiresAt: "",
   maxClicks: "",
+  campaignId: "",
   utmSource: "",
   utmMedium: "",
   utmCampaign: "",
@@ -39,6 +50,7 @@ export function CreateLinkForm() {
   const t = useTranslations("links");
   const tCommon = useTranslations("common");
   const tErrors = useTranslations("errors");
+  const tCampaigns = useTranslations("campaigns");
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -46,9 +58,51 @@ export function CreateLinkForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Campaign state
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(true);
+
+  // Fetch campaigns on mount
+  useEffect(() => {
+    async function fetchCampaigns() {
+      try {
+        const response = await fetch("/api/campaigns?status=ACTIVE");
+        if (response.ok) {
+          const data = await response.json();
+          setCampaigns(data.campaigns || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch campaigns:", err);
+      } finally {
+        setLoadingCampaigns(false);
+      }
+    }
+    fetchCampaigns();
+  }, []);
+
   const handleChange = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setError(null);
+  };
+
+  const handleCampaignChange = (campaignId: string) => {
+    const campaign = campaigns.find((c) => c.id === campaignId);
+    if (campaign) {
+      setFormData((prev) => ({
+        ...prev,
+        campaignId,
+        utmCampaign: campaign.name,
+        utmSource: campaign.defaultSource || prev.utmSource,
+        utmMedium: campaign.defaultMedium || prev.utmMedium,
+      }));
+      // Auto-expand UTM section when campaign is selected
+      if (!showUTM) setShowUTM(true);
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        campaignId: "",
+      }));
+    }
   };
 
   const handleUTMChange = (utmValues: {
@@ -95,6 +149,7 @@ export function CreateLinkForm() {
         redirectType: formData.redirectType,
         expiresAt: formData.expiresAt || undefined,
         maxClicks: formData.maxClicks ? parseInt(formData.maxClicks) : undefined,
+        campaignId: formData.campaignId || undefined,
         utmSource: formData.utmSource || undefined,
         utmMedium: formData.utmMedium || undefined,
         utmCampaign: formData.utmCampaign || undefined,
@@ -189,6 +244,44 @@ export function CreateLinkForm() {
           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 focus:bg-white transition-all duration-200 placeholder:text-slate-400"
         />
       </div>
+
+      {/* Campaign Selector */}
+      {campaigns.length > 0 && (
+        <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+          <div className="px-5 py-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center">
+                <Megaphone className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-left">
+                <span className="font-semibold text-slate-700 block">{tCampaigns("title")}</span>
+                <span className="text-xs text-slate-500">Link to a marketing campaign</span>
+              </div>
+            </div>
+            <div className="relative">
+              <select
+                value={formData.campaignId}
+                onChange={(e) => handleCampaignChange(e.target.value)}
+                disabled={loadingCampaigns}
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 appearance-none bg-white text-slate-700 disabled:opacity-50"
+              >
+                <option value="">No campaign (optional)</option>
+                {campaigns.map((campaign) => (
+                  <option key={campaign.id} value={campaign.id}>
+                    {campaign.displayName || campaign.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+            </div>
+            {formData.campaignId && (
+              <p className="mt-2 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+                utm_campaign will be set to: <span className="font-mono font-medium">{formData.utmCampaign}</span>
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* UTM Builder Toggle */}
       <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
