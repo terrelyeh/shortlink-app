@@ -48,7 +48,12 @@
     "activeLinks": "啟用連結",
     "recentLinks": "最近建立的連結",
     "topLinks": "熱門連結",
-    "clicksTrend": "點擊趨勢"
+    "clicksTrend": "點擊趨勢",
+    "emptyState": {
+      "title": "歡迎使用短網址管理系統！",
+      "description": "建立您的第一個短網址，開始追蹤點擊數據和分析流量。",
+      "createButton": "建立第一個短網址"
+    }
   },
   "links": {
     "title": "連結管理",
