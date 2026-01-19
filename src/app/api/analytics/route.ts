@@ -145,6 +145,123 @@ export async function GET(request: NextRequest) {
       take: 10,
     });
 
+    // ============================================
+    // UTM Analytics
+    // ============================================
+
+    // Get all links with UTM parameters and their click counts
+    const linksWithUTM = await prisma.shortLink.findMany({
+      where: {
+        ...whereLinks,
+        OR: [
+          { utmCampaign: { not: null } },
+          { utmSource: { not: null } },
+          { utmMedium: { not: null } },
+        ],
+      },
+      include: {
+        clicks: {
+          where: {
+            timestamp: { gte: startDate },
+          },
+          select: { id: true },
+        },
+      },
+    });
+
+    // Campaign breakdown: Campaign → Clicks
+    const campaignMap = new Map<string, number>();
+    // Source breakdown: Source → Clicks
+    const sourceMap = new Map<string, number>();
+    // Medium breakdown: Medium → Clicks
+    const mediumMap = new Map<string, number>();
+    // Campaign × Source: "campaign|source" → Clicks
+    const campaignSourceMap = new Map<string, { campaign: string; source: string; clicks: number }>();
+    // Campaign × Content: "campaign|content" → Clicks
+    const campaignContentMap = new Map<string, { campaign: string; content: string; clicks: number }>();
+
+    linksWithUTM.forEach((link) => {
+      const clickCount = link.clicks.length;
+
+      // Campaign breakdown
+      if (link.utmCampaign) {
+        campaignMap.set(
+          link.utmCampaign,
+          (campaignMap.get(link.utmCampaign) || 0) + clickCount
+        );
+      }
+
+      // Source breakdown
+      if (link.utmSource) {
+        sourceMap.set(
+          link.utmSource,
+          (sourceMap.get(link.utmSource) || 0) + clickCount
+        );
+      }
+
+      // Medium breakdown
+      if (link.utmMedium) {
+        mediumMap.set(
+          link.utmMedium,
+          (mediumMap.get(link.utmMedium) || 0) + clickCount
+        );
+      }
+
+      // Campaign × Source
+      if (link.utmCampaign && link.utmSource) {
+        const key = `${link.utmCampaign}|${link.utmSource}`;
+        const existing = campaignSourceMap.get(key);
+        if (existing) {
+          existing.clicks += clickCount;
+        } else {
+          campaignSourceMap.set(key, {
+            campaign: link.utmCampaign,
+            source: link.utmSource,
+            clicks: clickCount,
+          });
+        }
+      }
+
+      // Campaign × Content
+      if (link.utmCampaign && link.utmContent) {
+        const key = `${link.utmCampaign}|${link.utmContent}`;
+        const existing = campaignContentMap.get(key);
+        if (existing) {
+          existing.clicks += clickCount;
+        } else {
+          campaignContentMap.set(key, {
+            campaign: link.utmCampaign,
+            content: link.utmContent,
+            clicks: clickCount,
+          });
+        }
+      }
+    });
+
+    // Convert maps to sorted arrays
+    const utmCampaigns = Array.from(campaignMap.entries())
+      .map(([name, clicks]) => ({ name, clicks }))
+      .sort((a, b) => b.clicks - a.clicks)
+      .slice(0, 10);
+
+    const utmSources = Array.from(sourceMap.entries())
+      .map(([name, clicks]) => ({ name, clicks }))
+      .sort((a, b) => b.clicks - a.clicks)
+      .slice(0, 10);
+
+    const utmMediums = Array.from(mediumMap.entries())
+      .map(([name, clicks]) => ({ name, clicks }))
+      .sort((a, b) => b.clicks - a.clicks)
+      .slice(0, 10);
+
+    const utmCampaignSource = Array.from(campaignSourceMap.values())
+      .sort((a, b) => b.clicks - a.clicks)
+      .slice(0, 15);
+
+    const utmCampaignContent = Array.from(campaignContentMap.values())
+      .sort((a, b) => b.clicks - a.clicks)
+      .slice(0, 15);
+
     return NextResponse.json({
       summary: {
         totalClicks,
@@ -182,6 +299,14 @@ export async function GET(request: NextRequest) {
         originalUrl: l.originalUrl,
         clicks: l._count.clicks,
       })),
+      // UTM Analytics
+      utm: {
+        campaigns: utmCampaigns,
+        sources: utmSources,
+        mediums: utmMediums,
+        campaignSource: utmCampaignSource,
+        campaignContent: utmCampaignContent,
+      },
     });
   } catch (error) {
     console.error("Failed to fetch analytics:", error);

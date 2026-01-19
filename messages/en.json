@@ -123,7 +123,21 @@
     "operatingSystems": "Operating Systems",
     "countries": "Countries",
     "cities": "Cities",
-    "noData": "No data for this period"
+    "noData": "No data for this period",
+    "utm": {
+      "title": "UTM Campaign Analytics",
+      "subtitle": "Track your marketing campaign performance at a glance",
+      "byCampaign": "By Campaign",
+      "bySource": "By Source",
+      "byMedium": "By Medium",
+      "campaignSource": "Campaign × Source Breakdown",
+      "campaignContent": "Campaign × Content Breakdown",
+      "campaignContentDesc": "Compare different content variations within the same campaign",
+      "noCampaignData": "No campaign data",
+      "noSourceData": "No source data",
+      "noMediumData": "No medium data",
+      "performance": "Performance"
+    }
   },
   "share": {
     "title": "Share Report",
