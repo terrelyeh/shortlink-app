@@ -38,7 +38,8 @@
     "analytics": "數據分析",
     "settings": "設定",
     "users": "使用者管理",
-    "auditLog": "操作紀錄"
+    "auditLog": "操作紀錄",
+    "signOut": "登出"
   },
   "dashboard": {
     "title": "儀表板",

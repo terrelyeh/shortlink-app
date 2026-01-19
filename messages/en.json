@@ -38,7 +38,8 @@
     "analytics": "Analytics",
     "settings": "Settings",
     "users": "User Management",
-    "auditLog": "Audit Log"
+    "auditLog": "Audit Log",
+    "signOut": "Sign Out"
   },
   "dashboard": {
     "title": "Dashboard",
