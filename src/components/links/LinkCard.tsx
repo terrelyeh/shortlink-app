@@ -91,7 +91,7 @@ export function LinkCard({
 
           {/* Short URL with copy */}
           <div className="flex items-center gap-2 mb-2">
-            <code className="text-sm text-violet-600 font-medium">
+            <code className="text-sm text-[#03A9F4] font-medium">
               {shortUrl.replace('https://', '').replace('http://', '')}
             </code>
             <button
@@ -135,7 +135,7 @@ export function LinkCard({
             onClick={() => setShowQR(!showQR)}
             className={`p-2 rounded-lg transition-colors ${
               showQR
-                ? 'bg-violet-50 text-violet-600'
+                ? 'bg-sky-50 text-[#03A9F4]'
                 : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'
             }`}
             title={t("qrCode")}
@@ -227,7 +227,7 @@ export function LinkCard({
                     a.click();
                   }
                 }}
-                className="mt-3 text-sm text-violet-600 hover:text-violet-700 font-medium"
+                className="mt-3 text-sm text-[#03A9F4] hover:text-[#0288D1] font-medium"
               >
                 Download QR
               </button>

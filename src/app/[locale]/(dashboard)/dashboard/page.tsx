@@ -174,7 +174,7 @@ function QuickStartGuide() {
       title: "Create a Short Link",
       description: "Turn long URLs into short, trackable links",
       href: "/links/new",
-      color: "text-violet-600 bg-violet-50",
+      color: "text-[#03A9F4] bg-sky-50",
     },
     {
       icon: <Megaphone className="w-5 h-5" />,
@@ -224,7 +224,7 @@ function EmptyState({ t }: { t: (key: string) => string }) {
     <div className="space-y-8">
       {/* Welcome Header */}
       <div className="text-center py-8">
-        <div className="w-14 h-14 mx-auto mb-4 bg-violet-600 rounded-xl flex items-center justify-center">
+        <div className="w-14 h-14 mx-auto mb-4 bg-[#03A9F4] rounded-xl flex items-center justify-center">
           <Zap className="w-7 h-7 text-white" />
         </div>
         <h1 className="text-2xl font-semibold text-slate-900 mb-2">
@@ -275,7 +275,7 @@ export default async function DashboardPage() {
         </div>
         <Link
           href="/links/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Link
@@ -313,7 +313,7 @@ export default async function DashboardPage() {
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-slate-900">{t("topLinks")}</h2>
-            <Link href="/links" className="text-sm text-violet-600 hover:text-violet-700 font-medium">
+            <Link href="/links" className="text-sm text-[#03A9F4] hover:text-[#0288D1] font-medium">
               View all
             </Link>
           </div>
@@ -352,7 +352,7 @@ export default async function DashboardPage() {
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-slate-900">{t("recentLinks")}</h2>
-          <Link href="/links" className="text-sm text-violet-600 hover:text-violet-700 font-medium">
+          <Link href="/links" className="text-sm text-[#03A9F4] hover:text-[#0288D1] font-medium">
             View all
           </Link>
         </div>
