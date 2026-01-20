@@ -27,9 +27,9 @@ export default async function NewLinkPage() {
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Header */}
-        <div className="px-8 py-6 border-b border-slate-100">
+        <div className="px-8 py-6 bg-slate-100 border-b border-slate-200">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-slate-200 rounded-lg flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-slate-600" />
             </div>
             <div>

@@ -30,10 +30,10 @@ export function WorkspaceSwitcher({ collapsed = false }: WorkspaceSwitcherProps)
 
   if (isLoading) {
     return (
-      <div className="px-3 py-2">
-        <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-100 animate-pulse">
-          <div className="w-8 h-8 bg-slate-200 rounded-lg" />
-          {!collapsed && <div className="h-4 w-24 bg-slate-200 rounded" />}
+      <div className="py-1">
+        <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-700 animate-pulse">
+          <div className="w-8 h-8 bg-slate-600 rounded-lg" />
+          {!collapsed && <div className="h-4 w-24 bg-slate-600 rounded" />}
         </div>
       </div>
     );
@@ -41,10 +41,10 @@ export function WorkspaceSwitcher({ collapsed = false }: WorkspaceSwitcherProps)
 
   if (workspaces.length === 0) {
     return (
-      <div className="px-3 py-2">
+      <div className="py-1">
         <button
           onClick={() => router.push("/workspaces/new")}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500 text-white hover:from-violet-600 hover:to-purple-600 transition-all"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-[#03A9F4] text-white hover:bg-[#0288D1] transition-all"
         >
           <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
             <Plus className="w-5 h-5" />
@@ -65,23 +65,23 @@ export function WorkspaceSwitcher({ collapsed = false }: WorkspaceSwitcherProps)
   };
 
   return (
-    <div className="px-3 py-2 relative">
+    <div className="py-1 relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition-all ${
-          isOpen ? "ring-2 ring-violet-500 bg-slate-200" : ""
+        className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 transition-all ${
+          isOpen ? "ring-2 ring-[#03A9F4] bg-slate-600" : ""
         }`}
       >
-        <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center text-white flex-shrink-0">
+        <div className="w-8 h-8 bg-[#03A9F4] rounded-lg flex items-center justify-center text-white flex-shrink-0">
           <Building2 className="w-4 h-4" />
         </div>
         {!collapsed && (
           <>
             <div className="flex-1 text-left min-w-0">
-              <div className="text-sm font-semibold text-slate-900 truncate">
+              <div className="text-sm font-semibold text-white truncate">
                 {currentWorkspace?.name || "Select Workspace"}
               </div>
-              <div className="text-xs text-slate-500 capitalize">
+              <div className="text-xs text-slate-400 capitalize">
                 {currentWorkspace?.role.toLowerCase()}
               </div>
             </div>
@@ -115,13 +115,13 @@ export function WorkspaceSwitcher({ collapsed = false }: WorkspaceSwitcherProps)
                   key={workspace.id}
                   onClick={() => handleWorkspaceChange(workspace)}
                   className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-50 transition-colors ${
-                    currentWorkspace?.id === workspace.id ? "bg-violet-50" : ""
+                    currentWorkspace?.id === workspace.id ? "bg-sky-50" : ""
                   }`}
                 >
                   <div
                     className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                       currentWorkspace?.id === workspace.id
-                        ? "bg-violet-500 text-white"
+                        ? "bg-[#03A9F4] text-white"
                         : "bg-slate-100 text-slate-600"
                     }`}
                   >
@@ -136,7 +136,7 @@ export function WorkspaceSwitcher({ collapsed = false }: WorkspaceSwitcherProps)
                     </div>
                   </div>
                   {currentWorkspace?.id === workspace.id && (
-                    <Check className="w-4 h-4 text-violet-500" />
+                    <Check className="w-4 h-4 text-[#03A9F4]" />
                   )}
                 </button>
               ))}
@@ -176,7 +176,7 @@ export function WorkspaceSwitcher({ collapsed = false }: WorkspaceSwitcherProps)
                   setIsOpen(false);
                   router.push("/workspaces/new");
                 }}
-                className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-50 transition-colors text-violet-600"
+                className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-50 transition-colors text-[#03A9F4]"
               >
                 <Plus className="w-4 h-4" />
                 <span className="text-sm font-medium">Create Workspace</span>
