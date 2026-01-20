@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Link not found" }, { status: 404 });
     }
 
-    if (session.user.role === "MEMBER" && link.userId !== session.user.id) {
+    if (session.user.role === "MEMBER" && link.createdById !== session.user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

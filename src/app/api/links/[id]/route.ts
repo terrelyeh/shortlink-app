@@ -39,7 +39,7 @@ export async function GET(
     }
 
     // Check access
-    if (session.user.role === "MEMBER" && link.userId !== session.user.id) {
+    if (session.user.role === "MEMBER" && link.createdById !== session.user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -77,7 +77,7 @@ export async function PATCH(
     // Check permission
     if (
       session.user.role === "MEMBER" &&
-      existingLink.userId !== session.user.id
+      existingLink.createdById !== session.user.id
     ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
@@ -142,7 +142,7 @@ export async function DELETE(
     // Check permission
     if (
       session.user.role === "MEMBER" &&
-      existingLink.userId !== session.user.id
+      existingLink.createdById !== session.user.id
     ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }

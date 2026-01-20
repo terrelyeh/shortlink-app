@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     // Members can only see their own links
     if (session.user.role === "MEMBER") {
-      where.userId = session.user.id;
+      where.createdById = session.user.id;
     }
 
     if (search) {

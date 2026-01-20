@@ -63,7 +63,7 @@ export async function GET(
     }
 
     // Check access
-    if (session.user.role === "MEMBER" && campaign.userId !== session.user.id) {
+    if (session.user.role === "MEMBER" && campaign.createdById !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -106,7 +106,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
     }
 
-    if (session.user.role === "MEMBER" && existing.userId !== session.user.id) {
+    if (session.user.role === "MEMBER" && existing.createdById !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -115,7 +115,7 @@ export async function PATCH(
       const duplicate = await prisma.campaign.findFirst({
         where: {
           name: validated.name,
-          userId: existing.userId,
+          createdById: existing.createdById,
           id: { not: id },
         },
       });
@@ -247,7 +247,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
     }
 
-    if (session.user.role === "MEMBER" && campaign.userId !== session.user.id) {
+    if (session.user.role === "MEMBER" && campaign.createdById !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

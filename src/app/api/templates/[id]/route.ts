@@ -33,7 +33,7 @@ export async function GET(
       return NextResponse.json({ error: "Template not found" }, { status: 404 });
     }
 
-    if (template.userId !== session.user.id) {
+    if (template.createdById !== session.user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -65,7 +65,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Template not found" }, { status: 404 });
     }
 
-    if (existing.userId !== session.user.id) {
+    if (existing.createdById !== session.user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -112,7 +112,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Template not found" }, { status: 404 });
     }
 
-    if (existing.userId !== session.user.id) {
+    if (existing.createdById !== session.user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

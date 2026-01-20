@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     // Role-based filtering
     if (session.user.role === "MEMBER") {
-      where.userId = session.user.id;
+      where.createdById = session.user.id;
     }
 
     // Status filter
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     const existing = await prisma.campaign.findFirst({
       where: {
         name: validated.name,
-        userId: session.user.id,
+        createdById: session.user.id,
       },
     });
 
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
         endDate: validated.endDate ? new Date(validated.endDate) : null,
         defaultSource: validated.defaultSource,
         defaultMedium: validated.defaultMedium,
-        userId: session.user.id,
+        createdById: session.user.id,
         tags: {
           create: tagConnections,
         },
