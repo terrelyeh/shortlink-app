@@ -89,11 +89,11 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
   );
 
   const NavContent = () => (
-    <div className="flex flex-col h-full bg-white border-r border-slate-200">
+    <div className="flex flex-col h-full bg-slate-100">
       {/* Logo */}
       <div className="p-6 pb-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-violet-600 rounded-lg flex items-center justify-center">
+          <div className="w-9 h-9 bg-[#03A9F4] rounded-lg flex items-center justify-center">
             <Zap className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -121,12 +121,12 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
                 isActive
-                  ? "bg-violet-50 text-violet-700 font-medium"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                  ? "bg-white text-[#03A9F4] font-medium shadow-sm"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
               }`}
               onClick={() => setMobileOpen(false)}
             >
-              <span className={isActive ? "text-violet-600" : "text-slate-400"}>
+              <span className={isActive ? "text-[#03A9F4]" : "text-slate-400"}>
                 {item.icon}
               </span>
               <span>{t(item.labelKey)}</span>
@@ -136,11 +136,11 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       </nav>
 
       {/* User section */}
-      <div className="p-4 border-t border-slate-100">
+      <div className="p-4 border-t border-slate-200">
         <div className="mb-3">
           <LanguageSwitcher />
         </div>
-        <div className="flex items-center gap-3 p-2">
+        <div className="flex items-center gap-3 p-2 bg-white/60 rounded-lg">
           {userImage ? (
             <img
               src={userImage}
@@ -148,7 +148,7 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
               className="w-9 h-9 rounded-lg object-cover"
             />
           ) : (
-            <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg bg-slate-200 flex items-center justify-center">
               <span className="text-sm font-medium text-slate-600">
                 {userName?.charAt(0)?.toUpperCase() || "U"}
               </span>
@@ -165,7 +165,7 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
         </div>
         <button
           onClick={() => signOut({ callbackUrl: "/auth/signin" })}
-          className="flex items-center gap-2 w-full mt-2 px-3 py-2 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
+          className="flex items-center gap-2 w-full mt-2 px-3 py-2 text-sm text-slate-500 hover:text-slate-700 hover:bg-white/60 rounded-lg transition-colors"
         >
           <LogOut className="w-4 h-4" />
           <span>Sign Out</span>
@@ -200,7 +200,7 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       >
         <button
           onClick={() => setMobileOpen(false)}
-          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors z-10"
+          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-white/60 transition-colors z-10"
         >
           <X className="w-5 h-5" />
         </button>

@@ -115,7 +115,7 @@ export default function LinksPage() {
           </Link>
           <Link
             href="/links/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors"
           >
             <Plus className="w-4 h-4" />
             {t("createNew")}
@@ -132,7 +132,7 @@ export default function LinksPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={tCommon("search")}
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 text-sm"
+            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] text-sm"
           />
         </form>
         <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
@@ -167,7 +167,7 @@ export default function LinksPage() {
           <p className="text-sm text-slate-500 mb-4">{t("noLinks")}</p>
           <Link
             href="/links/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors"
           >
             <Plus className="w-4 h-4" />
             {t("createFirst")}
@@ -217,7 +217,7 @@ export default function LinksPage() {
                   onClick={() => fetchLinks(pageNum)}
                   className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
                     pagination.page === pageNum
-                      ? "bg-violet-600 text-white"
+                      ? "bg-[#03A9F4] text-white"
                       : "text-slate-600 hover:bg-slate-100"
                   }`}
                 >
