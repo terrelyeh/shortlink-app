@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     // Filter by user role
     if (session.user.role === "MEMBER") {
-      whereLinks.userId = session.user.id;
+      whereLinks.createdById = session.user.id;
     }
 
     if (linkId) {
