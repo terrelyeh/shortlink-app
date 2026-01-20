@@ -23,7 +23,7 @@ export async function GET() {
         role: true,
         createdAt: true,
         _count: {
-          select: { shortLinks: true },
+          select: { workspaceMembers: true },
         },
       },
       orderBy: { createdAt: "desc" },
