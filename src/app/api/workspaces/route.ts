@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { authOptions } from "@/lib/auth";
+import { auth } from "@/lib/auth";
+
+type Workspace = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  members: { role: string }[];
+  _count: { members: number; shortLinks: number; campaigns: number };
+};
 
 // GET /api/workspaces - List all workspaces the user is a member of
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -43,7 +53,7 @@ export async function GET() {
     });
 
     // Transform to include user's role
-    const transformedWorkspaces = workspaces.map((ws) => ({
+    const transformedWorkspaces = workspaces.map((ws: Workspace) => ({
       id: ws.id,
       name: ws.name,
       slug: ws.slug,
@@ -80,7 +90,7 @@ const createWorkspaceSchema = z.object({
 // POST /api/workspaces - Create a new workspace
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -153,7 +163,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validation error", details: error.errors },
+        { error: "Validation error", details: error.issues },
         { status: 400 }
       );
     }

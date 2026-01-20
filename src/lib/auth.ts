@@ -2,8 +2,9 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
-import type { UserRole } from "@prisma/client";
 import type { Adapter } from "next-auth/adapters";
+
+type UserRole = "ADMIN" | "MANAGER" | "MEMBER" | "VIEWER";
 
 declare module "next-auth" {
   interface Session {
