@@ -28,7 +28,6 @@ export async function GET(
     const link = await prisma.shortLink.findUnique({
       where: { id },
       include: {
-        user: { select: { name: true, email: true } },
         _count: { select: { clicks: true } },
         tags: { include: { tag: true } },
       },
