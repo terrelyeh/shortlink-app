@@ -16,14 +16,14 @@ export default async function DashboardLayout({
 
   return (
     <Providers session={session}>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-slate-50">
         <Sidebar
           userRole={session.user.role}
           userName={session.user.name}
           userImage={session.user.image}
         />
-        <main className="lg:pl-72">
-          <div className="p-6 lg:p-10">{children}</div>
+        <main className="lg:pl-64">
+          <div className="p-6 lg:p-8">{children}</div>
         </main>
       </div>
     </Providers>

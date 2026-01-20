@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { Link2, MousePointerClick, Users, TrendingUp, Plus, Sparkles } from "lucide-react";
+import { Link2, MousePointerClick, Users, TrendingUp, Plus, ArrowRight, Megaphone, FileText, Zap } from "lucide-react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
@@ -15,7 +15,7 @@ export async function generateMetadata() {
 // Get real stats from database
 async function getDashboardStats(userId: string, userRole: string) {
   const isAdminOrManager = userRole === "ADMIN" || userRole === "MANAGER";
-  const whereClause = isAdminOrManager ? { deletedAt: null } : { userId, deletedAt: null };
+  const whereClause = isAdminOrManager ? { deletedAt: null } : { createdById: userId, deletedAt: null };
 
   // Get total links and active links
   const [totalLinks, activeLinks] = await Promise.all([
@@ -35,7 +35,7 @@ async function getDashboardStats(userId: string, userRole: string) {
     where: whereClause,
     select: { id: true },
   });
-  const linkIds = userLinks.map(l => l.id);
+  const linkIds = userLinks.map((l: { id: string }) => l.id);
 
   // Current period clicks (last 30 days)
   const currentPeriodClicks = linkIds.length > 0 ? await prisma.click.count({
@@ -60,7 +60,7 @@ async function getDashboardStats(userId: string, userRole: string) {
       shortLinkId: { in: linkIds },
       timestamp: { gte: thirtyDaysAgo },
     },
-  }).then(results => results.length) : 0;
+  }).then((results: { ipHash: string | null }[]) => results.length) : 0;
 
   // Calculate trend
   const clicksTrend = previousPeriodClicks > 0
@@ -79,7 +79,7 @@ async function getDashboardStats(userId: string, userRole: string) {
 // Get top performing links
 async function getTopLinks(userId: string, userRole: string, limit = 5) {
   const isAdminOrManager = userRole === "ADMIN" || userRole === "MANAGER";
-  const whereClause = isAdminOrManager ? { deletedAt: null } : { userId, deletedAt: null };
+  const whereClause = isAdminOrManager ? { deletedAt: null } : { createdById: userId, deletedAt: null };
 
   const links = await prisma.shortLink.findMany({
     where: whereClause,
@@ -96,7 +96,7 @@ async function getTopLinks(userId: string, userRole: string, limit = 5) {
     take: limit,
   });
 
-  return links.map(link => ({
+  return links.map((link: { id: string; code: string; originalUrl: string; _count: { clicks: number } }) => ({
     id: link.id,
     code: link.code,
     originalUrl: link.originalUrl,
@@ -107,7 +107,7 @@ async function getTopLinks(userId: string, userRole: string, limit = 5) {
 // Get recent links
 async function getRecentLinks(userId: string, userRole: string, limit = 5) {
   const isAdminOrManager = userRole === "ADMIN" || userRole === "MANAGER";
-  const whereClause = isAdminOrManager ? { deletedAt: null } : { userId, deletedAt: null };
+  const whereClause = isAdminOrManager ? { deletedAt: null } : { createdById: userId, deletedAt: null };
 
   const links = await prisma.shortLink.findMany({
     where: whereClause,
@@ -122,7 +122,7 @@ async function getRecentLinks(userId: string, userRole: string, limit = 5) {
     take: limit,
   });
 
-  return links.map(link => ({
+  return links.map((link: { id: string; code: string; originalUrl: string; createdAt: Date; _count: { clicks: number } }) => ({
     id: link.id,
     code: link.code,
     originalUrl: link.originalUrl,
@@ -136,35 +136,83 @@ function StatCard({
   value,
   icon,
   trend,
-  iconBg,
-  iconShadow,
 }: {
   title: string;
   value: string | number;
   icon: React.ReactNode;
   trend?: { value: number; isPositive: boolean };
-  iconBg: string;
-  iconShadow: string;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl p-6 bg-white shadow-sm border border-slate-100">
-      <div className="flex items-center justify-between relative z-10">
+    <div className="bg-white rounded-xl p-5 border border-slate-200">
+      <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-slate-500">{title}</p>
-          <p className="text-3xl font-bold text-slate-900 mt-2">{value}</p>
+          <p className="text-sm text-slate-500">{title}</p>
+          <p className="text-2xl font-semibold text-slate-900 mt-1">{value}</p>
           {trend && trend.value !== 0 && (
             <p
-              className={`text-sm font-medium mt-2 ${
+              className={`text-xs mt-1 ${
                 trend.isPositive ? "text-emerald-600" : "text-red-500"
               }`}
             >
-              {trend.isPositive ? "↑" : "↓"} {Math.abs(trend.value)}% vs last period
+              {trend.isPositive ? "+" : ""}{trend.value}% vs last period
             </p>
           )}
         </div>
-        <div className={`p-4 rounded-xl ${iconBg} ${iconShadow}`}>
+        <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
           {icon}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Quick Start Guide for new users
+function QuickStartGuide() {
+  const steps = [
+    {
+      icon: <Link2 className="w-5 h-5" />,
+      title: "Create a Short Link",
+      description: "Turn long URLs into short, trackable links",
+      href: "/links/new",
+      color: "text-violet-600 bg-violet-50",
+    },
+    {
+      icon: <Megaphone className="w-5 h-5" />,
+      title: "Set Up a Campaign",
+      description: "Group your links for better organization",
+      href: "/campaigns",
+      color: "text-blue-600 bg-blue-50",
+    },
+    {
+      icon: <FileText className="w-5 h-5" />,
+      title: "Create UTM Template",
+      description: "Save time with reusable UTM parameters",
+      href: "/templates",
+      color: "text-emerald-600 bg-emerald-50",
+    },
+  ];
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-6">
+      <h2 className="text-lg font-semibold text-slate-900 mb-1">Quick Start</h2>
+      <p className="text-sm text-slate-500 mb-4">Get started with these simple steps</p>
+      <div className="space-y-3">
+        {steps.map((step, index) => (
+          <Link
+            key={index}
+            href={step.href}
+            className="flex items-center gap-4 p-3 rounded-lg border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-colors group"
+          >
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${step.color}`}>
+              {step.icon}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-slate-900">{step.title}</p>
+              <p className="text-xs text-slate-500">{step.description}</p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+          </Link>
+        ))}
       </div>
     </div>
   );
@@ -173,24 +221,23 @@ function StatCard({
 // Empty state component
 function EmptyState({ t }: { t: (key: string) => string }) {
   return (
-    <div className="min-h-[60vh] flex items-center justify-center">
-      <div className="text-center max-w-md mx-auto px-4">
-        <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/25">
-          <Sparkles className="w-10 h-10 text-white" />
+    <div className="space-y-8">
+      {/* Welcome Header */}
+      <div className="text-center py-8">
+        <div className="w-14 h-14 mx-auto mb-4 bg-violet-600 rounded-xl flex items-center justify-center">
+          <Zap className="w-7 h-7 text-white" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-3">
-          {t("emptyState.title") || "Welcome to EnGenius ShortLink!"}
-        </h2>
-        <p className="text-slate-600 mb-8">
-          {t("emptyState.description") || "Create your first short link to start tracking clicks and analyzing your traffic."}
+        <h1 className="text-2xl font-semibold text-slate-900 mb-2">
+          Welcome to EnGenius ShortLink
+        </h1>
+        <p className="text-slate-500 max-w-md mx-auto">
+          Create short links with UTM tracking to measure your marketing campaigns effectively.
         </p>
-        <Link
-          href="/links/new"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:scale-105 transition-all duration-200"
-        >
-          <Plus className="w-5 h-5" />
-          {t("emptyState.createButton") || "Create Your First Link"}
-        </Link>
+      </div>
+
+      {/* Quick Start */}
+      <div className="max-w-lg mx-auto">
+        <QuickStartGuide />
       </div>
     </div>
   );
@@ -219,147 +266,117 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">{t("title")}</h1>
-          <p className="text-slate-500 mt-1">Overview of your link performance</p>
+          <h1 className="text-2xl font-semibold text-slate-900">{t("title")}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Last 30 days overview</p>
         </div>
         <Link
           href="/links/new"
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium rounded-xl shadow-lg shadow-emerald-500/25 hover:shadow-xl transition-all duration-200"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Link
         </Link>
       </div>
 
-      {/* Stats Grid - Each card has unique color */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title={t("totalClicks")}
           value={stats.totalClicks.toLocaleString()}
-          icon={<MousePointerClick className="w-6 h-6 text-white" />}
+          icon={<MousePointerClick className="w-5 h-5" />}
           trend={{ value: stats.clicksTrend, isPositive: stats.clicksTrend >= 0 }}
-          iconBg="bg-gradient-to-br from-violet-500 to-purple-600"
-          iconShadow="shadow-lg shadow-violet-500/30"
         />
         <StatCard
           title={t("uniqueVisitors")}
           value={stats.uniqueVisitors.toLocaleString()}
-          icon={<Users className="w-6 h-6 text-white" />}
-          iconBg="bg-gradient-to-br from-cyan-500 to-blue-500"
-          iconShadow="shadow-lg shadow-cyan-500/30"
+          icon={<Users className="w-5 h-5" />}
         />
         <StatCard
           title={t("totalLinks")}
           value={stats.totalLinks}
-          icon={<Link2 className="w-6 h-6 text-white" />}
-          iconBg="bg-gradient-to-br from-amber-500 to-orange-500"
-          iconShadow="shadow-lg shadow-amber-500/30"
+          icon={<Link2 className="w-5 h-5" />}
         />
         <StatCard
           title={t("activeLinks")}
           value={stats.activeLinks}
-          icon={<TrendingUp className="w-6 h-6 text-white" />}
-          iconBg="bg-gradient-to-br from-emerald-500 to-teal-500"
-          iconShadow="shadow-lg shadow-emerald-500/30"
+          icon={<TrendingUp className="w-5 h-5" />}
         />
       </div>
 
-      {/* Top Links & Recent Links */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Top Links */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-slate-900">{t("topLinks")}</h2>
-            <Link href="/links" className="text-sm text-violet-600 hover:text-violet-700 font-medium transition-colors">
-              View all →
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-slate-900">{t("topLinks")}</h2>
+            <Link href="/links" className="text-sm text-violet-600 hover:text-violet-700 font-medium">
+              View all
             </Link>
           </div>
           {topLinks.length > 0 ? (
-            <div className="space-y-3">
-              {topLinks.map((link, index) => (
+            <div className="space-y-2">
+              {topLinks.map((link: { id: string; code: string; originalUrl: string; clicks: number }, index: number) => (
                 <div
                   key={link.id}
-                  className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 transition-colors"
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors"
                 >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm ${
-                    index === 0
-                      ? "bg-gradient-to-br from-amber-400 to-orange-500"
-                      : index === 1
-                        ? "bg-gradient-to-br from-slate-400 to-slate-500"
-                        : index === 2
-                          ? "bg-gradient-to-br from-amber-600 to-amber-700"
-                          : "bg-slate-300 text-slate-600"
-                  }`}>
+                  <span className="w-6 h-6 rounded text-xs font-medium flex items-center justify-center bg-slate-100 text-slate-600">
                     {index + 1}
-                  </div>
+                  </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 truncate">
-                      /{link.code}
-                    </p>
-                    <p className="text-xs text-slate-500 truncate">
-                      {link.originalUrl}
-                    </p>
+                    <p className="text-sm font-medium text-slate-900 truncate">/{link.code}</p>
+                    <p className="text-xs text-slate-500 truncate">{link.originalUrl}</p>
                   </div>
-                  <div className="text-right">
-                    <span className="text-lg font-bold text-slate-900">
-                      {link.clicks.toLocaleString()}
-                    </span>
-                    <p className="text-xs text-slate-500">clicks</p>
-                  </div>
+                  <span className="text-sm font-medium text-slate-900">
+                    {link.clicks.toLocaleString()}
+                  </span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-slate-500">
-              No links yet. Create your first link!
+            <div className="text-center py-8 text-sm text-slate-500">
+              No links yet
             </div>
           )}
         </div>
 
-        {/* Recent Links */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-slate-900">{t("recentLinks")}</h2>
-            <Link href="/links" className="text-sm text-violet-600 hover:text-violet-700 font-medium transition-colors">
-              View all →
-            </Link>
-          </div>
-          {recentLinks.length > 0 ? (
-            <div className="space-y-3">
-              {recentLinks.map((link) => (
-                <div
-                  key={link.id}
-                  className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
-                    <Link2 className="w-5 h-5 text-slate-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 truncate">
-                      /{link.code}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {new Date(link.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm font-semibold text-slate-900">
-                      {link.clicks.toLocaleString()} clicks
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-slate-500">
-              No links yet. Create your first link!
-            </div>
-          )}
+        {/* Quick Start */}
+        <QuickStartGuide />
+      </div>
+
+      {/* Recent Links */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold text-slate-900">{t("recentLinks")}</h2>
+          <Link href="/links" className="text-sm text-violet-600 hover:text-violet-700 font-medium">
+            View all
+          </Link>
         </div>
+        {recentLinks.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {recentLinks.map((link: { id: string; code: string; originalUrl: string; clicks: number; createdAt: Date }) => (
+              <div
+                key={link.id}
+                className="p-3 rounded-lg border border-slate-100 hover:border-slate-200 transition-colors"
+              >
+                <p className="text-sm font-medium text-slate-900 truncate">/{link.code}</p>
+                <p className="text-xs text-slate-500 truncate mt-0.5">{link.originalUrl}</p>
+                <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
+                  <span>{link.clicks} clicks</span>
+                  <span>{new Date(link.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-sm text-slate-500">
+            No links yet
+          </div>
+        )}
       </div>
     </div>
   );
