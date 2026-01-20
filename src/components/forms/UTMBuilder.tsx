@@ -98,8 +98,8 @@ export function UTMBuilder({ values, onChange, originalUrl }: UTMBuilderProps) {
     <div className="space-y-4">
       {/* Template Selector */}
       {templates.length > 0 && (
-        <div className="p-4 bg-violet-50 border border-violet-100 rounded-xl">
-          <label className="block text-sm font-semibold text-violet-700 mb-2">
+        <div className="p-4 bg-sky-50 border border-sky-100 rounded-xl">
+          <label className="block text-sm font-semibold text-sky-700 mb-2">
             <FileText className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />
             {t("applyTemplate")}
           </label>
@@ -107,7 +107,7 @@ export function UTMBuilder({ values, onChange, originalUrl }: UTMBuilderProps) {
             <select
               value={selectedTemplate}
               onChange={(e) => handleTemplateSelect(e.target.value)}
-              className="w-full px-4 py-2.5 border border-violet-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 appearance-none bg-white text-slate-700"
+              className="w-full px-4 py-2.5 border border-sky-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] appearance-none bg-white text-slate-700"
               disabled={loadingTemplates}
             >
               <option value="">
@@ -122,13 +122,13 @@ export function UTMBuilder({ values, onChange, originalUrl }: UTMBuilderProps) {
             </select>
             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
               {loadingTemplates ? (
-                <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
+                <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
               ) : (
-                <ChevronDown className="w-4 h-4 text-violet-400" />
+                <ChevronDown className="w-4 h-4 text-slate-400" />
               )}
             </div>
           </div>
-          <p className="mt-2 text-xs text-violet-600">
+          <p className="mt-2 text-xs text-slate-500">
             Select a saved template to auto-fill UTM parameters
           </p>
         </div>
@@ -144,7 +144,7 @@ export function UTMBuilder({ values, onChange, originalUrl }: UTMBuilderProps) {
             <select
               value={values.utmSource}
               onChange={(e) => handleChange("utmSource", e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 appearance-none bg-white"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] appearance-none bg-white"
             >
               <option value="">{t("sourcePlaceholder")}</option>
               {UTM_SOURCES.map((source) => (
@@ -160,7 +160,7 @@ export function UTMBuilder({ values, onChange, originalUrl }: UTMBuilderProps) {
             value={values.utmSource}
             onChange={(e) => handleChange("utmSource", e.target.value)}
             placeholder={t("sourcePlaceholder")}
-            className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 text-sm"
+            className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] text-sm"
           />
         </div>
 
@@ -173,7 +173,7 @@ export function UTMBuilder({ values, onChange, originalUrl }: UTMBuilderProps) {
             <select
               value={values.utmMedium}
               onChange={(e) => handleChange("utmMedium", e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 appearance-none bg-white"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] appearance-none bg-white"
             >
               <option value="">{t("mediumPlaceholder")}</option>
               {UTM_MEDIUMS.map((medium) => (
@@ -189,7 +189,7 @@ export function UTMBuilder({ values, onChange, originalUrl }: UTMBuilderProps) {
             value={values.utmMedium}
             onChange={(e) => handleChange("utmMedium", e.target.value)}
             placeholder={t("mediumPlaceholder")}
-            className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 text-sm"
+            className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] text-sm"
           />
         </div>
 
@@ -203,7 +203,7 @@ export function UTMBuilder({ values, onChange, originalUrl }: UTMBuilderProps) {
             value={values.utmCampaign}
             onChange={(e) => handleChange("utmCampaign", e.target.value)}
             placeholder={t("campaignPlaceholder")}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
           />
         </div>
 
@@ -217,7 +217,7 @@ export function UTMBuilder({ values, onChange, originalUrl }: UTMBuilderProps) {
             value={values.utmContent}
             onChange={(e) => handleChange("utmContent", e.target.value)}
             placeholder={t("contentPlaceholder")}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
           />
         </div>
 
@@ -231,7 +231,7 @@ export function UTMBuilder({ values, onChange, originalUrl }: UTMBuilderProps) {
             value={values.utmTerm}
             onChange={(e) => handleChange("utmTerm", e.target.value)}
             placeholder={t("termPlaceholder")}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
           />
         </div>
       </div>

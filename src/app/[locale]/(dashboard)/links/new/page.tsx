@@ -25,18 +25,18 @@ export default async function NewLinkPage() {
         </Link>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-        {/* Header with gradient */}
-        <div className="bg-gradient-to-r from-emerald-500 to-teal-500 px-8 py-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        {/* Header */}
+        <div className="px-8 py-6 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-slate-600" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">
+              <h1 className="text-xl font-semibold text-slate-900">
                 {t("createNew")}
               </h1>
-              <p className="text-emerald-100 text-sm mt-0.5">
+              <p className="text-slate-500 text-sm">
                 Create a short link to share with the world
               </p>
             </div>

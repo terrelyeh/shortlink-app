@@ -136,7 +136,7 @@ export default function TemplatesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#03A9F4]" />
       </div>
     );
   }
@@ -144,10 +144,10 @@ export default function TemplatesPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">{t("templates")}</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t("templates")}</h1>
         <button
           onClick={openCreateForm}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white rounded-lg hover:bg-[#0288D1] transition-colors"
         >
           <Plus className="w-5 h-5" />
           Create Template
@@ -156,14 +156,14 @@ export default function TemplatesPage() {
 
       {/* Template List */}
       {templates.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <FileText className="w-8 h-8 text-gray-400" />
+        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+          <div className="w-16 h-16 mx-auto bg-slate-100 rounded-full flex items-center justify-center mb-4">
+            <FileText className="w-8 h-8 text-slate-400" />
           </div>
-          <p className="text-gray-500 mb-4">No templates yet</p>
+          <p className="text-slate-500 mb-4">No templates yet</p>
           <button
             onClick={openCreateForm}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white rounded-lg hover:bg-[#0288D1] transition-colors"
           >
             <Plus className="w-5 h-5" />
             Create your first template
@@ -174,16 +174,16 @@ export default function TemplatesPage() {
           {templates.map((template) => (
             <div
               key={template.id}
-              className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+              className="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between mb-3">
-                <h3 className="font-semibold text-gray-900">{template.name}</h3>
+                <h3 className="font-semibold text-slate-900">{template.name}</h3>
                 <div className="flex gap-1">
                   <button
                     onClick={() => openEditForm(template)}
-                    className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+                    className="p-1.5 hover:bg-slate-100 rounded transition-colors"
                   >
-                    <Edit className="w-4 h-4 text-gray-500" />
+                    <Edit className="w-4 h-4 text-slate-500" />
                   </button>
                   <button
                     onClick={() => handleDelete(template.id)}
@@ -196,28 +196,28 @@ export default function TemplatesPage() {
 
               <div className="space-y-1 text-sm">
                 {template.source && (
-                  <p className="text-gray-600">
-                    <span className="text-gray-400">Source:</span> {template.source}
+                  <p className="text-slate-600">
+                    <span className="text-slate-400">Source:</span> {template.source}
                   </p>
                 )}
                 {template.medium && (
-                  <p className="text-gray-600">
-                    <span className="text-gray-400">Medium:</span> {template.medium}
+                  <p className="text-slate-600">
+                    <span className="text-slate-400">Medium:</span> {template.medium}
                   </p>
                 )}
                 {template.campaign && (
-                  <p className="text-gray-600">
-                    <span className="text-gray-400">Campaign:</span> {template.campaign}
+                  <p className="text-slate-600">
+                    <span className="text-slate-400">Campaign:</span> {template.campaign}
                   </p>
                 )}
                 {template.content && (
-                  <p className="text-gray-600">
-                    <span className="text-gray-400">Content:</span> {template.content}
+                  <p className="text-slate-600">
+                    <span className="text-slate-400">Content:</span> {template.content}
                   </p>
                 )}
                 {template.term && (
-                  <p className="text-gray-600">
-                    <span className="text-gray-400">Term:</span> {template.term}
+                  <p className="text-slate-600">
+                    <span className="text-slate-400">Term:</span> {template.term}
                   </p>
                 )}
               </div>
@@ -236,7 +236,7 @@ export default function TemplatesPage() {
               </h2>
               <button
                 onClick={() => setShowForm(false)}
-                className="p-1 hover:bg-gray-100 rounded"
+                className="p-1 hover:bg-slate-100 rounded"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -250,7 +250,7 @@ export default function TemplatesPage() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   {t("templateName")} <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -258,53 +258,53 @@ export default function TemplatesPage() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g., Facebook Ads Q1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4]"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     {t("source")}
                   </label>
                   <div className="relative">
                     <select
                       value={formData.source}
                       onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] appearance-none bg-white"
                     >
                       <option value="">Select</option>
                       {UTM_SOURCES.map((s) => (
                         <option key={s} value={s}>{s}</option>
                       ))}
                     </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     {t("medium")}
                   </label>
                   <div className="relative">
                     <select
                       value={formData.medium}
                       onChange={(e) => setFormData({ ...formData, medium: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] appearance-none bg-white"
                     >
                       <option value="">Select</option>
                       {UTM_MEDIUMS.map((m) => (
                         <option key={m} value={m}>{m}</option>
                       ))}
                     </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   {t("campaign")}
                 </label>
                 <input
@@ -312,12 +312,12 @@ export default function TemplatesPage() {
                   value={formData.campaign}
                   onChange={(e) => setFormData({ ...formData, campaign: e.target.value })}
                   placeholder={t("campaignPlaceholder")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   {t("content")}
                 </label>
                 <input
@@ -325,12 +325,12 @@ export default function TemplatesPage() {
                   value={formData.content}
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                   placeholder={t("contentPlaceholder")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   {t("term")}
                 </label>
                 <input
@@ -338,7 +338,7 @@ export default function TemplatesPage() {
                   value={formData.term}
                   onChange={(e) => setFormData({ ...formData, term: e.target.value })}
                   placeholder={t("termPlaceholder")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4]"
                 />
               </div>
 
@@ -346,14 +346,14 @@ export default function TemplatesPage() {
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
                 >
                   {tCommon("cancel")}
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#03A9F4] text-white rounded-lg hover:bg-[#0288D1] transition-colors disabled:opacity-50"
                 >
                   {saving ? (
                     <>

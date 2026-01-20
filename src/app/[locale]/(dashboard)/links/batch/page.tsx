@@ -18,18 +18,18 @@ export default async function BatchCreatePage() {
       <div className="mb-6">
         <Link
           href="/links"
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+          className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Links
         </Link>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <h1 className="text-2xl font-bold text-slate-900 mb-2">
           {t("batchCreate")}
         </h1>
-        <p className="text-gray-600 mb-6">
+        <p className="text-slate-500 mb-6">
           Create multiple short links at once with different UTM content values.
           Perfect for KOL campaigns or A/B testing.
         </p>
