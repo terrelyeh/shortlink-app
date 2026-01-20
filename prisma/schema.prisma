@@ -192,15 +192,15 @@ model ShortLink {
   expiresAt DateTime?
   maxClicks Int?
 
-  // Metadata
-  workspaceId String   @map("workspace_id")
-  createdById String   @map("created_by_id") // User who created the link
+  // Metadata (optional for migration, will be required after data migration)
+  workspaceId String?  @map("workspace_id")
+  createdById String?  @map("created_by_id") // User who created the link
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   deletedAt   DateTime? // Soft delete
 
   // Relations
-  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace   Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   clicks      Click[]
   tags        TagOnLink[]
   shareTokens ShareToken[]
@@ -244,11 +244,11 @@ model LinkGroup {
   name        String
   description String?
   color       String?  // Hex color for UI
-  workspaceId String   @map("workspace_id")
+  workspaceId String?  @map("workspace_id")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace?  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   links     ShortLink[]
 
   @@index([workspaceId])
@@ -257,14 +257,13 @@ model LinkGroup {
 
 model Tag {
   id          String      @id @default(cuid())
-  name        String
+  name        String      @unique
   color       String?     // Hex color for UI
-  workspaceId String      @map("workspace_id")
+  workspaceId String?     @map("workspace_id")
   links       TagOnLink[]
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  @@unique([name, workspaceId])
   @@index([workspaceId])
   @@map("tags")
 }
@@ -305,18 +304,17 @@ model Campaign {
   defaultSource String?      @map("default_source")
   defaultMedium String?      @map("default_medium")
 
-  // Metadata
-  workspaceId String   @map("workspace_id")
-  createdById String   @map("created_by_id") // User who created the campaign
+  // Metadata (optional for migration)
+  workspaceId String?  @map("workspace_id")
+  createdById String?  @map("created_by_id") // User who created the campaign
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
-  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   links     ShortLink[]
   tags      TagOnCampaign[]
 
-  @@unique([name, workspaceId])
   @@index([workspaceId])
   @@index([status])
   @@map("campaigns")
@@ -324,14 +322,13 @@ model Campaign {
 
 model CampaignTag {
   id          String          @id @default(cuid())
-  name        String
+  name        String          @unique
   color       String?         // Hex color for UI
-  workspaceId String          @map("workspace_id")
+  workspaceId String?         @map("workspace_id")
   campaigns   TagOnCampaign[]
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  @@unique([name, workspaceId])
   @@index([workspaceId])
   @@map("campaign_tags")
 }
@@ -360,12 +357,12 @@ model UTMTemplate {
   campaign    String?
   content     String?
   term        String?
-  workspaceId String   @map("workspace_id")
-  createdById String   @map("created_by_id")
+  workspaceId String?  @map("workspace_id")
+  createdById String?  @map("created_by_id")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
   @@map("utm_templates")
