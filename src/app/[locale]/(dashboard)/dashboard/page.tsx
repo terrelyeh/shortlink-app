@@ -174,21 +174,21 @@ function QuickStartGuide() {
       title: "Create a Short Link",
       description: "Turn long URLs into short, trackable links",
       href: "/links/new",
-      color: "text-[#03A9F4] bg-sky-50",
+      color: "text-slate-600 bg-slate-100",
     },
     {
       icon: <Megaphone className="w-5 h-5" />,
       title: "Set Up a Campaign",
       description: "Group your links for better organization",
       href: "/campaigns",
-      color: "text-blue-600 bg-blue-50",
+      color: "text-slate-600 bg-slate-100",
     },
     {
       icon: <FileText className="w-5 h-5" />,
       title: "Create UTM Template",
       description: "Save time with reusable UTM parameters",
       href: "/templates",
-      color: "text-emerald-600 bg-emerald-50",
+      color: "text-slate-600 bg-slate-100",
     },
   ];
 

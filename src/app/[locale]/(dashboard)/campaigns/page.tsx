@@ -227,7 +227,7 @@ export default function CampaignsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#03A9F4]" />
       </div>
     );
   }
@@ -242,7 +242,7 @@ export default function CampaignsPage() {
         </div>
         <button
           onClick={openCreateForm}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl hover:from-violet-700 hover:to-purple-700 transition-all shadow-lg shadow-violet-500/25"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#03A9F4] text-white rounded-xl hover:bg-[#0288D1] transition-all shadow-sm"
         >
           <Plus className="w-5 h-5" />
           {t("createCampaign")}
@@ -260,7 +260,7 @@ export default function CampaignsPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t("searchPlaceholder")}
-              className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+              className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
             />
           </div>
 
@@ -270,7 +270,7 @@ export default function CampaignsPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="pl-9 pr-8 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 appearance-none bg-white min-w-[140px]"
+              className="pl-9 pr-8 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] appearance-none bg-white min-w-[140px]"
             >
               <option value="">{t("allStatuses")}</option>
               <option value="DRAFT">{t("statusDraft")}</option>
@@ -288,7 +288,7 @@ export default function CampaignsPage() {
               <select
                 value={tagFilter}
                 onChange={(e) => setTagFilter(e.target.value)}
-                className="pl-9 pr-8 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 appearance-none bg-white min-w-[140px]"
+                className="pl-9 pr-8 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] appearance-none bg-white min-w-[140px]"
               >
                 <option value="">{t("allTags")}</option>
                 {allTags.map((tag) => (
@@ -307,7 +307,7 @@ export default function CampaignsPage() {
               type="checkbox"
               checked={showArchived}
               onChange={(e) => setShowArchived(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+              className="w-4 h-4 rounded border-slate-300 text-[#03A9F4] focus:ring-[#03A9F4]"
             />
             {t("showArchived")}
           </label>
@@ -317,13 +317,13 @@ export default function CampaignsPage() {
       {/* Campaign List */}
       {campaigns.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-100 p-12 text-center shadow-sm">
-          <div className="w-16 h-16 mx-auto bg-gradient-to-br from-violet-100 to-purple-100 rounded-2xl flex items-center justify-center mb-4">
-            <Megaphone className="w-8 h-8 text-violet-600" />
+          <div className="w-16 h-16 mx-auto bg-gradient-to-br from-sky-50 to-sky-100 rounded-2xl flex items-center justify-center mb-4">
+            <Megaphone className="w-8 h-8 text-[#03A9F4]" />
           </div>
           <p className="text-slate-500 mb-4">{t("noCampaigns")}</p>
           <button
             onClick={openCreateForm}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white rounded-lg hover:bg-[#0288D1] transition-colors"
           >
             <Plus className="w-5 h-5" />
             {t("createFirst")}
@@ -487,7 +487,7 @@ export default function CampaignsPage() {
                     })
                   }
                   placeholder="spring_sale_2026"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 font-mono text-sm"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] font-mono text-sm"
                   required
                   pattern="^[a-z0-9_-]+$"
                 />
@@ -504,7 +504,7 @@ export default function CampaignsPage() {
                   value={formData.displayName}
                   onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
                   placeholder={t("displayNamePlaceholder")}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
                 />
               </div>
 
@@ -518,7 +518,7 @@ export default function CampaignsPage() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder={t("descriptionPlaceholder")}
                   rows={2}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 resize-none"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] resize-none"
                 />
               </div>
 
@@ -538,12 +538,12 @@ export default function CampaignsPage() {
                         onClick={() => setFormData({ ...formData, status })}
                         className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${
                           formData.status === status
-                            ? "border-violet-500 bg-violet-50"
+                            ? "border-[#03A9F4] bg-sky-50"
                             : "border-slate-200 hover:border-slate-300"
                         }`}
                       >
-                        <Icon className={`w-5 h-5 ${formData.status === status ? "text-violet-600" : "text-slate-400"}`} />
-                        <span className={`text-xs font-medium ${formData.status === status ? "text-violet-700" : "text-slate-600"}`}>
+                        <Icon className={`w-5 h-5 ${formData.status === status ? "text-[#03A9F4]" : "text-slate-400"}`} />
+                        <span className={`text-xs font-medium ${formData.status === status ? "text-[#0288D1]" : "text-slate-600"}`}>
                           {t(`status${status.charAt(0)}${status.slice(1).toLowerCase()}`)}
                         </span>
                       </button>
@@ -562,7 +562,7 @@ export default function CampaignsPage() {
                     type="date"
                     value={formData.startDate}
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
                   />
                 </div>
                 <div>
@@ -573,7 +573,7 @@ export default function CampaignsPage() {
                     type="date"
                     value={formData.endDate}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
                   />
                 </div>
               </div>
@@ -589,7 +589,7 @@ export default function CampaignsPage() {
                     value={formData.defaultSource}
                     onChange={(e) => setFormData({ ...formData, defaultSource: e.target.value })}
                     placeholder="facebook"
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
                   />
                 </div>
                 <div>
@@ -601,7 +601,7 @@ export default function CampaignsPage() {
                     value={formData.defaultMedium}
                     onChange={(e) => setFormData({ ...formData, defaultMedium: e.target.value })}
                     placeholder="cpc"
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
                   />
                 </div>
               </div>
@@ -615,13 +615,13 @@ export default function CampaignsPage() {
                   {formData.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-violet-100 text-violet-700 rounded-lg text-sm"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-sky-100 text-[#0288D1] rounded-lg text-sm"
                     >
                       {tag}
                       <button
                         type="button"
                         onClick={() => removeTag(tag)}
-                        className="hover:text-violet-900"
+                        className="hover:text-sky-900"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -640,7 +640,7 @@ export default function CampaignsPage() {
                       }
                     }}
                     placeholder={t("addTagPlaceholder")}
-                    className="flex-1 px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 text-sm"
+                    className="flex-1 px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] text-sm"
                   />
                   <button
                     type="button"
@@ -664,7 +664,7 @@ export default function CampaignsPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl hover:from-violet-700 hover:to-purple-700 transition-all font-medium disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#03A9F4] text-white rounded-xl hover:bg-[#0288D1] transition-all font-medium disabled:opacity-50"
                 >
                   {saving ? (
                     <>

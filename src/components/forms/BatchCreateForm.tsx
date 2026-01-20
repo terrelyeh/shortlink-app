@@ -119,27 +119,27 @@ export function BatchCreateForm() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">
+          <h2 className="text-xl font-semibold text-slate-900">
             Created {createdLinks.length} Links
           </h2>
           <div className="flex gap-2">
             <button
               onClick={downloadCSV}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
             >
               <Download className="w-4 h-4" />
               Download CSV
             </button>
             <button
               onClick={downloadAllQRCodes}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
             >
               <Download className="w-4 h-4" />
               Download All QR Codes
             </button>
             <button
               onClick={() => setCreatedLinks([])}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-[#03A9F4] text-white rounded-lg hover:bg-[#0288D1] transition-colors"
             >
               Create More
             </button>
@@ -150,22 +150,22 @@ export function BatchCreateForm() {
           {createdLinks.map((link) => (
             <div
               key={link.id}
-              className="bg-white border border-gray-200 rounded-lg p-4 space-y-3"
+              className="bg-white border border-slate-200 rounded-lg p-4 space-y-3"
             >
               <div className="flex items-center justify-between">
-                <h3 className="font-medium text-gray-900">{link.title}</h3>
+                <h3 className="font-medium text-slate-900">{link.title}</h3>
                 <button
                   onClick={() => copyToClipboard(link.shortUrl, link.id)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                 >
                   {copiedId === link.id ? (
                     <Check className="w-4 h-4 text-green-600" />
                   ) : (
-                    <Copy className="w-4 h-4 text-gray-500" />
+                    <Copy className="w-4 h-4 text-slate-500" />
                   )}
                 </button>
               </div>
-              <p className="text-sm text-blue-600 break-all">{link.shortUrl}</p>
+              <p className="text-sm text-[#03A9F4] break-all">{link.shortUrl}</p>
               <div className="flex justify-center pt-2">
                 <QRCodeCanvas
                   id={`qr-${link.id}`}
@@ -191,7 +191,7 @@ export function BatchCreateForm() {
 
       {/* Original URL */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-slate-700 mb-1">
           {tLinks("originalUrl")} <span className="text-red-500">*</span>
         </label>
         <input
@@ -199,7 +199,7 @@ export function BatchCreateForm() {
           value={originalUrl}
           onChange={(e) => setOriginalUrl(e.target.value)}
           placeholder="https://example.com/landing-page"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
           required
         />
       </div>
@@ -207,14 +207,14 @@ export function BatchCreateForm() {
       {/* UTM Parameters */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             {t("source")}
           </label>
           <div className="relative">
             <select
               value={utmSource}
               onChange={(e) => setUtmSource(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] appearance-none bg-white"
             >
               <option value="">Select source</option>
               {UTM_SOURCES.map((source) => (
@@ -223,19 +223,19 @@ export function BatchCreateForm() {
                 </option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             {t("medium")}
           </label>
           <div className="relative">
             <select
               value={utmMedium}
               onChange={(e) => setUtmMedium(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] appearance-none bg-white"
             >
               <option value="">Select medium</option>
               {UTM_MEDIUMS.map((medium) => (
@@ -244,12 +244,12 @@ export function BatchCreateForm() {
                 </option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             {t("campaign")}
           </label>
           <input
@@ -257,14 +257,14 @@ export function BatchCreateForm() {
             value={utmCampaign}
             onChange={(e) => setUtmCampaign(e.target.value)}
             placeholder={t("campaignPlaceholder")}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4]"
           />
         </div>
       </div>
 
       {/* Content List */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-slate-700 mb-1">
           {t("content")} (utm_content) <span className="text-red-500">*</span>
         </label>
         <textarea
@@ -276,19 +276,19 @@ kol_bob
 kol_charlie
 influencer_david"
           rows={8}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] font-mono text-sm"
           required
         />
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-slate-500">
           {t("batchDescription")}
         </p>
       </div>
 
       {/* Preview */}
       {contents && originalUrl && (
-        <div className="p-4 bg-gray-50 rounded-lg">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Preview</h3>
-          <p className="text-sm text-gray-600">
+        <div className="p-4 bg-slate-50 rounded-lg">
+          <h3 className="text-sm font-medium text-slate-700 mb-2">Preview</h3>
+          <p className="text-sm text-slate-600">
             Will create{" "}
             <span className="font-semibold">
               {contents.split("\n").filter((c) => c.trim()).length}
@@ -302,7 +302,7 @@ influencer_david"
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#03A9F4] text-white rounded-lg hover:bg-[#0288D1] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isSubmitting ? (
           <>
