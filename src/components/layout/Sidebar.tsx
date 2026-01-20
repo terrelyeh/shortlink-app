@@ -89,7 +89,7 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
   );
 
   const NavContent = () => (
-    <div className="flex flex-col h-full bg-slate-100">
+    <div className="flex flex-col h-full bg-slate-800">
       {/* Logo */}
       <div className="p-6 pb-4">
         <div className="flex items-center gap-3">
@@ -97,8 +97,8 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
             <Zap className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-base font-semibold text-slate-900">EnGenius ShortLink</h1>
-            <p className="text-xs text-slate-500">UTM Manager</p>
+            <h1 className="text-base font-semibold text-white">EnGenius ShortLink</h1>
+            <p className="text-xs text-slate-400">UTM Manager</p>
           </div>
         </div>
       </div>
@@ -110,7 +110,7 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 pb-4 space-y-0.5">
-        <p className="px-3 py-2 text-xs font-medium text-slate-400 uppercase tracking-wider">
+        <p className="px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">
           Menu
         </p>
         {filteredItems.map((item) => {
@@ -121,8 +121,8 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
                 isActive
-                  ? "bg-white text-[#03A9F4] font-medium shadow-sm"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                  ? "bg-slate-700 text-white font-medium"
+                  : "text-slate-300 hover:text-white hover:bg-slate-700/50"
               }`}
               onClick={() => setMobileOpen(false)}
             >
@@ -136,11 +136,11 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       </nav>
 
       {/* User section */}
-      <div className="p-4 border-t border-slate-200">
+      <div className="p-4 border-t border-slate-700">
         <div className="mb-3">
           <LanguageSwitcher />
         </div>
-        <div className="flex items-center gap-3 p-2 bg-white/60 rounded-lg">
+        <div className="flex items-center gap-3 p-2 bg-slate-700/50 rounded-lg">
           {userImage ? (
             <img
               src={userImage}
@@ -148,24 +148,24 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
               className="w-9 h-9 rounded-lg object-cover"
             />
           ) : (
-            <div className="w-9 h-9 rounded-lg bg-slate-200 flex items-center justify-center">
-              <span className="text-sm font-medium text-slate-600">
+            <div className="w-9 h-9 rounded-lg bg-slate-600 flex items-center justify-center">
+              <span className="text-sm font-medium text-slate-300">
                 {userName?.charAt(0)?.toUpperCase() || "U"}
               </span>
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-slate-900 truncate">
+            <p className="text-sm font-medium text-white truncate">
               {userName}
             </p>
-            <p className="text-xs text-slate-500 capitalize">
+            <p className="text-xs text-slate-400 capitalize">
               {userRole.toLowerCase()}
             </p>
           </div>
         </div>
         <button
           onClick={() => signOut({ callbackUrl: "/auth/signin" })}
-          className="flex items-center gap-2 w-full mt-2 px-3 py-2 text-sm text-slate-500 hover:text-slate-700 hover:bg-white/60 rounded-lg transition-colors"
+          className="flex items-center gap-2 w-full mt-2 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
         >
           <LogOut className="w-4 h-4" />
           <span>Sign Out</span>
@@ -200,7 +200,7 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       >
         <button
           onClick={() => setMobileOpen(false)}
-          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-white/60 transition-colors z-10"
+          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors z-10"
         >
           <X className="w-5 h-5" />
         </button>
