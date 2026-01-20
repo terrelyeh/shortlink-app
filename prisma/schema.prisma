@@ -199,6 +199,9 @@ model ShortLink {
   updatedAt   DateTime @updatedAt
   deletedAt   DateTime? // Soft delete
 
+  // DEPRECATED: Legacy field kept for migration. Will be removed after data migration.
+  userId      String?  @map("user_id")
+
   // Relations
   workspace   Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   clicks      Click[]
@@ -361,6 +364,9 @@ model UTMTemplate {
   createdById String?  @map("created_by_id")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  // DEPRECATED: Legacy field kept for migration. Will be removed after data migration.
+  userId      String?  @map("user_id")
 
   workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
