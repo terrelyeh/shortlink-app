@@ -11,37 +11,35 @@ export default async function SignInPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex flex-col md:flex-row">
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-slate-900 p-12 flex-col justify-between">
-        <div>
-          {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#03A9F4] rounded-lg flex items-center justify-center">
-              <Zap className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-white">EnGenius ShortLink</h1>
-              <p className="text-sm text-slate-400">UTM Manager</p>
-            </div>
+      <div className="hidden md:flex md:w-[320px] lg:w-[400px] xl:w-[480px] bg-slate-900 p-6 lg:p-10 flex-col flex-shrink-0">
+        {/* Logo */}
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 lg:w-10 lg:h-10 bg-[#03A9F4] rounded-lg flex items-center justify-center">
+            <Zap className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg lg:text-xl font-semibold text-white">EnGenius ShortLink</h1>
+            <p className="text-xs lg:text-sm text-slate-400">UTM Manager</p>
           </div>
         </div>
 
-        {/* Features */}
-        <div className="space-y-8">
-          <div className="space-y-6">
+        {/* Features - Centered vertically */}
+        <div className="flex-1 flex items-center">
+          <div className="space-y-5 lg:space-y-6 py-8">
             <Feature
-              icon={<Link2 className="w-5 h-5" />}
+              icon={<Link2 className="w-4 h-4 lg:w-5 lg:h-5" />}
               title="Short Links"
               description="Create branded short links that are easy to share and track"
             />
             <Feature
-              icon={<Target className="w-5 h-5" />}
+              icon={<Target className="w-4 h-4 lg:w-5 lg:h-5" />}
               title="UTM Tracking"
               description="Add UTM parameters automatically to measure campaign performance"
             />
             <Feature
-              icon={<BarChart3 className="w-5 h-5" />}
+              icon={<BarChart3 className="w-4 h-4 lg:w-5 lg:h-5" />}
               title="Analytics"
               description="Get insights on clicks, locations, devices, and more"
             />
@@ -49,30 +47,30 @@ export default async function SignInPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-sm text-slate-500">
+        <p className="text-xs lg:text-sm text-slate-500">
           © {new Date().getFullYear()} EnGenius Networks. All rights reserved.
         </p>
       </div>
 
       {/* Right Panel - Sign In */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-slate-50">
-        <div className="w-full max-w-sm">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-8 bg-slate-50 min-h-screen md:min-h-0">
+        <div className="w-full max-w-[340px] sm:max-w-sm">
           {/* Mobile Logo */}
-          <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-[#03A9F4] rounded-lg flex items-center justify-center">
-              <Zap className="w-6 h-6 text-white" />
+          <div className="md:hidden flex items-center justify-center gap-3 mb-6">
+            <div className="w-9 h-9 bg-[#03A9F4] rounded-lg flex items-center justify-center">
+              <Zap className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-slate-900">EnGenius ShortLink</h1>
-              <p className="text-sm text-slate-500">UTM Manager</p>
+              <h1 className="text-lg font-semibold text-slate-900">EnGenius ShortLink</h1>
+              <p className="text-xs text-slate-500">UTM Manager</p>
             </div>
           </div>
 
           {/* Sign In Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-semibold text-slate-900">Welcome back</h2>
-              <p className="text-slate-500 mt-1">Sign in to your account to continue</p>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
+            <div className="text-center mb-6">
+              <h2 className="text-xl sm:text-2xl font-semibold text-slate-900">Welcome back</h2>
+              <p className="text-sm text-slate-500 mt-1">Sign in to your account to continue</p>
             </div>
 
             <form
@@ -109,15 +107,15 @@ export default async function SignInPage() {
               </button>
             </form>
 
-            <div className="mt-6 pt-6 border-t border-slate-100">
-              <p className="text-center text-sm text-slate-500">
+            <div className="mt-5 pt-5 border-t border-slate-100">
+              <p className="text-center text-xs sm:text-sm text-slate-500">
                 Only authorized company accounts can sign in
               </p>
             </div>
           </div>
 
           {/* Mobile Footer */}
-          <p className="lg:hidden text-center text-sm text-slate-400 mt-8">
+          <p className="md:hidden text-center text-xs text-slate-400 mt-6">
             © {new Date().getFullYear()} EnGenius Networks
           </p>
         </div>
@@ -128,13 +126,13 @@ export default async function SignInPage() {
 
 function Feature({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
   return (
-    <div className="flex gap-4">
-      <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-[#03A9F4] flex-shrink-0">
+    <div className="flex gap-3 lg:gap-4">
+      <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-lg bg-slate-800 flex items-center justify-center text-[#03A9F4] flex-shrink-0">
         {icon}
       </div>
       <div>
-        <h3 className="font-medium text-white">{title}</h3>
-        <p className="text-sm text-slate-400 mt-0.5">{description}</p>
+        <h3 className="text-sm lg:text-base font-medium text-white">{title}</h3>
+        <p className="text-xs lg:text-sm text-slate-400 mt-0.5 leading-relaxed">{description}</p>
       </div>
     </div>
   );
