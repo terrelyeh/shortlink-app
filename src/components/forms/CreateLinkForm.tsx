@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 import { UTMBuilder } from "./UTMBuilder";
 import { Link2, ChevronDown, ChevronUp, Loader2, Settings2, Target, AlertCircle, CheckCircle, Megaphone } from "lucide-react";
@@ -142,12 +142,17 @@ export function CreateLinkForm() {
     setIsSubmitting(true);
 
     try {
+      // Convert datetime-local format to ISO 8601 format for API validation
+      const expiresAtISO = formData.expiresAt
+        ? new Date(formData.expiresAt).toISOString()
+        : undefined;
+
       const payload = {
         originalUrl: formData.originalUrl,
         customCode: formData.customCode || undefined,
         title: formData.title || undefined,
         redirectType: formData.redirectType,
-        expiresAt: formData.expiresAt || undefined,
+        expiresAt: expiresAtISO,
         maxClicks: formData.maxClicks ? parseInt(formData.maxClicks) : undefined,
         campaignId: formData.campaignId || undefined,
         utmSource: formData.utmSource || undefined,
