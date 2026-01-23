@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { UTM_SOURCES, UTM_MEDIUMS } from "@/lib/utils/utm";
+import { UTM_MEDIUMS, getSourcesForMedium } from "@/lib/utils/utm";
 import { Loader2, Download, Check, Copy, ChevronDown } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 
@@ -208,18 +208,29 @@ export function BatchCreateForm() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
-            {t("source")}
+            {t("medium")}
+            <span className="ml-1 text-xs text-slate-400 font-normal">
+              ({t("selectFirst")})
+            </span>
           </label>
           <div className="relative">
             <select
-              value={utmSource}
-              onChange={(e) => setUtmSource(e.target.value)}
+              value={utmMedium}
+              onChange={(e) => {
+                const newMedium = e.target.value;
+                setUtmMedium(newMedium);
+                // Clear source if not in new medium's sources
+                const newSources = getSourcesForMedium(newMedium);
+                if (newSources.length > 0 && !newSources.includes(utmSource)) {
+                  setUtmSource("");
+                }
+              }}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] appearance-none bg-white"
             >
-              <option value="">Select source</option>
-              {UTM_SOURCES.map((source) => (
-                <option key={source} value={source}>
-                  {source}
+              <option value="">{t("mediumPlaceholder")}</option>
+              {UTM_MEDIUMS.map((medium) => (
+                <option key={medium} value={medium}>
+                  {medium}
                 </option>
               ))}
             </select>
@@ -229,18 +240,25 @@ export function BatchCreateForm() {
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
-            {t("medium")}
+            {t("source")}
           </label>
           <div className="relative">
             <select
-              value={utmMedium}
-              onChange={(e) => setUtmMedium(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] appearance-none bg-white"
+              value={utmSource}
+              onChange={(e) => setUtmSource(e.target.value)}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#03A9F4] appearance-none bg-white ${
+                !utmMedium
+                  ? "border-slate-100 bg-slate-50 text-slate-400"
+                  : "border-slate-200"
+              }`}
+              disabled={!utmMedium}
             >
-              <option value="">Select medium</option>
-              {UTM_MEDIUMS.map((medium) => (
-                <option key={medium} value={medium}>
-                  {medium}
+              <option value="">
+                {!utmMedium ? t("selectMediumFirst") : t("sourcePlaceholder")}
+              </option>
+              {getSourcesForMedium(utmMedium).map((source) => (
+                <option key={source} value={source}>
+                  {source}
                 </option>
               ))}
             </select>

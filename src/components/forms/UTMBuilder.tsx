@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { UTM_SOURCES, UTM_MEDIUMS } from "@/lib/utils/utm";
-import { ChevronDown, FileText, Loader2 } from "lucide-react";
+import {
+  UTM_MEDIUMS,
+  getSourcesForMedium,
+  isCustomSourceAllowed,
+  normalizeSource,
+} from "@/lib/utils/utm";
+import { ChevronDown, FileText, Loader2, AlertCircle } from "lucide-react";
 
 interface UTMParams {
   utmSource: string;
@@ -54,8 +59,45 @@ export function UTMBuilder({ values, onChange, originalUrl }: UTMBuilderProps) {
     fetchTemplates();
   }, []);
 
+  // Get available sources based on selected medium
+  const availableSources = useMemo(() => {
+    if (!values.utmMedium) return [];
+    return getSourcesForMedium(values.utmMedium);
+  }, [values.utmMedium]);
+
+  // Check if current source is valid for selected medium
+  const sourceWarning = useMemo(() => {
+    if (!values.utmMedium || !values.utmSource) return null;
+    const normalizedSource = normalizeSource(values.utmSource);
+    const sources = getSourcesForMedium(values.utmMedium);
+    if (sources.length > 0 && !sources.includes(normalizedSource)) {
+      // Check if custom source is allowed
+      if (isCustomSourceAllowed(values.utmMedium)) {
+        return null; // Custom sources allowed, no warning
+      }
+      return t("sourceNotRecommended");
+    }
+    return null;
+  }, [values.utmMedium, values.utmSource, t]);
+
   const handleChange = (field: keyof UTMParams, value: string) => {
-    onChange({ ...values, [field]: value });
+    const newValues = { ...values, [field]: value };
+
+    // When medium changes, check if current source is still valid
+    if (field === "utmMedium" && values.utmSource) {
+      const newSources = getSourcesForMedium(value);
+      const normalizedSource = normalizeSource(values.utmSource);
+      // Clear source if it's not in the new medium's sources and custom source not allowed
+      if (
+        newSources.length > 0 &&
+        !newSources.includes(normalizedSource) &&
+        !isCustomSourceAllowed(value)
+      ) {
+        newValues.utmSource = "";
+      }
+    }
+
+    onChange(newValues);
     setSelectedTemplate(""); // Clear template selection when manually editing
   };
 
@@ -135,39 +177,13 @@ export function UTMBuilder({ values, onChange, originalUrl }: UTMBuilderProps) {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* UTM Source */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            {t("source")}
-          </label>
-          <div className="relative">
-            <select
-              value={values.utmSource}
-              onChange={(e) => handleChange("utmSource", e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] appearance-none bg-white"
-            >
-              <option value="">{t("sourcePlaceholder")}</option>
-              {UTM_SOURCES.map((source) => (
-                <option key={source} value={source}>
-                  {source}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-          </div>
-          <input
-            type="text"
-            value={values.utmSource}
-            onChange={(e) => handleChange("utmSource", e.target.value)}
-            placeholder={t("sourcePlaceholder")}
-            className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] text-sm"
-          />
-        </div>
-
-        {/* UTM Medium */}
+        {/* UTM Medium - Select First */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
             {t("medium")}
+            <span className="ml-1 text-xs text-slate-400 font-normal">
+              ({t("selectFirst")})
+            </span>
           </label>
           <div className="relative">
             <select
@@ -191,6 +207,64 @@ export function UTMBuilder({ values, onChange, originalUrl }: UTMBuilderProps) {
             placeholder={t("mediumPlaceholder")}
             className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] text-sm"
           />
+        </div>
+
+        {/* UTM Source - Based on Medium */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            {t("source")}
+          </label>
+          <div className="relative">
+            <select
+              value={values.utmSource}
+              onChange={(e) => handleChange("utmSource", e.target.value)}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] appearance-none bg-white ${
+                !values.utmMedium
+                  ? "border-slate-100 bg-slate-50 text-slate-400"
+                  : "border-slate-200"
+              }`}
+              disabled={!values.utmMedium}
+            >
+              <option value="">
+                {!values.utmMedium
+                  ? t("selectMediumFirst")
+                  : t("sourcePlaceholder")}
+              </option>
+              {availableSources.map((source) => (
+                <option key={source} value={source}>
+                  {source}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          </div>
+          <input
+            type="text"
+            value={values.utmSource}
+            onChange={(e) => handleChange("utmSource", e.target.value)}
+            placeholder={
+              isCustomSourceAllowed(values.utmMedium)
+                ? t("sourceCustomPlaceholder")
+                : t("sourcePlaceholder")
+            }
+            className={`mt-2 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] text-sm ${
+              sourceWarning
+                ? "border-amber-300 bg-amber-50"
+                : "border-slate-200"
+            }`}
+            disabled={!values.utmMedium}
+          />
+          {sourceWarning && (
+            <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" />
+              {sourceWarning}
+            </p>
+          )}
+          {isCustomSourceAllowed(values.utmMedium) && (
+            <p className="mt-1 text-xs text-slate-500">
+              {t("customSourceAllowed")}
+            </p>
+          )}
         </div>
 
         {/* UTM Campaign */}
