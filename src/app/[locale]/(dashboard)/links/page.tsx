@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/routing";
 import { LinkCard } from "@/components/links/LinkCard";
 import { Plus, Search, Loader2, Link2, Layers, ChevronLeft, ChevronRight } from "lucide-react";
@@ -26,6 +27,7 @@ interface Pagination {
 export default function LinksPage() {
   const t = useTranslations("links");
   const tCommon = useTranslations("common");
+  const searchParams = useSearchParams();
 
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -35,7 +37,7 @@ export default function LinksPage() {
 
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
 
-  const fetchLinks = async (page = 1) => {
+  const fetchLinks = useCallback(async (page = 1) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: page.toString() });
@@ -45,18 +47,20 @@ export default function LinksPage() {
       const response = await fetch(`/api/links?${params}`);
       const data = await response.json();
 
-      setLinks(data.links);
+      setLinks(data.links || []);
       setPagination(data.pagination);
     } catch (error) {
       console.error("Failed to fetch links:", error);
+      setLinks([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, statusFilter]);
 
+  // Fetch links on mount, when filter changes, or when navigating to this page
   useEffect(() => {
     fetchLinks();
-  }, [statusFilter]);
+  }, [fetchLinks, searchParams]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

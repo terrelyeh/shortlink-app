@@ -173,8 +173,9 @@ export function CreateLinkForm() {
         throw new Error(data.error || "Failed to create link");
       }
 
-      router.push("/links");
-      router.refresh();
+      // Use replace to prevent the form page from being in browser history
+      // This ensures clean navigation back to links list
+      router.replace("/links");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create link");
     } finally {
