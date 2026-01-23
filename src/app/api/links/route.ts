@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
         utmCampaign: validated.utmCampaign,
         utmContent: validated.utmContent,
         utmTerm: validated.utmTerm,
-        userId: session.user.id,
+        createdById: session.user.id,
         groupId: validated.groupId,
         campaignId: validated.campaignId,
       },
