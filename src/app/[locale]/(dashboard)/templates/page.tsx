@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { UTM_SOURCES, UTM_MEDIUMS } from "@/lib/utils/utm";
+import {
+  UTM_MEDIUMS,
+  getSourcesForMedium,
+  isCustomSourceAllowed,
+} from "@/lib/utils/utm";
 import {
   Plus,
   Edit,
@@ -266,17 +270,33 @@ export default function TemplatesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
-                    {t("source")}
+                    {t("medium")}
+                    <span className="ml-1 text-xs text-slate-400 font-normal">
+                      ({t("selectFirst")})
+                    </span>
                   </label>
                   <div className="relative">
                     <select
-                      value={formData.source}
-                      onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                      value={formData.medium}
+                      onChange={(e) => {
+                        const newMedium = e.target.value;
+                        const newSources = getSourcesForMedium(newMedium);
+                        const newFormData = { ...formData, medium: newMedium };
+                        // Clear source if not in new medium's sources
+                        if (
+                          newSources.length > 0 &&
+                          !newSources.includes(formData.source) &&
+                          !isCustomSourceAllowed(newMedium)
+                        ) {
+                          newFormData.source = "";
+                        }
+                        setFormData(newFormData);
+                      }}
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] appearance-none bg-white"
                     >
-                      <option value="">Select</option>
-                      {UTM_SOURCES.map((s) => (
-                        <option key={s} value={s}>{s}</option>
+                      <option value="">{t("mediumPlaceholder")}</option>
+                      {UTM_MEDIUMS.map((m) => (
+                        <option key={m} value={m}>{m}</option>
                       ))}
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -285,21 +305,37 @@ export default function TemplatesPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
-                    {t("medium")}
+                    {t("source")}
                   </label>
                   <div className="relative">
                     <select
-                      value={formData.medium}
-                      onChange={(e) => setFormData({ ...formData, medium: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] appearance-none bg-white"
+                      value={formData.source}
+                      onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#03A9F4] appearance-none bg-white ${
+                        !formData.medium
+                          ? "border-slate-100 bg-slate-50 text-slate-400"
+                          : "border-slate-200"
+                      }`}
+                      disabled={!formData.medium}
                     >
-                      <option value="">Select</option>
-                      {UTM_MEDIUMS.map((m) => (
-                        <option key={m} value={m}>{m}</option>
+                      <option value="">
+                        {!formData.medium ? t("selectMediumFirst") : t("sourcePlaceholder")}
+                      </option>
+                      {getSourcesForMedium(formData.medium).map((s) => (
+                        <option key={s} value={s}>{s}</option>
                       ))}
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                   </div>
+                  {isCustomSourceAllowed(formData.medium) && (
+                    <input
+                      type="text"
+                      value={formData.source}
+                      onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                      placeholder={t("sourceCustomPlaceholder")}
+                      className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] text-sm"
+                    />
+                  )}
                 </div>
               </div>
 
