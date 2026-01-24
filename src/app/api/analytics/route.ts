@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
         where: whereLinks,
         select: { id: true },
       });
-      whereClicks.shortLinkId = { in: userLinks.map((l) => l.id) };
+      whereClicks.shortLinkId = { in: userLinks.map((l: { id: string }) => l.id) };
     }
 
     // Get total clicks
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
 
     // Aggregate by date
     const clicksByDayMap = new Map<string, number>();
-    clicksByDayRaw.forEach((c) => {
+    clicksByDayRaw.forEach((c: { timestamp: Date; _count: number }) => {
       const dateStr = c.timestamp.toISOString().split("T")[0];
       clicksByDayMap.set(dateStr, (clicksByDayMap.get(dateStr) || 0) + c._count);
     });
@@ -180,7 +180,7 @@ export async function GET(request: NextRequest) {
     // Campaign × Content: "campaign|content" → Clicks
     const campaignContentMap = new Map<string, { campaign: string; content: string; clicks: number }>();
 
-    linksWithUTM.forEach((link) => {
+    linksWithUTM.forEach((link: { utmCampaign: string | null; utmSource: string | null; utmMedium: string | null; utmContent: string | null; clicks: { id: string }[] }) => {
       const clickCount = link.clicks.length;
 
       // Campaign breakdown
@@ -272,27 +272,27 @@ export async function GET(request: NextRequest) {
         date: d.date,
         clicks: d.count,
       })),
-      devices: deviceStats.map((d) => ({
+      devices: deviceStats.map((d: { device: string | null; _count: number }) => ({
         name: d.device || "Unknown",
         value: d._count,
       })),
-      browsers: browserStats.map((b) => ({
+      browsers: browserStats.map((b: { browser: string | null; _count: number }) => ({
         name: b.browser || "Unknown",
         value: b._count,
       })),
-      operatingSystems: osStats.map((o) => ({
+      operatingSystems: osStats.map((o: { os: string | null; _count: number }) => ({
         name: o.os || "Unknown",
         value: o._count,
       })),
-      referrers: referrerStats.map((r) => ({
+      referrers: referrerStats.map((r: { referrer: string | null; _count: number }) => ({
         name: r.referrer || "Direct",
         value: r._count,
       })),
-      countries: countryStats.map((c) => ({
+      countries: countryStats.map((c: { country: string | null; _count: number }) => ({
         name: c.country || "Unknown",
         value: c._count,
       })),
-      topLinks: topLinks.map((l) => ({
+      topLinks: topLinks.map((l: { id: string; code: string; title: string | null; originalUrl: string; _count: { clicks: number } }) => ({
         id: l.id,
         code: l.code,
         title: l.title,
