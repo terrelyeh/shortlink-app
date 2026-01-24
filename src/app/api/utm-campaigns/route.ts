@@ -40,12 +40,12 @@ export async function GET(request: NextRequest) {
     // Build search where clause
     const searchWhere = search
       ? {
-          ...baseWhere,
-          utmCampaign: {
-            contains: search,
-            mode: "insensitive" as const,
-            not: null,
-          },
+          deletedAt: null,
+          ...(session.user.role === "MEMBER" ? { createdById: session.user.id } : {}),
+          AND: [
+            { utmCampaign: { not: null } },
+            { utmCampaign: { contains: search, mode: "insensitive" as const } },
+          ],
         }
       : baseWhere;
 
