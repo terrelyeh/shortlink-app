@@ -33,17 +33,22 @@ export async function GET(request: NextRequest) {
     const isMember = session.user.role === "MEMBER";
     const userId = session.user.id;
 
+    // Build where clause dynamically to avoid TypeScript issues with groupBy
+    const where: Record<string, unknown> = {
+      deletedAt: null,
+      utmCampaign: search
+        ? { not: null, contains: search, mode: "insensitive" }
+        : { not: null },
+    };
+
+    if (isMember) {
+      where.createdById = userId;
+    }
+
     // Get aggregated campaign data using groupBy
-    // Build the query inline to ensure proper typing
     const campaigns = (await prisma.shortLink.groupBy({
       by: ["utmCampaign"],
-      where: {
-        deletedAt: null,
-        utmCampaign: search
-          ? { not: null, contains: search, mode: "insensitive" }
-          : { not: null },
-        ...(isMember ? { createdById: userId } : {}),
-      },
+      where,
       _count: {
         id: true,
       },
