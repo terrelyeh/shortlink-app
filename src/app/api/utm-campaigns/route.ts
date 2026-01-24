@@ -30,29 +30,20 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const limit = parseInt(searchParams.get("limit") || "20");
 
-    // Build base where clause
-    const baseWhere = {
-      deletedAt: null,
-      utmCampaign: { not: null } as { not: null },
-      ...(session.user.role === "MEMBER" ? { createdById: session.user.id } : {}),
-    };
-
-    // Build search where clause
-    const searchWhere = search
-      ? {
-          deletedAt: null,
-          ...(session.user.role === "MEMBER" ? { createdById: session.user.id } : {}),
-          AND: [
-            { utmCampaign: { not: null } },
-            { utmCampaign: { contains: search, mode: "insensitive" as const } },
-          ],
-        }
-      : baseWhere;
+    // Build where clause - use explicit object to ensure proper typing for groupBy
+    const isMember = session.user.role === "MEMBER";
+    const userId = session.user.id;
 
     // Get aggregated campaign data using groupBy
     const campaigns = (await prisma.shortLink.groupBy({
-      by: ["utmCampaign"],
-      where: searchWhere,
+      by: ["utmCampaign"] as const,
+      where: {
+        deletedAt: null,
+        utmCampaign: search
+          ? { not: null, contains: search, mode: "insensitive" }
+          : { not: null },
+        ...(isMember ? { createdById: userId } : {}),
+      },
       _count: {
         id: true,
       },
