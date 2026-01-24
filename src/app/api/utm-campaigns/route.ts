@@ -34,16 +34,23 @@ export async function GET(request: NextRequest) {
     const isMember = session.user.role === "MEMBER";
     const userId = session.user.id;
 
+    // Build base where clause
+    const baseWhere = {
+      deletedAt: null as null,
+      utmCampaign: search
+        ? { not: null, contains: search, mode: "insensitive" as const }
+        : { not: null },
+    };
+
+    // Add createdById filter for members
+    const whereClause = isMember
+      ? { ...baseWhere, createdById: userId }
+      : baseWhere;
+
     // Get aggregated campaign data using groupBy
     const campaigns = (await prisma.shortLink.groupBy({
-      by: ["utmCampaign"] as const,
-      where: {
-        deletedAt: null,
-        utmCampaign: search
-          ? { not: null, contains: search, mode: "insensitive" }
-          : { not: null },
-        ...(isMember ? { createdById: userId } : {}),
-      },
+      by: ["utmCampaign"],
+      where: whereClause,
       _count: {
         id: true,
       },
