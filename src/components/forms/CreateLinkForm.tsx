@@ -1,18 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 import { UTMBuilder } from "./UTMBuilder";
-import { Link2, ChevronDown, ChevronUp, Loader2, Settings2, Target, AlertCircle, CheckCircle, Megaphone } from "lucide-react";
+import { Link2, ChevronDown, ChevronUp, Loader2, Settings2, Target, AlertCircle, CheckCircle, Megaphone, Clock } from "lucide-react";
 
-interface Campaign {
-  id: string;
+interface UtmCampaignSuggestion {
   name: string;
-  displayName: string | null;
-  status: string;
-  defaultSource: string | null;
-  defaultMedium: string | null;
+  linkCount: number;
+  clickCount: number;
+  lastUsed: string;
 }
 
 interface FormData {
@@ -22,7 +20,6 @@ interface FormData {
   redirectType: "PERMANENT" | "TEMPORARY";
   expiresAt: string;
   maxClicks: string;
-  campaignId: string;
   utmSource: string;
   utmMedium: string;
   utmCampaign: string;
@@ -37,7 +34,6 @@ const initialFormData: FormData = {
   redirectType: "TEMPORARY",
   expiresAt: "",
   maxClicks: "",
-  campaignId: "",
   utmSource: "",
   utmMedium: "",
   utmCampaign: "",
@@ -58,26 +54,46 @@ export function CreateLinkForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Campaign state
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  // Campaign autocomplete state
+  const [campaignSuggestions, setCampaignSuggestions] = useState<UtmCampaignSuggestion[]>([]);
   const [loadingCampaigns, setLoadingCampaigns] = useState(true);
+  const [showCampaignDropdown, setShowCampaignDropdown] = useState(false);
+  const [campaignInputFocused, setCampaignInputFocused] = useState(false);
+  const campaignInputRef = useRef<HTMLInputElement>(null);
+  const campaignDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Fetch campaigns on mount
+  // Fetch campaign suggestions on mount
   useEffect(() => {
-    async function fetchCampaigns() {
+    async function fetchCampaignSuggestions() {
       try {
-        const response = await fetch("/api/campaigns?status=ACTIVE");
+        const response = await fetch("/api/utm-campaigns?limit=50");
         if (response.ok) {
           const data = await response.json();
-          setCampaigns(data.campaigns || []);
+          setCampaignSuggestions(data.campaigns || []);
         }
       } catch (err) {
-        console.error("Failed to fetch campaigns:", err);
+        console.error("Failed to fetch campaign suggestions:", err);
       } finally {
         setLoadingCampaigns(false);
       }
     }
-    fetchCampaigns();
+    fetchCampaignSuggestions();
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        campaignDropdownRef.current &&
+        !campaignDropdownRef.current.contains(event.target as Node) &&
+        campaignInputRef.current &&
+        !campaignInputRef.current.contains(event.target as Node)
+      ) {
+        setShowCampaignDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleChange = (field: keyof FormData, value: string) => {
@@ -85,25 +101,26 @@ export function CreateLinkForm() {
     setError(null);
   };
 
-  const handleCampaignChange = (campaignId: string) => {
-    const campaign = campaigns.find((c) => c.id === campaignId);
-    if (campaign) {
-      setFormData((prev) => ({
-        ...prev,
-        campaignId,
-        utmCampaign: campaign.name,
-        utmSource: campaign.defaultSource || prev.utmSource,
-        utmMedium: campaign.defaultMedium || prev.utmMedium,
-      }));
-      // Auto-expand UTM section when campaign is selected
-      if (!showUTM) setShowUTM(true);
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        campaignId: "",
-      }));
-    }
+  const handleCampaignInputChange = (value: string) => {
+    // Normalize: lowercase and replace spaces with underscores
+    const normalized = value.toLowerCase().replace(/\s+/g, "_");
+    setFormData((prev) => ({ ...prev, utmCampaign: normalized }));
+    setShowCampaignDropdown(true);
+    // Auto-expand UTM section when typing campaign
+    if (normalized && !showUTM) setShowUTM(true);
   };
+
+  const handleCampaignSelect = (campaignName: string) => {
+    setFormData((prev) => ({ ...prev, utmCampaign: campaignName }));
+    setShowCampaignDropdown(false);
+    // Auto-expand UTM section when campaign is selected
+    if (!showUTM) setShowUTM(true);
+  };
+
+  // Filter suggestions based on input
+  const filteredSuggestions = campaignSuggestions.filter((c) =>
+    c.name.toLowerCase().includes(formData.utmCampaign.toLowerCase())
+  );
 
   const handleUTMChange = (utmValues: {
     utmSource: string;
@@ -154,7 +171,6 @@ export function CreateLinkForm() {
         redirectType: formData.redirectType,
         expiresAt: expiresAtISO,
         maxClicks: formData.maxClicks ? parseInt(formData.maxClicks) : undefined,
-        campaignId: formData.campaignId || undefined,
         utmSource: formData.utmSource || undefined,
         utmMedium: formData.utmMedium || undefined,
         utmCampaign: formData.utmCampaign || undefined,
@@ -251,7 +267,7 @@ export function CreateLinkForm() {
         />
       </div>
 
-      {/* Campaign Selector */}
+      {/* Campaign Input with Autocomplete */}
       <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
         <div className="px-5 py-4">
           <div className="flex items-center gap-3 mb-3">
@@ -260,48 +276,79 @@ export function CreateLinkForm() {
             </div>
             <div className="text-left">
               <span className="font-semibold text-slate-700 block">{tCampaigns("title")}</span>
-              <span className="text-xs text-slate-500">{tCampaigns("linkToCampaign")}</span>
+              <span className="text-xs text-slate-500">{tCampaigns("campaignDescription")}</span>
             </div>
           </div>
 
-          {loadingCampaigns ? (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-            </div>
-          ) : campaigns.length > 0 ? (
-            <>
-              <div className="relative">
-                <select
-                  value={formData.campaignId}
-                  onChange={(e) => handleCampaignChange(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] appearance-none bg-white text-slate-700"
-                >
-                  <option value="">{tCampaigns("noCampaign")}</option>
-                  {campaigns.map((campaign) => (
-                    <option key={campaign.id} value={campaign.id}>
-                      {campaign.displayName || campaign.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-              </div>
-              {formData.campaignId && (
-                <p className="mt-2 text-xs text-slate-600 bg-slate-50 px-3 py-2 rounded-lg">
-                  utm_campaign will be set to: <span className="font-mono font-medium">{formData.utmCampaign}</span>
-                </p>
-              )}
-            </>
-          ) : (
-            <div className="bg-slate-50 rounded-xl p-4">
-              <p className="text-sm text-slate-600 mb-2">{tCampaigns("emptyState.title")}</p>
-              <p className="text-xs text-slate-500 mb-3">{tCampaigns("emptyState.description")}</p>
-              <a
-                href="/campaigns"
-                className="inline-flex items-center gap-2 text-sm font-medium text-[#03A9F4] hover:text-[#0288D1] transition-colors"
+          <div className="relative">
+            <input
+              ref={campaignInputRef}
+              type="text"
+              value={formData.utmCampaign}
+              onChange={(e) => handleCampaignInputChange(e.target.value)}
+              onFocus={() => {
+                setCampaignInputFocused(true);
+                setShowCampaignDropdown(true);
+              }}
+              onBlur={() => setCampaignInputFocused(false)}
+              placeholder={tCampaigns("campaignPlaceholder")}
+              className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] bg-white text-slate-700 font-mono text-sm"
+            />
+            {loadingCampaigns && (
+              <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 animate-spin text-slate-400" />
+            )}
+
+            {/* Autocomplete Dropdown */}
+            {showCampaignDropdown && !loadingCampaigns && (campaignInputFocused || showCampaignDropdown) && (
+              <div
+                ref={campaignDropdownRef}
+                className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-64 overflow-y-auto"
               >
-                <span>+ {tCampaigns("emptyState.createFirst")}</span>
-              </a>
-            </div>
+                {filteredSuggestions.length > 0 ? (
+                  <>
+                    <div className="px-3 py-2 text-xs text-slate-500 border-b border-slate-100">
+                      {tCampaigns("recentCampaigns")}
+                    </div>
+                    {filteredSuggestions.map((suggestion) => (
+                      <button
+                        key={suggestion.name}
+                        type="button"
+                        onClick={() => handleCampaignSelect(suggestion.name)}
+                        className="w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-center justify-between group"
+                      >
+                        <div>
+                          <span className="font-mono text-sm text-slate-700">{suggestion.name}</span>
+                          <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                            <span>{suggestion.linkCount} {tCampaigns("linksCount")}</span>
+                            <span>{suggestion.clickCount} {tCampaigns("clicksCount")}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Clock className="w-3 h-3" />
+                          <span>{new Date(suggestion.lastUsed).toLocaleDateString()}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                ) : formData.utmCampaign ? (
+                  <div className="px-4 py-3 text-sm text-slate-600">
+                    <span className="text-slate-400">{tCampaigns("newCampaign")}</span>{" "}
+                    <span className="font-mono font-medium text-[#03A9F4]">{formData.utmCampaign}</span>
+                  </div>
+                ) : campaignSuggestions.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-slate-500">
+                    {tCampaigns("noPreviousCampaigns")}
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          {formData.utmCampaign && (
+            <p className="mt-2 text-xs text-slate-600 bg-slate-50 px-3 py-2 rounded-lg">
+              utm_campaign={" "}
+              <span className="font-mono font-medium">{formData.utmCampaign}</span>
+            </p>
           )}
         </div>
       </div>

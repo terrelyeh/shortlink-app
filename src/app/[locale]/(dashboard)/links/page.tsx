@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { Link } from "@/i18n/routing";
+import { Link, useRouter } from "@/i18n/routing";
 import { LinkCard } from "@/components/links/LinkCard";
-import { Plus, Search, Loader2, Link2, Layers, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, Loader2, Link2, Layers, ChevronLeft, ChevronRight, X, Megaphone } from "lucide-react";
 
 interface ShortLink {
   id: string;
@@ -27,13 +27,18 @@ interface Pagination {
 export default function LinksPage() {
   const t = useTranslations("links");
   const tCommon = useTranslations("common");
+  const tCampaigns = useTranslations("campaigns");
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+
+  // Campaign filter from URL
+  const campaignFilter = searchParams.get("campaign") || "";
 
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
 
@@ -43,6 +48,7 @@ export default function LinksPage() {
       const params = new URLSearchParams({ page: page.toString() });
       if (search) params.set("search", search);
       if (statusFilter) params.set("status", statusFilter);
+      if (campaignFilter) params.set("campaign", campaignFilter);
 
       const response = await fetch(`/api/links?${params}`);
       const data = await response.json();
@@ -55,7 +61,11 @@ export default function LinksPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter]);
+  }, [search, statusFilter, campaignFilter]);
+
+  const clearCampaignFilter = () => {
+    router.push("/links");
+  };
 
   // Fetch links on mount, when filter changes, or when navigating to this page
   useEffect(() => {
@@ -106,6 +116,9 @@ export default function LinksPage() {
           {pagination && (
             <p className="text-sm text-slate-500 mt-0.5">
               {pagination.total} {pagination.total === 1 ? "link" : "links"}
+              {campaignFilter && (
+                <span className="text-slate-400"> in campaign</span>
+              )}
             </p>
           )}
         </div>
@@ -126,6 +139,22 @@ export default function LinksPage() {
           </Link>
         </div>
       </div>
+
+      {/* Campaign Filter Badge */}
+      {campaignFilter && (
+        <div className="flex items-center gap-2 p-3 bg-sky-50 border border-sky-200 rounded-xl">
+          <Megaphone className="w-4 h-4 text-[#03A9F4]" />
+          <span className="text-sm text-slate-600">{tCampaigns("title")}:</span>
+          <span className="font-mono text-sm font-medium text-[#0288D1]">{campaignFilter}</span>
+          <button
+            onClick={clearCampaignFilter}
+            className="ml-auto p-1 hover:bg-sky-100 rounded-lg transition-colors"
+            title={tCommon("cancel")}
+          >
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+      )}
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
