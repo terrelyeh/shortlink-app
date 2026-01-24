@@ -63,7 +63,8 @@ export async function GET(request: NextRequest) {
       .map((c: CampaignGroupByResult) => c.utmCampaign)
       .filter((name): name is string => name !== null);
 
-    const clickCounts = (await prisma.click.groupBy({
+    // Using type assertion to work around Prisma groupBy type limitation
+    const clickCounts = (await (prisma.click.groupBy as Function)({
       by: ["shortLinkId"],
       where: {
         shortLink: {

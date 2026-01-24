@@ -80,9 +80,9 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({
-      campaigns: campaigns.map((c) => ({
+      campaigns: campaigns.map((c: { id: string; name: string; description: string | null; createdAt: Date; tags: { tag: { id: string; name: string } }[]; _count: { links: number } }) => ({
         ...c,
-        tags: c.tags.map((t) => t.tag),
+        tags: c.tags.map((t: { tag: { id: string; name: string } }) => t.tag),
         linkCount: c._count.links,
       })),
       tags: allTags,
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         ...campaign,
-        tags: campaign.tags.map((t) => t.tag),
+        tags: campaign.tags.map((t: { tag: { id: string; name: string } }) => t.tag),
       },
       { status: 201 }
     );

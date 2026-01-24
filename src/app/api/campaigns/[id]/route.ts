@@ -69,8 +69,8 @@ export async function GET(
 
     return NextResponse.json({
       ...campaign,
-      tags: campaign.tags.map((t) => t.tag),
-      links: campaign.links.map((l) => ({
+      tags: campaign.tags.map((t: { tag: { id: string; name: string } }) => t.tag),
+      links: campaign.links.map((l: { id: string; code: string; originalUrl: string; title: string | null; _count: { clicks: number } }) => ({
         ...l,
         clicks: l._count.clicks,
       })),
@@ -209,7 +209,7 @@ export async function PATCH(
 
     return NextResponse.json({
       ...campaign,
-      tags: campaign.tags.map((t) => t.tag),
+      tags: campaign.tags.map((t: { tag: { id: string; name: string } }) => t.tag),
       linkCount: campaign._count.links,
     });
   } catch (error) {

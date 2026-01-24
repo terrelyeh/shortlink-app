@@ -93,7 +93,7 @@ export async function POST(
 
     // Aggregate clicks by date
     const clicksByDayMap = new Map<string, number>();
-    clicksByDayRaw.forEach((c) => {
+    clicksByDayRaw.forEach((c: { timestamp: Date; _count: number }) => {
       const dateStr = c.timestamp.toISOString().split("T")[0];
       clicksByDayMap.set(dateStr, (clicksByDayMap.get(dateStr) || 0) + c._count);
     });
@@ -114,15 +114,15 @@ export async function POST(
           date: d.date,
           clicks: d.count,
         })),
-        devices: deviceStats.map((d) => ({
+        devices: deviceStats.map((d: { device: string | null; _count: number }) => ({
           name: d.device || "Unknown",
           value: d._count,
         })),
-        browsers: browserStats.map((b) => ({
+        browsers: browserStats.map((b: { browser: string | null; _count: number }) => ({
           name: b.browser || "Unknown",
           value: b._count,
         })),
-        countries: countryStats.map((c) => ({
+        countries: countryStats.map((c: { country: string | null; _count: number }) => ({
           name: c.country || "Unknown",
           value: c._count,
         })),
