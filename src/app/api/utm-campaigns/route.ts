@@ -30,28 +30,29 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const limit = parseInt(searchParams.get("limit") || "20");
 
-    // Build where clause for role-based filtering
-    const where: Record<string, unknown> = {
+    // Build base where clause
+    const baseWhere = {
       deletedAt: null,
-      utmCampaign: { not: null },
+      utmCampaign: { not: null } as { not: null },
+      ...(session.user.role === "MEMBER" ? { createdById: session.user.id } : {}),
     };
 
-    if (session.user.role === "MEMBER") {
-      where.createdById = session.user.id;
-    }
-
-    if (search) {
-      where.utmCampaign = {
-        contains: search,
-        mode: "insensitive",
-        not: null,
-      };
-    }
+    // Build search where clause
+    const searchWhere = search
+      ? {
+          ...baseWhere,
+          utmCampaign: {
+            contains: search,
+            mode: "insensitive" as const,
+            not: null,
+          },
+        }
+      : baseWhere;
 
     // Get aggregated campaign data using groupBy
-    const campaigns: CampaignGroupByResult[] = await prisma.shortLink.groupBy({
+    const campaigns = (await prisma.shortLink.groupBy({
       by: ["utmCampaign"],
-      where,
+      where: searchWhere,
       _count: {
         id: true,
       },
@@ -64,14 +65,14 @@ export async function GET(request: NextRequest) {
         },
       },
       take: limit,
-    });
+    })) as CampaignGroupByResult[];
 
     // Get click counts for each campaign
     const campaignNames = campaigns
       .map((c: CampaignGroupByResult) => c.utmCampaign)
       .filter((name): name is string => name !== null);
 
-    const clickCounts: ClickCountResult[] = await prisma.click.groupBy({
+    const clickCounts = (await prisma.click.groupBy({
       by: ["shortLinkId"],
       where: {
         shortLink: {
@@ -83,10 +84,10 @@ export async function GET(request: NextRequest) {
       _count: {
         id: true,
       },
-    });
+    })) as ClickCountResult[];
 
     // Get shortLink to campaign mapping for click aggregation
-    const linksWithCampaigns: LinkWithCampaign[] = await prisma.shortLink.findMany({
+    const linksWithCampaigns = (await prisma.shortLink.findMany({
       where: {
         utmCampaign: { in: campaignNames },
         deletedAt: null,
@@ -96,7 +97,7 @@ export async function GET(request: NextRequest) {
         id: true,
         utmCampaign: true,
       },
-    });
+    })) as LinkWithCampaign[];
 
     // Aggregate clicks by campaign
     const clicksByLinkId = new Map<string, number>(
