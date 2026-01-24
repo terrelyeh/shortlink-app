@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "20");
     const search = searchParams.get("search") || "";
     const status = searchParams.get("status");
+    const campaign = searchParams.get("campaign");
 
     const where: Record<string, unknown> = {
       deletedAt: null,
@@ -55,6 +56,11 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       where.status = status;
+    }
+
+    // Filter by utm_campaign
+    if (campaign) {
+      where.utmCampaign = campaign;
     }
 
     const [links, total] = await Promise.all([
