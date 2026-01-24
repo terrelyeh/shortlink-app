@@ -30,27 +30,20 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const limit = parseInt(searchParams.get("limit") || "20");
 
-    // Build where clause - use explicit object to ensure proper typing for groupBy
     const isMember = session.user.role === "MEMBER";
     const userId = session.user.id;
 
-    // Build base where clause
-    const baseWhere = {
-      deletedAt: null as null,
-      utmCampaign: search
-        ? { not: null, contains: search, mode: "insensitive" as const }
-        : { not: null },
-    };
-
-    // Add createdById filter for members
-    const whereClause = isMember
-      ? { ...baseWhere, createdById: userId }
-      : baseWhere;
-
     // Get aggregated campaign data using groupBy
+    // Build the query inline to ensure proper typing
     const campaigns = (await prisma.shortLink.groupBy({
       by: ["utmCampaign"],
-      where: whereClause,
+      where: {
+        deletedAt: null,
+        utmCampaign: search
+          ? { not: null, contains: search, mode: "insensitive" }
+          : { not: null },
+        ...(isMember ? { createdById: userId } : {}),
+      },
       _count: {
         id: true,
       },
