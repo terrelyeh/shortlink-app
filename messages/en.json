@@ -86,7 +86,17 @@
     "tags": "Tags",
     "addTag": "Add Tag",
     "noLinks": "No links yet",
-    "createFirst": "Create your first short link"
+    "createFirst": "Create your first short link",
+    "clone": "Clone",
+    "cloneSuccess": "Link cloned successfully",
+    "sortNewest": "Newest",
+    "sortOldest": "Oldest",
+    "sortMostClicks": "Most clicks",
+    "sortFewestClicks": "Fewest clicks",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "selected": "selected",
+    "batchDeleteConfirm": "Are you sure you want to delete the selected links?"
   },
   "utm": {
     "title": "UTM Parameters",

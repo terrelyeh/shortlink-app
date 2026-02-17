@@ -36,6 +36,9 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const status = searchParams.get("status");
     const campaign = searchParams.get("campaign");
+    const tagId = searchParams.get("tagId");
+    const sortBy = searchParams.get("sortBy") || "createdAt";
+    const sortOrder = searchParams.get("sortOrder") || "desc";
 
     const where: Record<string, unknown> = {
       deletedAt: null,
@@ -63,6 +66,11 @@ export async function GET(request: NextRequest) {
       where.utmCampaign = campaign;
     }
 
+    // Filter by tag
+    if (tagId) {
+      where.tags = { some: { tagId } };
+    }
+
     const [links, total] = await Promise.all([
       prisma.shortLink.findMany({
         where,
@@ -70,7 +78,9 @@ export async function GET(request: NextRequest) {
           _count: { select: { clicks: true } },
           tags: { include: { tag: true } },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: sortBy === "clicks"
+          ? { clicks: { _count: sortOrder as "asc" | "desc" } }
+          : { [sortBy]: sortOrder },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -160,7 +170,7 @@ export async function POST(request: NextRequest) {
       finalUrl = url.toString();
     }
 
-    // Create the short link
+    // Create the short link with tags
     const shortLink = await prisma.shortLink.create({
       data: {
         code: code!,
@@ -177,6 +187,16 @@ export async function POST(request: NextRequest) {
         createdById: session.user.id,
         groupId: validated.groupId,
         campaignId: validated.campaignId,
+        ...(validated.tags && validated.tags.length > 0 && {
+          tags: {
+            create: validated.tags.map((tagId) => ({
+              tag: { connect: { id: tagId } },
+            })),
+          },
+        }),
+      },
+      include: {
+        tags: { include: { tag: true } },
       },
     });
 

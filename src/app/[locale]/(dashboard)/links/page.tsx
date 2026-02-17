@@ -5,7 +5,18 @@ import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Link, useRouter } from "@/i18n/routing";
 import { LinkCard } from "@/components/links/LinkCard";
-import { Plus, Search, Loader2, Link2, Layers, ChevronLeft, ChevronRight, X, Megaphone } from "lucide-react";
+import { Plus, Search, Loader2, Link2, Layers, ChevronLeft, ChevronRight, X, Megaphone, Tag, Trash2, Pause, Play, Archive, CheckSquare, Download, ArrowUpDown } from "lucide-react";
+
+interface LinkTag {
+  tag: { id: string; name: string; color?: string | null };
+}
+
+interface TagOption {
+  id: string;
+  name: string;
+  color?: string | null;
+  _count: { links: number };
+}
 
 interface ShortLink {
   id: string;
@@ -15,6 +26,7 @@ interface ShortLink {
   status: string;
   createdAt: string;
   _count: { clicks: number };
+  tags?: LinkTag[];
 }
 
 interface Pagination {
@@ -36,9 +48,31 @@ export default function LinksPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
+  const [allTags, setAllTags] = useState<TagOption[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState("desc");
 
   // Campaign filter from URL
   const campaignFilter = searchParams.get("campaign") || "";
+
+  // Fetch tags for filter
+  useEffect(() => {
+    async function fetchTags() {
+      try {
+        const response = await fetch("/api/tags");
+        if (response.ok) {
+          const data = await response.json();
+          setAllTags(data.tags || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch tags:", err);
+      }
+    }
+    fetchTags();
+  }, []);
 
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
 
@@ -49,6 +83,9 @@ export default function LinksPage() {
       if (search) params.set("search", search);
       if (statusFilter) params.set("status", statusFilter);
       if (campaignFilter) params.set("campaign", campaignFilter);
+      if (tagFilter) params.set("tagId", tagFilter);
+      if (sortBy !== "createdAt") params.set("sortBy", sortBy);
+      if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
 
       const response = await fetch(`/api/links?${params}`);
       const data = await response.json();
@@ -61,7 +98,7 @@ export default function LinksPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, campaignFilter]);
+  }, [search, statusFilter, campaignFilter, tagFilter, sortBy, sortOrder]);
 
   const clearCampaignFilter = () => {
     router.push("/links");
@@ -107,6 +144,56 @@ export default function LinksPage() {
     }
   };
 
+  const handleClone = async (id: string) => {
+    try {
+      const response = await fetch(`/api/links/${id}/clone`, { method: "POST" });
+      if (response.ok) {
+        fetchLinks(pagination?.page || 1);
+      }
+    } catch (error) {
+      console.error("Failed to clone link:", error);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === links.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(links.map((l) => l.id)));
+    }
+  };
+
+  const handleBatchAction = async (action: "delete" | "pause" | "activate" | "archive") => {
+    if (selectedIds.size === 0) return;
+    if (action === "delete" && !confirm(t("deleteConfirm"))) return;
+
+    setBatchLoading(true);
+    try {
+      const response = await fetch("/api/links/batch-actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selectedIds), action }),
+      });
+      if (response.ok) {
+        setSelectedIds(new Set());
+        fetchLinks(pagination?.page || 1);
+      }
+    } catch (error) {
+      console.error("Batch action failed:", error);
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -123,6 +210,13 @@ export default function LinksPage() {
           )}
         </div>
         <div className="flex gap-2">
+          <a
+            href={`/api/export/links${statusFilter ? `?status=${statusFilter}` : ""}`}
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            {tCommon("export")}
+          </a>
           <Link
             href="/links/batch"
             className="inline-flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
@@ -183,7 +277,87 @@ export default function LinksPage() {
             </button>
           ))}
         </div>
+        <div className="relative">
+          <select
+            value={`${sortBy}:${sortOrder}`}
+            onChange={(e) => {
+              const [by, order] = e.target.value.split(":");
+              setSortBy(by);
+              setSortOrder(order);
+            }}
+            className="appearance-none pl-8 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] cursor-pointer"
+          >
+            <option value="createdAt:desc">Newest</option>
+            <option value="createdAt:asc">Oldest</option>
+            <option value="clicks:desc">Most clicks</option>
+            <option value="clicks:asc">Fewest clicks</option>
+            <option value="title:asc">Title A-Z</option>
+            <option value="title:desc">Title Z-A</option>
+          </select>
+          <ArrowUpDown className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        </div>
+        {allTags.length > 0 && (
+          <div className="relative">
+            <select
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+              className="appearance-none pl-8 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] cursor-pointer"
+            >
+              <option value="">{t("tags")}: {tCommon("all")}</option>
+              {allTags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name} ({tag._count.links})
+                </option>
+              ))}
+            </select>
+            <Tag className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          </div>
+        )}
       </div>
+
+      {/* Batch Actions Toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+          <span className="text-sm font-medium text-slate-700">
+            {selectedIds.size} selected
+          </span>
+          <div className="flex gap-1 ml-auto">
+            <button
+              onClick={() => handleBatchAction("activate")}
+              disabled={batchLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+            >
+              <Play className="w-3.5 h-3.5" />
+              {t("active")}
+            </button>
+            <button
+              onClick={() => handleBatchAction("pause")}
+              disabled={batchLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50"
+            >
+              <Pause className="w-3.5 h-3.5" />
+              {t("paused")}
+            </button>
+            <button
+              onClick={() => handleBatchAction("archive")}
+              disabled={batchLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50"
+            >
+              <Archive className="w-3.5 h-3.5" />
+              {t("archived")}
+            </button>
+            <button
+              onClick={() => handleBatchAction("delete")}
+              disabled={batchLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              {tCommon("delete")}
+            </button>
+          </div>
+          {batchLoading && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
+        </div>
+      )}
 
       {/* Links List */}
       {loading ? (
@@ -207,17 +381,47 @@ export default function LinksPage() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-3">
-          {links.map((link) => (
-            <LinkCard
-              key={link.id}
-              link={link}
-              shortBaseUrl={shortBaseUrl}
-              onDelete={handleDelete}
-              onStatusChange={handleStatusChange}
-            />
-          ))}
-        </div>
+        <>
+          {/* Select All */}
+          <div className="flex items-center gap-2 px-1">
+            <button
+              onClick={toggleSelectAll}
+              className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-700 transition-colors"
+            >
+              <CheckSquare className={`w-4 h-4 ${selectedIds.size === links.length && links.length > 0 ? "text-[#03A9F4]" : ""}`} />
+              {selectedIds.size === links.length && links.length > 0 ? "Deselect all" : "Select all"}
+            </button>
+          </div>
+          <div className="space-y-3">
+            {links.map((link) => (
+              <div key={link.id} className="flex items-start gap-3">
+                <button
+                  onClick={() => toggleSelect(link.id)}
+                  className={`mt-4 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                    selectedIds.has(link.id)
+                      ? "bg-[#03A9F4] border-[#03A9F4] text-white"
+                      : "border-slate-300 hover:border-slate-400"
+                  }`}
+                >
+                  {selectedIds.has(link.id) && (
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </button>
+                <div className="flex-1">
+                  <LinkCard
+                    link={link}
+                    shortBaseUrl={shortBaseUrl}
+                    onDelete={handleDelete}
+                    onStatusChange={handleStatusChange}
+                    onClone={handleClone}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Pagination */}

@@ -86,7 +86,17 @@
     "tags": "標籤",
     "addTag": "新增標籤",
     "noLinks": "尚無連結",
-    "createFirst": "建立您的第一個短網址"
+    "createFirst": "建立您的第一個短網址",
+    "clone": "複製連結",
+    "cloneSuccess": "連結已複製成功",
+    "sortNewest": "最新",
+    "sortOldest": "最舊",
+    "sortMostClicks": "最多點擊",
+    "sortFewestClicks": "最少點擊",
+    "selectAll": "全選",
+    "deselectAll": "取消全選",
+    "selected": "已選取",
+    "batchDeleteConfirm": "確定要刪除所選的連結嗎？"
   },
   "utm": {
     "title": "UTM 參數",

@@ -16,8 +16,13 @@ import {
   Play,
   MousePointerClick,
   Calendar,
+  CopyPlus,
 } from "lucide-react";
 import Link from "next/link";
+
+interface LinkTag {
+  tag: { id: string; name: string; color?: string | null };
+}
 
 interface LinkCardProps {
   link: {
@@ -28,10 +33,12 @@ interface LinkCardProps {
     status: string;
     createdAt: string;
     _count: { clicks: number };
+    tags?: LinkTag[];
   };
   shortBaseUrl: string;
   onDelete?: (id: string) => void;
   onStatusChange?: (id: string, status: string) => void;
+  onClone?: (id: string) => void;
 }
 
 export function LinkCard({
@@ -39,6 +46,7 @@ export function LinkCard({
   shortBaseUrl,
   onDelete,
   onStatusChange,
+  onClone,
 }: LinkCardProps) {
   const t = useTranslations("links");
   const [copied, setCopied] = useState(false);
@@ -116,6 +124,21 @@ export function LinkCard({
             {link.originalUrl}
           </p>
 
+          {/* Tags */}
+          {link.tags && link.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {link.tags.map(({ tag }) => (
+                <span
+                  key={tag.id}
+                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600"
+                  style={tag.color ? { backgroundColor: tag.color + "20", color: tag.color } : undefined}
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* Stats */}
           <div className="flex items-center gap-4 text-sm text-slate-500">
             <span className="flex items-center gap-1.5">
@@ -175,6 +198,16 @@ export function LinkCard({
                     Analytics
                   </Link>
                   <button
+                    onClick={() => {
+                      onClone?.(link.id);
+                      setShowMenu(false);
+                    }}
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <CopyPlus className="w-4 h-4" />
+                    Clone
+                  </button>
+                  <button
                     onClick={toggleStatus}
                     className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                   >
@@ -205,20 +238,33 @@ export function LinkCard({
         </div>
       </div>
 
-      {/* QR Code */}
+      {/* QR Code (branded) */}
       {showQR && (
         <div className="mt-4 pt-4 border-t border-slate-100">
-          <div className="flex items-center justify-center">
-            <div className="text-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm">
               <QRCodeCanvas
+                id={`qr-${link.id}`}
                 value={shortUrl}
-                size={120}
-                level="M"
-                className="mx-auto"
+                size={160}
+                level="H"
+                fgColor="#0F172A"
+                bgColor="#FFFFFF"
+                marginSize={2}
+                imageSettings={{
+                  src: "/icon.svg",
+                  x: undefined,
+                  y: undefined,
+                  height: 32,
+                  width: 32,
+                  excavate: true,
+                }}
               />
+            </div>
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => {
-                  const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+                  const canvas = document.getElementById(`qr-${link.id}`) as HTMLCanvasElement;
                   if (canvas) {
                     const url = canvas.toDataURL("image/png");
                     const a = document.createElement("a");
@@ -227,9 +273,33 @@ export function LinkCard({
                     a.click();
                   }
                 }}
-                className="mt-3 text-sm text-[#03A9F4] hover:text-[#0288D1] font-medium"
+                className="text-sm text-[#03A9F4] hover:text-[#0288D1] font-medium"
               >
-                Download QR
+                PNG
+              </button>
+              <span className="text-slate-300">|</span>
+              <button
+                onClick={() => {
+                  const canvas = document.getElementById(`qr-${link.id}`) as HTMLCanvasElement;
+                  if (canvas) {
+                    // Create SVG wrapper with white background
+                    const dataUrl = canvas.toDataURL("image/png");
+                    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+                      <rect width="200" height="200" fill="white"/>
+                      <image href="${dataUrl}" width="200" height="200"/>
+                    </svg>`;
+                    const blob = new Blob([svg], { type: "image/svg+xml" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `qr-${link.code}.svg`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }
+                }}
+                className="text-sm text-[#03A9F4] hover:text-[#0288D1] font-medium"
+              >
+                SVG
               </button>
             </div>
           </div>
