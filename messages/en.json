@@ -40,7 +40,8 @@
     "settings": "Settings",
     "users": "User Management",
     "auditLog": "Audit Log",
-    "signOut": "Sign Out"
+    "signOut": "Sign Out",
+    "menu": "Menu"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -51,9 +52,25 @@
     "recentLinks": "Recent Links",
     "topLinks": "Top Links",
     "clicksTrend": "Clicks Trend",
+    "last30DaysOverview": "Last 30 days overview",
+    "newLink": "New Link",
+    "viewAll": "View all",
+    "noLinksYet": "No links yet",
+    "clicksCount": "{count} clicks",
+    "vsLastPeriod": "{value}% vs last period",
+    "quickStart": {
+      "title": "Quick Start",
+      "description": "Get started with these simple steps",
+      "createLink": "Create a Short Link",
+      "createLinkDesc": "Turn long URLs into short, trackable links",
+      "setupCampaign": "Set Up a Campaign",
+      "setupCampaignDesc": "Group your links for better organization",
+      "createTemplate": "Create UTM Template",
+      "createTemplateDesc": "Save time with reusable UTM parameters"
+    },
     "emptyState": {
-      "title": "Welcome to Short Link Manager!",
-      "description": "Create your first short link to start tracking clicks and analyzing your traffic.",
+      "title": "Welcome to EnGenius ShortLink",
+      "description": "Create short links with UTM tracking to measure your marketing campaigns effectively.",
       "createButton": "Create Your First Link"
     }
   },

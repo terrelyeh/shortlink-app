@@ -6,11 +6,15 @@ import { checkRateLimit } from "@/lib/rate-limit";
 
 // Validate IP_HASH_SALT at module load time
 const IP_HASH_SALT = process.env.IP_HASH_SALT;
-if (!IP_HASH_SALT) {
+if (!IP_HASH_SALT && process.env.NODE_ENV === "production") {
+  throw new Error(
+    "IP_HASH_SALT environment variable is required in production. " +
+    "IP addresses cannot be properly anonymized without it."
+  );
+} else if (!IP_HASH_SALT) {
   console.warn(
     "WARNING: IP_HASH_SALT environment variable is not set. " +
-    "IP addresses will not be properly anonymized. " +
-    "Please set IP_HASH_SALT in production."
+    "Please set IP_HASH_SALT before deploying to production."
   );
 }
 

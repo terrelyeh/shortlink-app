@@ -215,6 +215,8 @@ model ShortLink {
   @@index([code])
   @@index([workspaceId])
   @@index([createdAt])
+  @@index([deletedAt])
+  @@index([workspaceId, status])
   @@map("short_links")
 }
 
@@ -236,6 +238,7 @@ model Click {
   @@index([shortLinkId])
   @@index([timestamp])
   @@index([shortLinkId, ipHash, timestamp])
+  @@index([ipHash])
   @@map("clicks")
 }
 
@@ -439,5 +442,6 @@ model AuditLog {
 
   @@index([userId])
   @@index([createdAt])
+  @@index([action])
   @@map("audit_logs")
 }

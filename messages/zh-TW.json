@@ -40,7 +40,8 @@
     "settings": "設定",
     "users": "使用者管理",
     "auditLog": "操作紀錄",
-    "signOut": "登出"
+    "signOut": "登出",
+    "menu": "選單"
   },
   "dashboard": {
     "title": "儀表板",
@@ -51,9 +52,25 @@
     "recentLinks": "最近建立的連結",
     "topLinks": "熱門連結",
     "clicksTrend": "點擊趨勢",
+    "last30DaysOverview": "過去 30 天總覽",
+    "newLink": "新增連結",
+    "viewAll": "查看全部",
+    "noLinksYet": "尚無連結",
+    "clicksCount": "{count} 次點擊",
+    "vsLastPeriod": "{value}% 較上期",
+    "quickStart": {
+      "title": "快速開始",
+      "description": "透過以下簡單步驟開始使用",
+      "createLink": "建立短網址",
+      "createLinkDesc": "將長網址轉為可追蹤的短連結",
+      "setupCampaign": "設定行銷活動",
+      "setupCampaignDesc": "分組管理連結更有條理",
+      "createTemplate": "建立 UTM 模板",
+      "createTemplateDesc": "使用可重複利用的 UTM 參數節省時間"
+    },
     "emptyState": {
-      "title": "歡迎使用短網址管理系統！",
-      "description": "建立您的第一個短網址，開始追蹤點擊數據和分析流量。",
+      "title": "歡迎使用 EnGenius ShortLink",
+      "description": "建立帶有 UTM 追蹤的短連結，有效衡量您的行銷活動成效。",
       "createButton": "建立第一個短網址"
     }
   },
