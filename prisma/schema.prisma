@@ -235,6 +235,7 @@ model Click {
 
   @@index([shortLinkId])
   @@index([timestamp])
+  @@index([shortLinkId, ipHash, timestamp])
   @@map("clicks")
 }
 

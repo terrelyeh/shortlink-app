@@ -4,7 +4,14 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 import { UTMBuilder } from "./UTMBuilder";
-import { Link2, ChevronDown, ChevronUp, Loader2, Settings2, Target, AlertCircle, CheckCircle, Megaphone, Clock } from "lucide-react";
+import { Link2, ChevronDown, ChevronUp, Loader2, Settings2, Target, AlertCircle, CheckCircle, Megaphone, Clock, Tag } from "lucide-react";
+import { TagInput } from "@/components/tags/TagInput";
+
+interface TagOption {
+  id: string;
+  name: string;
+  color?: string | null;
+}
 
 interface UtmCampaignSuggestion {
   name: string;
@@ -53,6 +60,7 @@ export function CreateLinkForm() {
   const [showUTM, setShowUTM] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<TagOption[]>([]);
 
   // Campaign autocomplete state
   const [campaignSuggestions, setCampaignSuggestions] = useState<UtmCampaignSuggestion[]>([]);
@@ -176,6 +184,7 @@ export function CreateLinkForm() {
         utmCampaign: formData.utmCampaign || undefined,
         utmContent: formData.utmContent || undefined,
         utmTerm: formData.utmTerm || undefined,
+        tags: selectedTags.length > 0 ? selectedTags.map((t) => t.id) : undefined,
       };
 
       const response = await fetch("/api/links", {
@@ -264,6 +273,19 @@ export function CreateLinkForm() {
           onChange={(e) => handleChange("title", e.target.value)}
           placeholder="Optional title for this link"
           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] focus:bg-white transition-all duration-200 placeholder:text-slate-400"
+        />
+      </div>
+
+      {/* Tags */}
+      <div>
+        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
+          <Tag className="w-4 h-4" />
+          {t("tags")}
+        </label>
+        <TagInput
+          selectedTags={selectedTags}
+          onChange={setSelectedTags}
+          placeholder={t("addTag")}
         />
       </div>
 

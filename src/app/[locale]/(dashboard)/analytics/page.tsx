@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { ClicksChart } from "@/components/analytics/ClicksChart";
 import { PieChartComponent } from "@/components/analytics/PieChartComponent";
-import { MousePointerClick, Users, TrendingUp, Loader2, Link2, ChevronDown, X, Target, Globe, Megaphone } from "lucide-react";
+import { MousePointerClick, Users, TrendingUp, Loader2, Link2, ChevronDown, X, Target, Globe, Megaphone, Download } from "lucide-react";
 
 interface AnalyticsData {
   summary: {
@@ -46,6 +46,7 @@ const dateRanges = [
   { value: "7d", label: "7 Days" },
   { value: "30d", label: "30 Days" },
   { value: "90d", label: "90 Days" },
+  { value: "custom", label: "Custom" },
 ];
 
 function StatCard({
@@ -87,6 +88,8 @@ function StatCard({
 export default function AnalyticsPage() {
   const t = useTranslations("analytics");
   const [range, setRange] = useState("7d");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [selectedLinkId, setSelectedLinkId] = useState<string>("");
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(true);
@@ -124,6 +127,10 @@ export default function AnalyticsPage() {
         if (selectedLinkId) {
           params.set("linkId", selectedLinkId);
         }
+        if (range === "custom" && customFrom) {
+          params.set("from", customFrom);
+          if (customTo) params.set("to", customTo);
+        }
 
         const response = await fetch(`/api/analytics?${params}`);
         if (!response.ok) throw new Error("Failed to fetch analytics");
@@ -137,7 +144,7 @@ export default function AnalyticsPage() {
     }
 
     fetchAnalytics();
-  }, [range, selectedLinkId]);
+  }, [range, selectedLinkId, customFrom, customTo]);
 
   const selectedLink = links.find(l => l.id === selectedLinkId);
 
@@ -156,8 +163,15 @@ export default function AnalyticsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
 
-          {/* Date Range Selector */}
-          <div className="flex gap-2">
+          {/* Date Range Selector + Export */}
+          <div className="flex gap-2 items-center">
+            <a
+              href={`/api/export/analytics?range=${range}${selectedLinkId ? `&linkId=${selectedLinkId}` : ""}`}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              CSV
+            </a>
             {dateRanges.map((r) => (
               <button
                 key={r.value}
@@ -173,6 +187,26 @@ export default function AnalyticsPage() {
             ))}
           </div>
         </div>
+
+        {/* Custom Date Range Picker */}
+        {range === "custom" && (
+          <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+            <label className="text-sm text-slate-600">From:</label>
+            <input
+              type="date"
+              value={customFrom}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
+            />
+            <label className="text-sm text-slate-600">To:</label>
+            <input
+              type="date"
+              value={customTo}
+              onChange={(e) => setCustomTo(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
+            />
+          </div>
+        )}
 
         {/* Link Selector */}
         <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">

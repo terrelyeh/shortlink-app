@@ -12,31 +12,39 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const range = searchParams.get("range") || "7d";
     const linkId = searchParams.get("linkId");
+    const customFrom = searchParams.get("from");
+    const customTo = searchParams.get("to");
 
     // Calculate date range
     const now = new Date();
     let startDate: Date;
+    let endDate: Date = now;
 
-    switch (range) {
-      case "24h":
-        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        break;
-      case "7d":
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case "30d":
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        break;
-      case "90d":
-        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-        break;
-      default:
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    if (range === "custom" && customFrom) {
+      startDate = new Date(customFrom);
+      endDate = customTo ? new Date(customTo) : now;
+    } else {
+      switch (range) {
+        case "24h":
+          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
+        case "7d":
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case "30d":
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case "90d":
+          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      }
     }
 
     // Base query conditions
     const whereClicks: Record<string, unknown> = {
-      timestamp: { gte: startDate },
+      timestamp: { gte: startDate, lte: endDate },
     };
 
     const whereLinks: Record<string, unknown> = {
@@ -61,6 +69,23 @@ export async function GET(request: NextRequest) {
 
     // Get total clicks
     const totalClicks = await prisma.click.count({ where: whereClicks });
+
+    // Calculate previous period for comparison
+    const periodMs = now.getTime() - startDate.getTime();
+    const prevStartDate = new Date(startDate.getTime() - periodMs);
+    const prevWhereClicks: Record<string, unknown> = {
+      ...whereClicks,
+      timestamp: { gte: prevStartDate, lt: startDate },
+    };
+    const prevTotalClicks = await prisma.click.count({ where: prevWhereClicks });
+
+    // Calculate percentage change
+    let clicksChange = 0;
+    if (prevTotalClicks > 0) {
+      clicksChange = Math.round(((totalClicks - prevTotalClicks) / prevTotalClicks) * 100);
+    } else if (totalClicks > 0) {
+      clicksChange = 100;
+    }
 
     // Get unique visitors (by IP hash)
     const uniqueVisitors = await prisma.click.groupBy({
@@ -266,7 +291,7 @@ export async function GET(request: NextRequest) {
       summary: {
         totalClicks,
         uniqueVisitors: uniqueVisitors.length,
-        clicksChange: 0, // TODO: Calculate compared to previous period
+        clicksChange,
       },
       clicksByDay: clicksByDay.map((d) => ({
         date: d.date,
