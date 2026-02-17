@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createHash } from "crypto";
 import { headers } from "next/headers";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // Validate IP_HASH_SALT at module load time
 const IP_HASH_SALT = process.env.IP_HASH_SALT;
@@ -80,6 +81,14 @@ export async function GET(
 ) {
   const { code } = await params;
 
+  // Rate limit: 100 requests per minute per IP
+  const headersList = await headers();
+  const clientIp = headersList.get("x-forwarded-for")?.split(",")[0] ||
+                   headersList.get("x-real-ip") ||
+                   "unknown";
+  const rateLimitResponse = checkRateLimit(clientIp, "redirect", { limit: 100, windowSeconds: 60 });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     // Find the short link
     const shortLink = await prisma.shortLink.findUnique({
@@ -114,11 +123,8 @@ export async function GET(
       }
     }
 
-    // Get request headers for tracking
-    const headersList = await headers();
-    const ip = headersList.get("x-forwarded-for")?.split(",")[0] ||
-               headersList.get("x-real-ip") ||
-               "unknown";
+    // Get request headers for tracking (headersList already fetched above for rate limiting)
+    const ip = clientIp;
     const userAgent = headersList.get("user-agent");
     const referrer = headersList.get("referer");
     const { device, os, browser } = parseUserAgent(userAgent);

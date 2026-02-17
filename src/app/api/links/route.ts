@@ -37,6 +37,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const campaign = searchParams.get("campaign");
     const tagId = searchParams.get("tagId");
+    const sortBy = searchParams.get("sortBy") || "createdAt";
+    const sortOrder = searchParams.get("sortOrder") || "desc";
 
     const where: Record<string, unknown> = {
       deletedAt: null,
@@ -76,7 +78,9 @@ export async function GET(request: NextRequest) {
           _count: { select: { clicks: true } },
           tags: { include: { tag: true } },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: sortBy === "clicks"
+          ? { clicks: { _count: sortOrder as "asc" | "desc" } }
+          : { [sortBy]: sortOrder },
         skip: (page - 1) * limit,
         take: limit,
       }),

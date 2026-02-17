@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Link, useRouter } from "@/i18n/routing";
 import { LinkCard } from "@/components/links/LinkCard";
-import { Plus, Search, Loader2, Link2, Layers, ChevronLeft, ChevronRight, X, Megaphone, Tag, Trash2, Pause, Play, Archive, CheckSquare, Download } from "lucide-react";
+import { Plus, Search, Loader2, Link2, Layers, ChevronLeft, ChevronRight, X, Megaphone, Tag, Trash2, Pause, Play, Archive, CheckSquare, Download, ArrowUpDown } from "lucide-react";
 
 interface LinkTag {
   tag: { id: string; name: string; color?: string | null };
@@ -52,6 +52,8 @@ export default function LinksPage() {
   const [allTags, setAllTags] = useState<TagOption[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState("desc");
 
   // Campaign filter from URL
   const campaignFilter = searchParams.get("campaign") || "";
@@ -82,6 +84,8 @@ export default function LinksPage() {
       if (statusFilter) params.set("status", statusFilter);
       if (campaignFilter) params.set("campaign", campaignFilter);
       if (tagFilter) params.set("tagId", tagFilter);
+      if (sortBy !== "createdAt") params.set("sortBy", sortBy);
+      if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
 
       const response = await fetch(`/api/links?${params}`);
       const data = await response.json();
@@ -94,7 +98,7 @@ export default function LinksPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, campaignFilter, tagFilter]);
+  }, [search, statusFilter, campaignFilter, tagFilter, sortBy, sortOrder]);
 
   const clearCampaignFilter = () => {
     router.push("/links");
@@ -137,6 +141,17 @@ export default function LinksPage() {
       }
     } catch (error) {
       console.error("Failed to update link:", error);
+    }
+  };
+
+  const handleClone = async (id: string) => {
+    try {
+      const response = await fetch(`/api/links/${id}/clone`, { method: "POST" });
+      if (response.ok) {
+        fetchLinks(pagination?.page || 1);
+      }
+    } catch (error) {
+      console.error("Failed to clone link:", error);
     }
   };
 
@@ -262,6 +277,25 @@ export default function LinksPage() {
             </button>
           ))}
         </div>
+        <div className="relative">
+          <select
+            value={`${sortBy}:${sortOrder}`}
+            onChange={(e) => {
+              const [by, order] = e.target.value.split(":");
+              setSortBy(by);
+              setSortOrder(order);
+            }}
+            className="appearance-none pl-8 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] cursor-pointer"
+          >
+            <option value="createdAt:desc">Newest</option>
+            <option value="createdAt:asc">Oldest</option>
+            <option value="clicks:desc">Most clicks</option>
+            <option value="clicks:asc">Fewest clicks</option>
+            <option value="title:asc">Title A-Z</option>
+            <option value="title:desc">Title Z-A</option>
+          </select>
+          <ArrowUpDown className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        </div>
         {allTags.length > 0 && (
           <div className="relative">
             <select
@@ -381,6 +415,7 @@ export default function LinksPage() {
                     shortBaseUrl={shortBaseUrl}
                     onDelete={handleDelete}
                     onStatusChange={handleStatusChange}
+                    onClone={handleClone}
                   />
                 </div>
               </div>
