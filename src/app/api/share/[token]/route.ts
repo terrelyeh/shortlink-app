@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit } from "@/lib/rate-limit";
 import bcrypt from "bcryptjs";
+import { headers } from "next/headers";
 
 // POST - Get shared report (with optional password verification)
 export async function POST(
@@ -9,6 +11,15 @@ export async function POST(
 ) {
   try {
     const { token } = await params;
+
+    // Rate limit: 5 password attempts per minute per IP
+    const headersList = await headers();
+    const clientIp = headersList.get("x-forwarded-for")?.split(",")[0] ||
+                     headersList.get("x-real-ip") ||
+                     "unknown";
+    const rateLimitResponse = checkRateLimit(clientIp, "share-token", { limit: 5, windowSeconds: 60 });
+    if (rateLimitResponse) return rateLimitResponse;
+
     const body = await request.json().catch(() => ({}));
     const { password } = body;
 
@@ -49,7 +60,7 @@ export async function POST(
       }
     }
 
-    // Increment view count
+    // Increment view count only after successful authentication
     await prisma.shareToken.update({
       where: { id: shareToken.id },
       data: { viewCount: { increment: 1 } },
