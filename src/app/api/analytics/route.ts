@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const range = searchParams.get("range") || "7d";
     const linkId = searchParams.get("linkId");
+    const campaign = searchParams.get("campaign");
     const customFrom = searchParams.get("from");
     const customTo = searchParams.get("to");
 
@@ -54,6 +55,15 @@ export async function GET(request: NextRequest) {
       deletedAt: null,
       ...workspaceWhere,
     };
+
+    // Filter by campaign
+    if (campaign) {
+      if (campaign === "__none__") {
+        whereLinks.utmCampaign = null;
+      } else {
+        whereLinks.utmCampaign = campaign;
+      }
+    }
 
     if (linkId) {
       whereClicks.shortLinkId = linkId;
