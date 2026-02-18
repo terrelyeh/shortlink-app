@@ -8,8 +8,6 @@ import {
   ChevronDown,
   Check,
   Plus,
-  Settings,
-  Users,
   Loader2,
 } from "lucide-react";
 
@@ -24,7 +22,6 @@ export function WorkspaceSwitcher({ collapsed = false }: WorkspaceSwitcherProps)
     currentWorkspace,
     setCurrentWorkspace,
     isLoading,
-    hasPermission,
   } = useWorkspace();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -147,30 +144,6 @@ export function WorkspaceSwitcher({ collapsed = false }: WorkspaceSwitcherProps)
 
             {/* Actions */}
             <div className="px-2">
-              {hasPermission("manage") && currentWorkspace && (
-                <>
-                  <button
-                    onClick={() => {
-                      setIsOpen(false);
-                      router.push(`/workspaces/${currentWorkspace.id}/members`);
-                    }}
-                    className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-50 transition-colors text-slate-600"
-                  >
-                    <Users className="w-4 h-4" />
-                    <span className="text-sm">Manage Members</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsOpen(false);
-                      router.push(`/workspaces/${currentWorkspace.id}/settings`);
-                    }}
-                    className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-50 transition-colors text-slate-600"
-                  >
-                    <Settings className="w-4 h-4" />
-                    <span className="text-sm">Workspace Settings</span>
-                  </button>
-                </>
-              )}
               <button
                 onClick={() => {
                   setIsOpen(false);
