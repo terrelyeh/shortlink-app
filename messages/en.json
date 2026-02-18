@@ -196,7 +196,21 @@
     "theme": "Theme",
     "lightMode": "Light Mode",
     "darkMode": "Dark Mode",
-    "systemDefault": "System Default"
+    "systemDefault": "System Default",
+    "editProfile": "Edit Profile",
+    "displayName": "Display Name",
+    "saveChanges": "Save Changes",
+    "saving": "Saving...",
+    "profileUpdated": "Profile updated successfully",
+    "dangerZone": "Danger Zone",
+    "deleteAccount": "Delete Account",
+    "deleteAccountDesc": "Permanently delete your account and all associated data",
+    "deleteAccountConfirm": "Are you sure you want to delete your account? This action cannot be undone.",
+    "about": "About",
+    "version": "Version",
+    "framework": "Framework",
+    "database": "Database",
+    "role": "Role"
   },
   "users": {
     "title": "User Management",

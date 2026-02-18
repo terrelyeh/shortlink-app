@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createShortCode, isValidCustomCode, isReservedCode } from "@/lib/utils/shortcode";
+import { getWorkspaceId, buildWorkspaceWhere } from "@/lib/workspace";
 import { z } from "zod";
 
 // Validation schema
@@ -40,14 +41,13 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get("sortBy") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";
 
+    const workspaceId = getWorkspaceId(request);
+    const workspaceWhere = buildWorkspaceWhere(workspaceId, session.user.id, session.user.role);
+
     const where: Record<string, unknown> = {
       deletedAt: null,
+      ...workspaceWhere,
     };
-
-    // Members can only see their own links
-    if (session.user.role === "MEMBER") {
-      where.createdById = session.user.id;
-    }
 
     if (search) {
       where.OR = [
@@ -171,6 +171,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the short link with tags
+    const workspaceId = getWorkspaceId(request);
     const shortLink = await prisma.shortLink.create({
       data: {
         code: code!,
@@ -185,6 +186,7 @@ export async function POST(request: NextRequest) {
         utmContent: validated.utmContent,
         utmTerm: validated.utmTerm,
         createdById: session.user.id,
+        workspaceId: workspaceId || undefined,
         groupId: validated.groupId,
         campaignId: validated.campaignId,
         ...(validated.tags && validated.tags.length > 0 && {

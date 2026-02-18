@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getWorkspaceId, buildWorkspaceWhere } from "@/lib/workspace";
 import { z } from "zod";
 
 const campaignSchema = z.object({
@@ -30,12 +31,9 @@ export async function GET(request: NextRequest) {
     const includeArchived = searchParams.get("includeArchived") === "true";
 
     // Build where clause
-    const where: Record<string, unknown> = {};
-
-    // Role-based filtering
-    if (session.user.role === "MEMBER") {
-      where.createdById = session.user.id;
-    }
+    const workspaceId = getWorkspaceId(request);
+    const workspaceWhere = buildWorkspaceWhere(workspaceId, session.user.id, session.user.role);
+    const where: Record<string, unknown> = { ...workspaceWhere };
 
     // Status filter
     if (status) {
@@ -133,6 +131,7 @@ export async function POST(request: NextRequest) {
       tagConnections = await Promise.all(tagPromises);
     }
 
+    const workspaceId = getWorkspaceId(request);
     const campaign = await prisma.campaign.create({
       data: {
         name: validated.name,
@@ -144,6 +143,7 @@ export async function POST(request: NextRequest) {
         defaultSource: validated.defaultSource,
         defaultMedium: validated.defaultMedium,
         createdById: session.user.id,
+        workspaceId: workspaceId || undefined,
         tags: {
           create: tagConnections,
         },

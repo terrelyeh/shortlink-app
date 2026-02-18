@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getWorkspaceId } from "@/lib/workspace";
 import { z } from "zod";
 
 const batchActionSchema = z.object({
@@ -18,14 +19,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { ids, action } = batchActionSchema.parse(body);
 
-    // Verify ownership for MEMBER role
-    if (session.user.role === "MEMBER") {
-      const ownedCount = await prisma.shortLink.count({
-        where: { id: { in: ids }, createdById: session.user.id, deletedAt: null },
-      });
-      if (ownedCount !== ids.length) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-      }
+    // Verify ownership/workspace scope
+    const workspaceId = getWorkspaceId(request);
+    const accessWhere: Record<string, unknown> = { id: { in: ids }, deletedAt: null };
+    if (workspaceId) {
+      accessWhere.workspaceId = workspaceId;
+    } else if (session.user.role === "MEMBER") {
+      accessWhere.createdById = session.user.id;
+    }
+    const accessibleCount = await prisma.shortLink.count({ where: accessWhere });
+    if (accessibleCount !== ids.length) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
     let result;

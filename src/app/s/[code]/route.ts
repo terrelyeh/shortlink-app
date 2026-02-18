@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { createHash } from "crypto";
 import { headers } from "next/headers";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { lookupIP } from "@/lib/geoip";
 
 // Validate IP_HASH_SALT at module load time
 const IP_HASH_SALT = process.env.IP_HASH_SALT;
@@ -150,6 +151,7 @@ export async function GET(
         });
 
         if (!recentClick) {
+          const geo = lookupIP(ip);
           await prisma.click.create({
             data: {
               shortLinkId: shortLink.id,
@@ -159,7 +161,8 @@ export async function GET(
               device,
               os,
               browser,
-              // Note: Country/City would require a GeoIP service
+              country: geo.country,
+              city: geo.city,
             },
           });
         }
