@@ -18,7 +18,6 @@ import {
   Megaphone,
 } from "lucide-react";
 import { useState } from "react";
-import { LanguageSwitcher } from "./LanguageSwitcher";
 import { WorkspaceSwitcher } from "../workspace/WorkspaceSwitcher";
 
 interface NavItem {
@@ -77,11 +76,6 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       icon: <ClipboardList className="w-5 h-5" />,
       roles: ["ADMIN", "MANAGER"],
     },
-    {
-      href: "/settings",
-      labelKey: "settings",
-      icon: <Settings className="w-5 h-5" />,
-    },
   ];
 
   const filteredItems = navItems.filter(
@@ -137,9 +131,6 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
 
       {/* User section */}
       <div className="p-4 border-t border-slate-700">
-        <div className="mb-3">
-          <LanguageSwitcher />
-        </div>
         <div className="flex items-center gap-3 p-2 bg-slate-700/50 rounded-lg">
           {userImage ? (
             <img
@@ -163,9 +154,21 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
             </p>
           </div>
         </div>
+        <Link
+          href="/settings"
+          className={`flex items-center gap-2 w-full mt-2 px-3 py-2 text-sm rounded-lg transition-colors ${
+            pathname === "/settings"
+              ? "text-white bg-slate-700"
+              : "text-slate-400 hover:text-white hover:bg-slate-700/50"
+          }`}
+          onClick={() => setMobileOpen(false)}
+        >
+          <Settings className="w-4 h-4" />
+          <span>{t("settings")}</span>
+        </Link>
         <button
           onClick={() => signOut({ callbackUrl: "/auth/signin" })}
-          className="flex items-center gap-2 w-full mt-2 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
+          className="flex items-center gap-2 w-full mt-1 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
         >
           <LogOut className="w-4 h-4" />
           <span>{t("signOut")}</span>
