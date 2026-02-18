@@ -13,27 +13,45 @@
 | **UTM 模板系統** | 儲存常用 UTM 組合為模板，快速套用 |
 | **批次建立** | 一次建立多個短網址變體（如多位 KOL 的追蹤連結） |
 | **QR Code 產生** | 自動為每個短網址產生 QR Code |
-| **連結分組** | 使用群組和標籤整理連結 |
+| **連結分組與標籤** | 使用群組和標籤整理連結，支援多標籤篩選 |
+| **連結複製** | 一鍵複製既有連結設定，快速建立變體 |
+
+### 行銷活動管理
+
+| 功能 | 說明 |
+|------|------|
+| **Campaign 管理** | 建立行銷活動（Campaign），設定預設 UTM Source / Medium |
+| **活動狀態生命週期** | Draft → Active → Completed → Archived 四階段管理 |
+| **活動標籤** | 為活動加上標籤分類，方便搜尋篩選 |
+| **跨頁面 Campaign 篩選** | 在連結、分析、儀表板頁面皆可依 Campaign 篩選 |
+| **儀表板活動摘要** | 首頁直接顯示 Top Campaigns 排行（依點擊數） |
 
 ### 數據分析
 
 | 功能 | 說明 |
 |------|------|
-| **點擊追蹤** | 即時記錄每次點擊 |
-| **趨勢圖表** | 視覺化呈現點擊數據（支援 24h / 7d / 30d / 90d） |
+| **點擊追蹤** | 即時記錄每次點擊，含重複點擊去重與 Bot 偵測 |
+| **趨勢圖表** | 視覺化呈現點擊數據（支援 24h / 7d / 30d / 90d / 自訂範圍） |
 | **來源分析** | 追蹤流量來源（Referrer） |
 | **裝置分析** | Mobile / Tablet / Desktop 分佈 |
 | **瀏覽器分析** | Chrome / Safari / Firefox 等統計 |
 | **作業系統** | iOS / Android / Windows / macOS 分佈 |
-| **地理位置** | 國家與城市層級分析（需 GeoIP 服務） |
+| **地理位置** | 國家與城市層級分析（GeoIP） |
+| **時段分佈** | 24 小時內各時段的點擊熱度 |
+| **UTM 維度分析** | Campaign / Source / Medium / Content 交叉分析 |
+| **Campaign 篩選分析** | 選擇特定 Campaign 後，所有圖表與統計自動聚焦該活動 |
+| **匯出 CSV** | 匯出連結清單或點擊原始數據 |
 
 ### 團隊協作
 
 | 功能 | 說明 |
 |------|------|
-| **角色權限** | Admin / Manager / Member / Viewer 四級權限 |
-| **共享報告** | 產生公開分享連結，支援密碼保護與到期時間 |
-| **審計日誌** | 記錄所有操作（建立、更新、刪除、分享） |
+| **工作區 (Workspace)** | 多工作區支援，每個團隊獨立管理連結與活動 |
+| **角色權限** | 系統層級 Admin / Manager / Member / Viewer 四級權限 |
+| **工作區角色** | 工作區層級 Owner / Admin / Member / Viewer 獨立權限 |
+| **成員邀請** | 透過 Email 邀請成員加入工作區，含邀請連結與到期時間 |
+| **共享報告** | 產生公開分享連結，支援密碼保護、到期時間、最大瀏覽次數 |
+| **審計日誌** | 記錄所有操作（建立、更新、刪除、分享、邀請成員等） |
 | **使用者管理** | Admin 可管理團隊成員與角色 |
 
 ### 其他特色
@@ -42,6 +60,8 @@
 - **響應式設計** - 適配桌面與行動裝置
 - **軟刪除** - 已刪除連結保留於資料庫，可供稽核
 - **連結過期** - 設定到期時間或最大點擊次數
+- **Rate Limiting** - 重導向端點與分享報告端點均設有速率限制
+- **IP 匿名化** - 使用 Hash Salt 對 IP 位址進行匿名化處理
 
 ---
 
@@ -61,12 +81,23 @@
 
 ## 使用者角色
 
+### 系統角色
+
 | 角色 | 權限說明 |
 |------|----------|
 | **Admin** | 完整權限：系統設定、使用者管理、檢視所有連結與報告 |
 | **Manager** | 檢視所有連結與報告、編輯團隊連結 |
 | **Member** | 建立 / 編輯 / 刪除自己的連結 |
 | **Viewer** | 僅可檢視被分享的特定報告 |
+
+### 工作區角色
+
+| 角色 | 權限說明 |
+|------|----------|
+| **Owner** | 完整控制權，包括刪除工作區 |
+| **Admin** | 管理成員和工作區內所有資源 |
+| **Member** | 建立和管理自己的資源 |
+| **Viewer** | 僅能檢視 |
 
 ---
 
@@ -211,44 +242,104 @@ src/
 │   ├── [locale]/              # 國際化路由
 │   │   ├── (dashboard)/       # 受保護的儀表板路由
 │   │   │   ├── dashboard/     # 總覽儀表板
-│   │   │   ├── links/         # 連結管理
+│   │   │   ├── links/         # 連結管理（含新增、批次建立）
+│   │   │   ├── campaigns/     # 行銷活動管理
 │   │   │   ├── templates/     # UTM 模板
 │   │   │   ├── analytics/     # 數據分析
-│   │   │   ├── users/         # 使用者管理
+│   │   │   ├── workspaces/    # 工作區管理（含成員、設定）
+│   │   │   ├── users/         # 使用者管理（Admin）
 │   │   │   ├── audit-log/     # 審計日誌
-│   │   │   └── settings/      # 設定
+│   │   │   └── settings/      # 個人設定
 │   │   └── auth/              # 認證頁面
 │   ├── api/                   # API 路由
 │   ├── s/[code]/              # 短網址重導向處理
 │   └── share/[token]/         # 公開分享報告頁面
 ├── components/
-│   ├── layout/                # 版面元件
-│   ├── forms/                 # 表單元件
-│   ├── links/                 # 連結相關元件
-│   └── analytics/             # 分析圖表元件
+│   ├── layout/                # 版面元件（Sidebar、語言切換）
+│   ├── forms/                 # 表單元件（建立連結、批次建立、UTM 建構器）
+│   ├── links/                 # 連結相關元件（LinkCard、QR Code）
+│   ├── analytics/             # 分析圖表元件（折線圖、圓餅圖）
+│   ├── campaigns/             # Campaign 元件（CampaignFilter）
+│   ├── tags/                  # 標籤元件（TagInput）
+│   ├── workspace/             # 工作區元件（WorkspaceSwitcher）
+│   ├── ui/                    # 通用 UI 元件（Toast）
+│   └── providers/             # Context Providers
+├── hooks/
+│   └── useDebounce.ts         # 防抖 Hook
 ├── lib/
 │   ├── auth.ts                # NextAuth.js 設定
 │   ├── prisma.ts              # Prisma 客戶端
-│   └── utils/                 # 工具函式
-└── messages/                  # 翻譯檔案
+│   ├── workspace.ts           # 工作區查詢工具
+│   ├── rate-limit.ts          # 速率限制
+│   ├── geoip.ts               # IP 地理位置查詢
+│   └── utils/                 # 工具函式（短碼生成、UTM 處理）
+├── i18n/                      # 國際化設定
+└── messages/                  # 翻譯檔案（en.json、zh-TW.json）
 ```
 
 ---
 
 ## API 端點
 
+### 連結管理
+
 | 端點 | 方法 | 說明 |
 |------|------|------|
-| `/api/links` | GET, POST | 列出 / 建立連結 |
+| `/api/links` | GET, POST | 列出 / 建立連結（支援 campaign、tag、status 篩選） |
 | `/api/links/batch` | POST | 批次建立連結 |
+| `/api/links/batch-actions` | POST | 批次操作（刪除、暫停、啟用、封存） |
 | `/api/links/[id]` | GET, PATCH, DELETE | 單一連結操作 |
-| `/api/analytics` | GET | 取得分析數據 |
+| `/api/links/[id]/clone` | POST | 複製連結 |
+| `/api/links/[id]/preview` | GET | 預覽目標網址資訊 |
+
+### 行銷活動
+
+| 端點 | 方法 | 說明 |
+|------|------|------|
+| `/api/campaigns` | GET, POST | 列出 / 建立行銷活動 |
+| `/api/campaigns/[id]` | GET, PATCH, DELETE | 單一活動操作 |
+| `/api/utm-campaigns` | GET | UTM Campaign 聚合統計（連結數、點擊數） |
+
+### 分析與匯出
+
+| 端點 | 方法 | 說明 |
+|------|------|------|
+| `/api/analytics` | GET | 取得分析數據（支援 campaign、link、日期範圍篩選） |
+| `/api/export/links` | GET | 匯出連結清單 CSV |
+| `/api/export/analytics` | GET | 匯出點擊原始數據 CSV |
+
+### 模板與標籤
+
+| 端點 | 方法 | 說明 |
+|------|------|------|
 | `/api/templates` | GET, POST | 列出 / 建立 UTM 模板 |
 | `/api/templates/[id]` | GET, PATCH, DELETE | 單一模板操作 |
+| `/api/tags` | GET, POST | 列出 / 建立標籤 |
+
+### 分享
+
+| 端點 | 方法 | 說明 |
+|------|------|------|
 | `/api/share` | POST | 建立分享連結 |
 | `/api/share/[token]` | POST | 驗證並取得分享報告 |
+
+### 工作區
+
+| 端點 | 方法 | 說明 |
+|------|------|------|
+| `/api/workspaces` | GET, POST | 列出 / 建立工作區 |
+| `/api/workspaces/[id]` | GET, PATCH, DELETE | 單一工作區操作 |
+| `/api/workspaces/[id]/members` | GET, PATCH, DELETE | 管理工作區成員 |
+| `/api/workspaces/[id]/invitations` | GET, POST, DELETE | 管理邀請 |
+| `/api/invitations/[token]` | GET, POST | 查看 / 接受邀請 |
+
+### 管理
+
+| 端點 | 方法 | 說明 |
+|------|------|------|
 | `/api/users` | GET | 列出使用者（Admin） |
 | `/api/users/[id]` | PATCH, DELETE | 使用者管理（Admin） |
+| `/api/user/profile` | PATCH, DELETE | 個人資料管理 |
 | `/api/audit-log` | GET | 審計日誌（Admin/Manager） |
 
 ---
@@ -265,7 +356,6 @@ src/
 | `NEXT_PUBLIC_SHORT_URL` | 是 | 短網址基底 URL |
 | `IP_HASH_SALT` | 是 | IP 位址雜湊鹽值 |
 | `ALLOWED_EMAIL_DOMAIN` | 否 | 限制登入網域 |
-| `GEOIP_API_KEY` | 否 | 地理位置服務 API 金鑰 |
 
 ---
 
