@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter, useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
   Users,
-  ArrowLeft,
   Loader2,
   UserPlus,
   Mail,
@@ -49,12 +48,6 @@ interface Invitation {
   };
 }
 
-interface Workspace {
-  id: string;
-  name: string;
-  currentUserRole: WorkspaceRole;
-}
-
 const roleIcons: Record<WorkspaceRole, typeof Crown> = {
   OWNER: Crown,
   ADMIN: Shield,
@@ -69,14 +62,12 @@ const roleColors: Record<WorkspaceRole, string> = {
   VIEWER: "text-slate-600 bg-slate-50",
 };
 
-export default function WorkspaceMembersPage() {
-  const router = useRouter();
-  const params = useParams();
-  const workspaceId = params.id as string;
+export function MembersTab() {
+  const { currentWorkspace, hasPermission } = useWorkspace();
+  const workspaceId = currentWorkspace?.id;
   const t = useTranslations("workspace");
   const tCommon = useTranslations("common");
 
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -96,26 +87,19 @@ export default function WorkspaceMembersPage() {
   const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
-  const canManage = workspace?.currentUserRole === "OWNER" || workspace?.currentUserRole === "ADMIN";
-  const isOwner = workspace?.currentUserRole === "OWNER";
+  const canManage = hasPermission("manage");
+  const isOwner = currentWorkspace?.role === "OWNER";
 
   const fetchData = useCallback(async () => {
+    if (!workspaceId) return;
     try {
       setIsLoading(true);
       setError(null);
 
-      const [workspaceRes, membersRes, invitationsRes] = await Promise.all([
-        fetch(`/api/workspaces/${workspaceId}`),
+      const [membersRes, invitationsRes] = await Promise.all([
         fetch(`/api/workspaces/${workspaceId}/members`),
         fetch(`/api/workspaces/${workspaceId}/invitations`),
       ]);
-
-      if (!workspaceRes.ok) {
-        throw new Error("Failed to load workspace");
-      }
-
-      const workspaceData = await workspaceRes.json();
-      setWorkspace(workspaceData.workspace);
 
       if (membersRes.ok) {
         const membersData = await membersRes.json();
@@ -169,7 +153,6 @@ export default function WorkspaceMembersPage() {
       setInviteEmail("");
       setInviteRole("MEMBER");
 
-      // Refresh invitations
       const invitationsRes = await fetch(`/api/workspaces/${workspaceId}/invitations`);
       if (invitationsRes.ok) {
         const invitationsData = await invitationsRes.json();
@@ -201,7 +184,6 @@ export default function WorkspaceMembersPage() {
         throw new Error(data.error || "Failed to change role");
       }
 
-      // Update local state
       setMembers(members.map(m =>
         m.id === memberId ? { ...m, role: newRole } : m
       ));
@@ -228,7 +210,6 @@ export default function WorkspaceMembersPage() {
         throw new Error(data.error || "Failed to remove member");
       }
 
-      // Update local state
       setMembers(members.filter(m => m.id !== memberId));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to remove member");
@@ -256,69 +237,56 @@ export default function WorkspaceMembersPage() {
   };
 
   const copyInviteLink = (invitationId: string) => {
-    // In a real app, this would use the actual invite URL
     const inviteUrl = `${window.location.origin}/invite/${invitationId}`;
     navigator.clipboard.writeText(inviteUrl);
     setCopiedInviteLink(invitationId);
     setTimeout(() => setCopiedInviteLink(null), 2000);
   };
 
+  if (!currentWorkspace) {
+    return (
+      <div className="text-center py-12 text-slate-500">
+        <Users className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+        <p>No workspace selected</p>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-3xl mx-auto py-8">
-        <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-red-700">
-          {error}
-        </div>
+      <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-red-700">
+        {error}
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-8">
-      {/* Back Button */}
-      <button
-        onClick={() => router.back()}
-        className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span className="text-sm">{tCommon("back")}</span>
-      </button>
-
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center text-white">
-            <Users className="w-7 h-7" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">{t("members")}</h1>
-            <p className="text-slate-500">{workspace?.name}</p>
-          </div>
-        </div>
-
-        {canManage && (
+    <div className="space-y-6">
+      {/* Header with invite button */}
+      {canManage && (
+        <div className="flex justify-end">
           <button
             onClick={() => setShowInviteForm(!showInviteForm)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white rounded-xl hover:bg-[#0288D1] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white rounded-lg hover:bg-[#0288D1] transition-colors text-sm font-medium"
           >
             <UserPlus className="w-4 h-4" />
             {t("inviteMember")}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Invite Form */}
       {showInviteForm && canManage && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">{t("inviteMember")}</h3>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h3 className="text-base font-semibold text-slate-900 mb-4">{t("inviteMember")}</h3>
 
           <form onSubmit={handleInvite} className="space-y-4">
             {inviteError && (
@@ -374,14 +342,14 @@ export default function WorkspaceMembersPage() {
               <button
                 type="button"
                 onClick={() => setShowInviteForm(false)}
-                className="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm"
               >
                 {tCommon("cancel")}
               </button>
               <button
                 type="submit"
                 disabled={isInviting}
-                className="flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white rounded-lg hover:bg-[#0288D1] transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white rounded-lg hover:bg-[#0288D1] transition-colors disabled:opacity-50 text-sm"
               >
                 {isInviting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -397,8 +365,8 @@ export default function WorkspaceMembersPage() {
 
       {/* Pending Invitations */}
       {invitations.length > 0 && canManage && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h3 className="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
             <Clock className="w-5 h-5 text-slate-400" />
             {t("pendingInvitations")}
           </h3>

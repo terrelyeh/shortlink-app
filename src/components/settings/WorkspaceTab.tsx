@@ -1,21 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter, useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
-  Settings,
-  ArrowLeft,
   Loader2,
   Building2,
-  AlertTriangle,
-  Trash2,
   Save,
   Check,
 } from "lucide-react";
-import { useWorkspace } from "@/contexts/WorkspaceContext";
-
-type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
 
 interface WorkspaceData {
   id: string;
@@ -23,7 +16,7 @@ interface WorkspaceData {
   slug: string;
   description: string | null;
   createdAt: string;
-  currentUserRole: WorkspaceRole;
+  currentUserRole: string;
   _count: {
     members: number;
     shortLinks: number;
@@ -32,13 +25,11 @@ interface WorkspaceData {
   };
 }
 
-export default function WorkspaceSettingsPage() {
-  const router = useRouter();
-  const params = useParams();
-  const workspaceId = params.id as string;
+export function WorkspaceTab() {
+  const { currentWorkspace, hasPermission, refreshWorkspaces } = useWorkspace();
+  const workspaceId = currentWorkspace?.id;
   const t = useTranslations("workspace");
   const tCommon = useTranslations("common");
-  const { refreshWorkspaces } = useWorkspace();
 
   const [workspace, setWorkspace] = useState<WorkspaceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,16 +43,10 @@ export default function WorkspaceSettingsPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Delete state
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmName, setDeleteConfirmName] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  const canEdit = workspace?.currentUserRole === "OWNER" || workspace?.currentUserRole === "ADMIN";
-  const canDelete = workspace?.currentUserRole === "OWNER";
+  const canEdit = hasPermission("manage");
 
   const fetchWorkspace = useCallback(async () => {
+    if (!workspaceId) return;
     try {
       setIsLoading(true);
       setError(null);
@@ -133,89 +118,34 @@ export default function WorkspaceSettingsPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (deleteConfirmName !== workspace?.name) {
-      setDeleteError("Workspace name does not match");
-      return;
-    }
-
-    setIsDeleting(true);
-    setDeleteError(null);
-
-    try {
-      const response = await fetch(`/api/workspaces/${workspaceId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to delete workspace");
-      }
-
-      await refreshWorkspaces();
-      router.push("/dashboard");
-    } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Failed to delete workspace");
-      setIsDeleting(false);
-    }
-  };
-
-  const generateSlug = (value: string) => {
-    return value
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .slice(0, 50);
-  };
+  if (!currentWorkspace) {
+    return (
+      <div className="text-center py-12 text-slate-500">
+        <Building2 className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+        <p>No workspace selected</p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-2xl mx-auto py-8">
-        <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-red-700">
-          {error}
-        </div>
+      <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-red-700">
+        {error}
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto py-8">
-      {/* Back Button */}
-      <button
-        onClick={() => router.back()}
-        className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span className="text-sm">{tCommon("back")}</span>
-      </button>
-
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-8">
-        <div className="w-14 h-14 bg-gradient-to-br from-slate-600 to-slate-800 rounded-2xl flex items-center justify-center text-white">
-          <Settings className="w-7 h-7" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">{t("settings")}</h1>
-          <p className="text-slate-500">{workspace?.name}</p>
-        </div>
-      </div>
-
-      {/* Settings Form */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-        <h3 className="text-lg font-semibold text-slate-900 mb-6 flex items-center gap-2">
-          <Building2 className="w-5 h-5 text-slate-400" />
-          {t("title")}
-        </h3>
-
+    <div className="space-y-6">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <form onSubmit={handleSave} className="space-y-5">
           {saveError && (
             <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-red-700 text-sm">
@@ -327,77 +257,6 @@ export default function WorkspaceSettingsPage() {
           )}
         </form>
       </div>
-
-      {/* Danger Zone */}
-      {canDelete && (
-        <div className="bg-white rounded-xl shadow-sm border border-red-200 p-6">
-          <h3 className="text-lg font-semibold text-red-700 mb-4 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5" />
-            {t("dangerZone")}
-          </h3>
-
-          <div className="p-4 bg-red-50 rounded-lg">
-            <h4 className="font-medium text-red-900 mb-1">{t("deleteWorkspace")}</h4>
-            <p className="text-sm text-red-700 mb-4">{t("deleteWorkspaceDesc")}</p>
-
-            {!showDeleteConfirm ? (
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                {t("deleteWorkspace")}
-              </button>
-            ) : (
-              <div className="space-y-4">
-                {deleteError && (
-                  <div className="p-3 bg-red-100 border border-red-200 rounded-lg text-red-700 text-sm">
-                    {deleteError}
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium text-red-800 mb-2">
-                    {t("deleteWorkspaceConfirm")}
-                  </label>
-                  <input
-                    type="text"
-                    value={deleteConfirmName}
-                    onChange={(e) => setDeleteConfirmName(e.target.value)}
-                    placeholder={workspace?.name}
-                    className="w-full px-4 py-2 border border-red-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
-                  />
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setShowDeleteConfirm(false);
-                      setDeleteConfirmName("");
-                      setDeleteError(null);
-                    }}
-                    className="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
-                  >
-                    {tCommon("cancel")}
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    disabled={isDeleting || deleteConfirmName !== workspace?.name}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isDeleting ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                    {tCommon("delete")}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
