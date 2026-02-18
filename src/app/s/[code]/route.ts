@@ -151,7 +151,7 @@ export async function GET(
         });
 
         if (!recentClick) {
-          const geo = lookupIP(ip);
+          const geo = await lookupIP(ip);
           await prisma.click.create({
             data: {
               shortLinkId: shortLink.id,
