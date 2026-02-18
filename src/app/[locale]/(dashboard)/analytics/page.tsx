@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { ClicksChart } from "@/components/analytics/ClicksChart";
 import { PieChartComponent } from "@/components/analytics/PieChartComponent";
 import { MousePointerClick, Users, TrendingUp, Loader2, Link2, ChevronDown, X, Target, Globe, Megaphone, Download } from "lucide-react";
+import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
 
 interface AnalyticsData {
   summary: {
@@ -90,6 +91,7 @@ export default function AnalyticsPage() {
   const [range, setRange] = useState("7d");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const [selectedCampaign, setSelectedCampaign] = useState<string>("");
   const [selectedLinkId, setSelectedLinkId] = useState<string>("");
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(true);
@@ -97,12 +99,14 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch all links for the selector
+  // Fetch links for the selector (filtered by campaign when selected)
   useEffect(() => {
     async function fetchLinks() {
       setLoadingLinks(true);
       try {
-        const response = await fetch("/api/links?limit=100");
+        const params = new URLSearchParams({ limit: "100" });
+        if (selectedCampaign) params.set("campaign", selectedCampaign);
+        const response = await fetch(`/api/links?${params}`);
         if (response.ok) {
           const data = await response.json();
           setLinks(data.links || []);
@@ -114,7 +118,7 @@ export default function AnalyticsPage() {
       }
     }
     fetchLinks();
-  }, []);
+  }, [selectedCampaign]);
 
   // Fetch analytics data
   useEffect(() => {
@@ -124,6 +128,9 @@ export default function AnalyticsPage() {
 
       try {
         const params = new URLSearchParams({ range });
+        if (selectedCampaign) {
+          params.set("campaign", selectedCampaign);
+        }
         if (selectedLinkId) {
           params.set("linkId", selectedLinkId);
         }
@@ -144,7 +151,12 @@ export default function AnalyticsPage() {
     }
 
     fetchAnalytics();
-  }, [range, selectedLinkId, customFrom, customTo]);
+  }, [range, selectedCampaign, selectedLinkId, customFrom, customTo]);
+
+  const handleCampaignChange = (value: string) => {
+    setSelectedCampaign(value);
+    setSelectedLinkId(""); // Reset link selection when campaign changes
+  };
 
   const selectedLink = links.find(l => l.id === selectedLinkId);
 
@@ -166,7 +178,7 @@ export default function AnalyticsPage() {
           {/* Date Range Selector + Export */}
           <div className="flex gap-2 items-center">
             <a
-              href={`/api/export/analytics?range=${range}${selectedLinkId ? `&linkId=${selectedLinkId}` : ""}`}
+              href={`/api/export/analytics?range=${range}${selectedCampaign ? `&campaign=${selectedCampaign}` : ""}${selectedLinkId ? `&linkId=${selectedLinkId}` : ""}`}
               className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
             >
               <Download className="w-4 h-4" />
@@ -208,47 +220,70 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        {/* Link Selector */}
+        {/* Campaign & Link Filters */}
         <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-2 text-sm text-slate-500">
-              <Link2 className="w-4 h-4" />
-              <span className="font-medium">Filter by link:</span>
+          <div className="flex flex-col gap-3">
+            {/* Campaign Filter Row */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Megaphone className="w-4 h-4" />
+                <span className="font-medium">Campaign:</span>
+              </div>
+              <div className="flex-1 flex items-center gap-2">
+                <CampaignFilter
+                  value={selectedCampaign}
+                  onChange={handleCampaignChange}
+                  showNoCampaign
+                />
+                {selectedCampaign && (
+                  <span className="text-xs text-sky-600 bg-sky-50 px-2 py-1 rounded-lg font-mono">
+                    {selectedCampaign === "__none__" ? "No Campaign" : selectedCampaign}
+                  </span>
+                )}
+              </div>
             </div>
 
-            <div className="flex-1 flex items-center gap-2">
-              <div className="relative flex-1 max-w-md">
-                <select
-                  value={selectedLinkId}
-                  onChange={(e) => setSelectedLinkId(e.target.value)}
-                  disabled={loadingLinks}
-                  className="w-full px-4 py-2.5 pr-10 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 appearance-none bg-white text-slate-700 disabled:opacity-50"
-                >
-                  <option value="">All Links (Aggregated)</option>
-                  {links.map((link) => (
-                    <option key={link.id} value={link.id}>
-                      /{link.code} {link.title ? `- ${link.title}` : ""}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  {loadingLinks ? (
-                    <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-slate-400" />
-                  )}
-                </div>
+            {/* Link Filter Row */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Link2 className="w-4 h-4" />
+                <span className="font-medium">Link:</span>
               </div>
 
-              {selectedLinkId && (
-                <button
-                  onClick={() => setSelectedLinkId("")}
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                  title="Clear filter"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              )}
+              <div className="flex-1 flex items-center gap-2">
+                <div className="relative flex-1 max-w-md">
+                  <select
+                    value={selectedLinkId}
+                    onChange={(e) => setSelectedLinkId(e.target.value)}
+                    disabled={loadingLinks}
+                    className="w-full px-4 py-2.5 pr-10 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 appearance-none bg-white text-slate-700 disabled:opacity-50"
+                  >
+                    <option value="">All Links (Aggregated)</option>
+                    {links.map((link) => (
+                      <option key={link.id} value={link.id}>
+                        /{link.code} {link.title ? `- ${link.title}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    {loadingLinks ? (
+                      <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    )}
+                  </div>
+                </div>
+
+                {selectedLinkId && (
+                  <button
+                    onClick={() => setSelectedLinkId("")}
+                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    title="Clear filter"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

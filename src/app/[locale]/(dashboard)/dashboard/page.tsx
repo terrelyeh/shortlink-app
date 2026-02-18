@@ -131,6 +131,40 @@ async function getRecentLinks(userId: string, userRole: string, limit = 5) {
   }));
 }
 
+// Get top campaigns by click count
+async function getTopCampaigns(userId: string, userRole: string, limit = 5) {
+  const isAdminOrManager = userRole === "ADMIN" || userRole === "MANAGER";
+  const whereClause = isAdminOrManager
+    ? { deletedAt: null, utmCampaign: { not: null } }
+    : { createdById: userId, deletedAt: null, utmCampaign: { not: null } };
+
+  const links = await prisma.shortLink.findMany({
+    where: whereClause,
+    select: {
+      utmCampaign: true,
+      _count: { select: { clicks: true } },
+    },
+  });
+
+  // Aggregate by campaign name
+  const campaignMap = new Map<string, { linkCount: number; clickCount: number }>();
+  links.forEach((link: { utmCampaign: string | null; _count: { clicks: number } }) => {
+    if (!link.utmCampaign) return;
+    const existing = campaignMap.get(link.utmCampaign);
+    if (existing) {
+      existing.linkCount++;
+      existing.clickCount += link._count.clicks;
+    } else {
+      campaignMap.set(link.utmCampaign, { linkCount: 1, clickCount: link._count.clicks });
+    }
+  });
+
+  return Array.from(campaignMap.entries())
+    .map(([name, stats]) => ({ name, ...stats }))
+    .sort((a, b) => b.clickCount - a.clickCount)
+    .slice(0, limit);
+}
+
 function StatCard({
   title,
   value,
@@ -254,10 +288,11 @@ export default async function DashboardPage() {
   const userRole = session.user.role;
 
   // Fetch real data
-  const [stats, topLinks, recentLinks] = await Promise.all([
+  const [stats, topLinks, recentLinks, topCampaigns] = await Promise.all([
     getDashboardStats(userId, userRole),
     getTopLinks(userId, userRole),
     getRecentLinks(userId, userRole),
+    getTopCampaigns(userId, userRole),
   ]);
 
   // Show empty state if no links
@@ -347,6 +382,43 @@ export default async function DashboardPage() {
         {/* Quick Start */}
         <QuickStartGuide t={t} />
       </div>
+
+      {/* Top Campaigns */}
+      {topCampaigns.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Megaphone className="w-4 h-4 text-[#03A9F4]" />
+              <h2 className="font-semibold text-slate-900">{t("topCampaigns")}</h2>
+            </div>
+            <Link href="/campaigns" className="text-sm text-[#03A9F4] hover:text-[#0288D1] font-medium">
+              {t("viewAll")}
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-sm text-slate-500 border-b border-slate-100">
+                  <th className="pb-2 font-medium">Campaign</th>
+                  <th className="pb-2 font-medium text-right">Links</th>
+                  <th className="pb-2 font-medium text-right">Clicks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topCampaigns.map((campaign: { name: string; linkCount: number; clickCount: number }) => (
+                  <tr key={campaign.name} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                    <td className="py-2.5">
+                      <span className="font-mono text-sm text-slate-900">{campaign.name}</span>
+                    </td>
+                    <td className="py-2.5 text-right text-sm text-slate-600">{campaign.linkCount}</td>
+                    <td className="py-2.5 text-right text-sm font-medium text-slate-900">{campaign.clickCount.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Recent Links */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">

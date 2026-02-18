@@ -63,7 +63,11 @@ export async function GET(request: NextRequest) {
 
     // Filter by utm_campaign
     if (campaign) {
-      where.utmCampaign = campaign;
+      if (campaign === "__none__") {
+        where.utmCampaign = null;
+      } else {
+        where.utmCampaign = campaign;
+      }
     }
 
     // Filter by tag
