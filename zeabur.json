@@ -1,6 +1,5 @@
 {
   "$schema": "https://json.schemastore.org/zeabur-config",
   "build_command": "npm run build",
-  "start_command": "npm run start",
-  "output_dir": ".next"
+  "start_command": "prisma db push && node .next/standalone/server.js"
 }
