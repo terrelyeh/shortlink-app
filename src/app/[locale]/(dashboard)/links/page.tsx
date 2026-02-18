@@ -239,6 +239,11 @@ export default function LinksPage() {
             className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] text-sm"
           />
         </div>
+        <CampaignFilter
+          value={campaignFilter}
+          onChange={setCampaignFilter}
+          showNoCampaign
+        />
         <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
           {["", "ACTIVE", "PAUSED", "ARCHIVED"].map((status) => (
             <button
@@ -290,11 +295,6 @@ export default function LinksPage() {
             <Tag className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           </div>
         )}
-        <CampaignFilter
-          value={campaignFilter}
-          onChange={setCampaignFilter}
-          showNoCampaign
-        />
       </div>
 
       {/* Batch Actions Toolbar */}
