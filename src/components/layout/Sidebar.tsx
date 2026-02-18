@@ -111,7 +111,7 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 px-3 pb-4 space-y-0.5">
         <p className="px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">
-          Menu
+          {t("menu")}
         </p>
         {filteredItems.map((item) => {
           const isActive = pathname === item.href;
@@ -168,7 +168,7 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
           className="flex items-center gap-2 w-full mt-2 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
         >
           <LogOut className="w-4 h-4" />
-          <span>Sign Out</span>
+          <span>{t("signOut")}</span>
         </button>
       </div>
     </div>

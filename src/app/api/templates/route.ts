@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getWorkspaceId } from "@/lib/workspace";
 import { z } from "zod";
 
 const templateSchema = z.object({
@@ -13,15 +14,20 @@ const templateSchema = z.object({
 });
 
 // GET - List templates
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const workspaceId = getWorkspaceId(request);
+    const where: Record<string, unknown> = workspaceId
+      ? { workspaceId }
+      : { createdById: session.user.id };
+
     const templates = await prisma.uTMTemplate.findMany({
-      where: { userId: session.user.id },
+      where,
       orderBy: { createdAt: "desc" },
     });
 
@@ -43,10 +49,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = templateSchema.parse(body);
 
+    const workspaceId = getWorkspaceId(request);
     const template = await prisma.uTMTemplate.create({
       data: {
         ...validated,
-        userId: session.user.id,
+        createdById: session.user.id,
+        workspaceId: workspaceId || undefined,
       },
     });
 

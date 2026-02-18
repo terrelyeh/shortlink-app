@@ -140,7 +140,7 @@ function StatCard({
   title: string;
   value: string | number;
   icon: React.ReactNode;
-  trend?: { value: number; isPositive: boolean };
+  trend?: { value: number; isPositive: boolean; label: string };
 }) {
   return (
     <div className="bg-white rounded-xl p-5 border border-slate-200">
@@ -154,7 +154,7 @@ function StatCard({
                 trend.isPositive ? "text-emerald-600" : "text-red-500"
               }`}
             >
-              {trend.isPositive ? "+" : ""}{trend.value}% vs last period
+              {trend.isPositive ? "+" : ""}{trend.label}
             </p>
           )}
         </div>
@@ -167,26 +167,26 @@ function StatCard({
 }
 
 // Quick Start Guide for new users
-function QuickStartGuide() {
+function QuickStartGuide({ t }: { t: (key: string) => string }) {
   const steps = [
     {
       icon: <Link2 className="w-5 h-5" />,
-      title: "Create a Short Link",
-      description: "Turn long URLs into short, trackable links",
+      title: t("quickStart.createLink"),
+      description: t("quickStart.createLinkDesc"),
       href: "/links/new",
       color: "text-slate-600 bg-slate-100",
     },
     {
       icon: <Megaphone className="w-5 h-5" />,
-      title: "Set Up a Campaign",
-      description: "Group your links for better organization",
+      title: t("quickStart.setupCampaign"),
+      description: t("quickStart.setupCampaignDesc"),
       href: "/campaigns",
       color: "text-slate-600 bg-slate-100",
     },
     {
       icon: <FileText className="w-5 h-5" />,
-      title: "Create UTM Template",
-      description: "Save time with reusable UTM parameters",
+      title: t("quickStart.createTemplate"),
+      description: t("quickStart.createTemplateDesc"),
       href: "/templates",
       color: "text-slate-600 bg-slate-100",
     },
@@ -194,8 +194,8 @@ function QuickStartGuide() {
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-6">
-      <h2 className="text-lg font-semibold text-slate-900 mb-1">Quick Start</h2>
-      <p className="text-sm text-slate-500 mb-4">Get started with these simple steps</p>
+      <h2 className="text-lg font-semibold text-slate-900 mb-1">{t("quickStart.title")}</h2>
+      <p className="text-sm text-slate-500 mb-4">{t("quickStart.description")}</p>
       <div className="space-y-3">
         {steps.map((step, index) => (
           <Link
@@ -228,16 +228,16 @@ function EmptyState({ t }: { t: (key: string) => string }) {
           <Zap className="w-7 h-7 text-white" />
         </div>
         <h1 className="text-2xl font-semibold text-slate-900 mb-2">
-          Welcome to EnGenius ShortLink
+          {t("emptyState.title")}
         </h1>
         <p className="text-slate-500 max-w-md mx-auto">
-          Create short links with UTM tracking to measure your marketing campaigns effectively.
+          {t("emptyState.description")}
         </p>
       </div>
 
       {/* Quick Start */}
       <div className="max-w-lg mx-auto">
-        <QuickStartGuide />
+        <QuickStartGuide t={t} />
       </div>
     </div>
   );
@@ -271,14 +271,14 @@ export default async function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">{t("title")}</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Last 30 days overview</p>
+          <p className="text-sm text-slate-500 mt-0.5">{t("last30DaysOverview")}</p>
         </div>
         <Link
           href="/links/new"
           className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors"
         >
           <Plus className="w-4 h-4" />
-          New Link
+          {t("newLink")}
         </Link>
       </div>
 
@@ -288,7 +288,7 @@ export default async function DashboardPage() {
           title={t("totalClicks")}
           value={stats.totalClicks.toLocaleString()}
           icon={<MousePointerClick className="w-5 h-5" />}
-          trend={{ value: stats.clicksTrend, isPositive: stats.clicksTrend >= 0 }}
+          trend={{ value: stats.clicksTrend, isPositive: stats.clicksTrend >= 0, label: t("vsLastPeriod", { value: stats.clicksTrend }) }}
         />
         <StatCard
           title={t("uniqueVisitors")}
@@ -314,7 +314,7 @@ export default async function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-slate-900">{t("topLinks")}</h2>
             <Link href="/links" className="text-sm text-[#03A9F4] hover:text-[#0288D1] font-medium">
-              View all
+              {t("viewAll")}
             </Link>
           </div>
           {topLinks.length > 0 ? (
@@ -339,13 +339,13 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <div className="text-center py-8 text-sm text-slate-500">
-              No links yet
+              {t("noLinksYet")}
             </div>
           )}
         </div>
 
         {/* Quick Start */}
-        <QuickStartGuide />
+        <QuickStartGuide t={t} />
       </div>
 
       {/* Recent Links */}
@@ -366,7 +366,7 @@ export default async function DashboardPage() {
                 <p className="text-sm font-medium text-slate-900 truncate">/{link.code}</p>
                 <p className="text-xs text-slate-500 truncate mt-0.5">{link.originalUrl}</p>
                 <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
-                  <span>{link.clicks} clicks</span>
+                  <span>{t("clicksCount", { count: link.clicks })}</span>
                   <span>{new Date(link.createdAt).toLocaleDateString()}</span>
                 </div>
               </div>

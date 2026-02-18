@@ -2,6 +2,7 @@
 
 import { SessionProvider } from "next-auth/react";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
+import { ToastProvider } from "@/components/ui/Toast";
 import { Session } from "next-auth";
 
 interface ProvidersProps {
@@ -13,7 +14,9 @@ export function Providers({ children, session }: ProvidersProps) {
   return (
     <SessionProvider session={session}>
       <WorkspaceProvider>
-        {children}
+        <ToastProvider>
+          {children}
+        </ToastProvider>
       </WorkspaceProvider>
     </SessionProvider>
   );

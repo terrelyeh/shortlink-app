@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getWorkspaceId, buildWorkspaceWhere } from "@/lib/workspace";
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,14 +48,12 @@ export async function GET(request: NextRequest) {
       timestamp: { gte: startDate, lte: endDate },
     };
 
+    const workspaceId = getWorkspaceId(request);
+    const workspaceWhere = buildWorkspaceWhere(workspaceId, session.user.id, session.user.role);
     const whereLinks: Record<string, unknown> = {
       deletedAt: null,
+      ...workspaceWhere,
     };
-
-    // Filter by user role
-    if (session.user.role === "MEMBER") {
-      whereLinks.createdById = session.user.id;
-    }
 
     if (linkId) {
       whereClicks.shortLinkId = linkId;
@@ -143,6 +142,27 @@ export async function GET(request: NextRequest) {
       orderBy: { _count: { referrer: "desc" } },
       take: 10,
     });
+
+    // Get clicks by hour distribution (0-23)
+    const clicksByHourRaw = await prisma.click.groupBy({
+      by: ["timestamp"],
+      where: whereClicks,
+      _count: true,
+    });
+
+    // Aggregate by hour of day
+    const clicksByHourMap = new Map<number, number>();
+    for (let h = 0; h < 24; h++) {
+      clicksByHourMap.set(h, 0);
+    }
+    clicksByHourRaw.forEach((c: { timestamp: Date; _count: number }) => {
+      const hour = c.timestamp.getHours();
+      clicksByHourMap.set(hour, (clicksByHourMap.get(hour) || 0) + c._count);
+    });
+
+    const clicksByHour = Array.from(clicksByHourMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([hour, clicks]) => ({ hour, clicks }));
 
     // Get country distribution
     const countryStats = await prisma.click.groupBy({

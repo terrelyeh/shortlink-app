@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Link, useRouter } from "@/i18n/routing";
+import { useDebounce } from "@/hooks/useDebounce";
 import { LinkCard } from "@/components/links/LinkCard";
 import { Plus, Search, Loader2, Link2, Layers, ChevronLeft, ChevronRight, X, Megaphone, Tag, Trash2, Pause, Play, Archive, CheckSquare, Download, ArrowUpDown } from "lucide-react";
 
@@ -47,6 +48,7 @@ export default function LinksPage() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
   const [statusFilter, setStatusFilter] = useState("");
   const [tagFilter, setTagFilter] = useState("");
   const [allTags, setAllTags] = useState<TagOption[]>([]);
@@ -80,7 +82,7 @@ export default function LinksPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: page.toString() });
-      if (search) params.set("search", search);
+      if (debouncedSearch) params.set("search", debouncedSearch);
       if (statusFilter) params.set("status", statusFilter);
       if (campaignFilter) params.set("campaign", campaignFilter);
       if (tagFilter) params.set("tagId", tagFilter);
@@ -98,7 +100,7 @@ export default function LinksPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, campaignFilter, tagFilter, sortBy, sortOrder]);
+  }, [debouncedSearch, statusFilter, campaignFilter, tagFilter, sortBy, sortOrder]);
 
   const clearCampaignFilter = () => {
     router.push("/links");
@@ -108,11 +110,6 @@ export default function LinksPage() {
   useEffect(() => {
     fetchLinks();
   }, [fetchLinks, searchParams]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchLinks();
-  };
 
   const handleDelete = async (id: string) => {
     try {
@@ -252,7 +249,7 @@ export default function LinksPage() {
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <form onSubmit={handleSearch} className="flex-1 relative">
+        <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
@@ -261,7 +258,7 @@ export default function LinksPage() {
             placeholder={tCommon("search")}
             className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] text-sm"
           />
-        </form>
+        </div>
         <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
           {["", "ACTIVE", "PAUSED", "ARCHIVED"].map((status) => (
             <button

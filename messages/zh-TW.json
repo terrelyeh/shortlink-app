@@ -40,7 +40,8 @@
     "settings": "設定",
     "users": "使用者管理",
     "auditLog": "操作紀錄",
-    "signOut": "登出"
+    "signOut": "登出",
+    "menu": "選單"
   },
   "dashboard": {
     "title": "儀表板",
@@ -51,9 +52,25 @@
     "recentLinks": "最近建立的連結",
     "topLinks": "熱門連結",
     "clicksTrend": "點擊趨勢",
+    "last30DaysOverview": "過去 30 天總覽",
+    "newLink": "新增連結",
+    "viewAll": "查看全部",
+    "noLinksYet": "尚無連結",
+    "clicksCount": "{count} 次點擊",
+    "vsLastPeriod": "{value}% 較上期",
+    "quickStart": {
+      "title": "快速開始",
+      "description": "透過以下簡單步驟開始使用",
+      "createLink": "建立短網址",
+      "createLinkDesc": "將長網址轉為可追蹤的短連結",
+      "setupCampaign": "設定行銷活動",
+      "setupCampaignDesc": "分組管理連結更有條理",
+      "createTemplate": "建立 UTM 模板",
+      "createTemplateDesc": "使用可重複利用的 UTM 參數節省時間"
+    },
     "emptyState": {
-      "title": "歡迎使用短網址管理系統！",
-      "description": "建立您的第一個短網址，開始追蹤點擊數據和分析流量。",
+      "title": "歡迎使用 EnGenius ShortLink",
+      "description": "建立帶有 UTM 追蹤的短連結，有效衡量您的行銷活動成效。",
       "createButton": "建立第一個短網址"
     }
   },
@@ -179,7 +196,21 @@
     "theme": "主題",
     "lightMode": "淺色模式",
     "darkMode": "深色模式",
-    "systemDefault": "跟隨系統"
+    "systemDefault": "跟隨系統",
+    "editProfile": "編輯個人資料",
+    "displayName": "顯示名稱",
+    "saveChanges": "儲存變更",
+    "saving": "儲存中...",
+    "profileUpdated": "個人資料已更新",
+    "dangerZone": "危險區域",
+    "deleteAccount": "刪除帳號",
+    "deleteAccountDesc": "永久刪除您的帳號及所有相關資料",
+    "deleteAccountConfirm": "確定要刪除帳號嗎？此操作無法復原。",
+    "about": "關於",
+    "version": "版本",
+    "framework": "框架",
+    "database": "資料庫",
+    "role": "角色"
   },
   "users": {
     "title": "使用者管理",

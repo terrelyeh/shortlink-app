@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getWorkspaceId, buildWorkspaceWhere } from "@/lib/workspace";
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,10 +37,9 @@ export async function GET(request: NextRequest) {
     if (linkId) {
       whereClicks.shortLinkId = linkId;
     } else {
-      const whereLinks: Record<string, unknown> = { deletedAt: null };
-      if (session.user.role === "MEMBER") {
-        whereLinks.createdById = session.user.id;
-      }
+      const workspaceId = getWorkspaceId(request);
+      const workspaceWhere = buildWorkspaceWhere(workspaceId, session.user.id, session.user.role);
+      const whereLinks: Record<string, unknown> = { deletedAt: null, ...workspaceWhere };
       const userLinks = await prisma.shortLink.findMany({
         where: whereLinks,
         select: { id: true },
