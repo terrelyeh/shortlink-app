@@ -5,8 +5,9 @@ import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/routing";
 import { useDebounce } from "@/hooks/useDebounce";
-import { LinkCard } from "@/components/links/LinkCard";
-import { Plus, Search, Loader2, Link2, Layers, ChevronLeft, ChevronRight, Tag, Trash2, Pause, Play, Archive, CheckSquare, Download, ArrowUpDown } from "lucide-react";
+import { LinkTableRow } from "@/components/links/LinkTableRow";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Plus, Search, Loader2, Link2, Layers, ChevronLeft, ChevronRight, Tag, Trash2, Pause, Play, Archive, Download, ArrowUpDown } from "lucide-react";
 import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
 
 interface LinkTag {
@@ -269,12 +270,10 @@ export default function LinksPage() {
             }}
             className="appearance-none pl-8 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] cursor-pointer"
           >
-            <option value="createdAt:desc">Newest</option>
-            <option value="createdAt:asc">Oldest</option>
-            <option value="clicks:desc">Most clicks</option>
-            <option value="clicks:asc">Fewest clicks</option>
-            <option value="title:asc">Title A-Z</option>
-            <option value="title:desc">Title Z-A</option>
+            <option value="createdAt:desc">{t("sortNewest")}</option>
+            <option value="createdAt:asc">{t("sortOldest")}</option>
+            <option value="clicks:desc">{t("sortMostClicks")}</option>
+            <option value="clicks:asc">{t("sortFewestClicks")}</option>
           </select>
           <ArrowUpDown className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
         </div>
@@ -341,69 +340,81 @@ export default function LinksPage() {
         </div>
       )}
 
-      {/* Links List */}
+      {/* Links Table */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16">
           <Loader2 className="w-6 h-6 animate-spin text-slate-400 mb-2" />
-          <p className="text-sm text-slate-500">Loading...</p>
+          <p className="text-sm text-slate-500">{tCommon("loading")}</p>
         </div>
       ) : links.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
-          <div className="w-12 h-12 mx-auto bg-slate-100 rounded-lg flex items-center justify-center mb-4">
-            <Link2 className="w-6 h-6 text-slate-400" />
-          </div>
-          <h3 className="text-lg font-medium text-slate-900 mb-1">No links yet</h3>
-          <p className="text-sm text-slate-500 mb-4">{t("noLinks")}</p>
-          <Link
-            href="/links/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            {t("createFirst")}
-          </Link>
+        <div className="bg-white rounded-xl border border-slate-100">
+          <EmptyState
+            icon={<Link2 className="w-10 h-10" />}
+            title={t("noLinks")}
+            description={t("createFirst")}
+            action={{ label: t("createNew"), href: "/links/new" }}
+          />
         </div>
       ) : (
-        <>
-          {/* Select All */}
-          <div className="flex items-center gap-2 px-1">
-            <button
-              onClick={toggleSelectAll}
-              className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-700 transition-colors"
-            >
-              <CheckSquare className={`w-4 h-4 ${selectedIds.size === links.length && links.length > 0 ? "text-[#03A9F4]" : ""}`} />
-              {selectedIds.size === links.length && links.length > 0 ? "Deselect all" : "Select all"}
-            </button>
-          </div>
-          <div className="space-y-3">
-            {links.map((link) => (
-              <div key={link.id} className="flex items-start gap-3">
-                <button
-                  onClick={() => toggleSelect(link.id)}
-                  className={`mt-4 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                    selectedIds.has(link.id)
-                      ? "bg-[#03A9F4] border-[#03A9F4] text-white"
-                      : "border-slate-300 hover:border-slate-400"
-                  }`}
-                >
-                  {selectedIds.has(link.id) && (
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
-                <div className="flex-1">
-                  <LinkCard
+        <div className="bg-white rounded-xl border border-slate-100">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="pl-4 pr-2 py-2.5 w-10">
+                    <button
+                      onClick={toggleSelectAll}
+                      className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                        selectedIds.size === links.length && links.length > 0
+                          ? "bg-[#03A9F4] border-[#03A9F4] text-white"
+                          : "border-slate-300 hover:border-slate-400"
+                      }`}
+                    >
+                      {selectedIds.size === links.length && links.length > 0 && (
+                        <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  </th>
+                  <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    {t("title")}
+                  </th>
+                  <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    {t("shortUrl")}
+                  </th>
+                  <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    {t("tags")}
+                  </th>
+                  <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    {t("status")}
+                  </th>
+                  <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    {t("clicks")}
+                  </th>
+                  <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    {t("createdAt")}
+                  </th>
+                  <th className="py-2.5 pr-4 w-10" />
+                </tr>
+              </thead>
+              <tbody>
+                {links.map((link) => (
+                  <LinkTableRow
+                    key={link.id}
                     link={link}
                     shortBaseUrl={shortBaseUrl}
+                    selected={selectedIds.has(link.id)}
+                    onSelect={toggleSelect}
                     onDelete={handleDelete}
                     onStatusChange={handleStatusChange}
                     onClone={handleClone}
                   />
-                </div>
-              </div>
-            ))}
+                ))}
+              </tbody>
+            </table>
           </div>
-        </>
+        </div>
       )}
 
       {/* Pagination */}
