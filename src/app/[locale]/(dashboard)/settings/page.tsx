@@ -160,7 +160,10 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">{t("title")}</h1>
+      <div>
+        <h1 className="text-2xl font-semibold text-slate-900">{t("title")}</h1>
+        <p className="text-sm text-slate-500 mt-0.5">{t("description")}</p>
+      </div>
 
       {/* Tab Navigation */}
       <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
@@ -201,16 +204,16 @@ export default function SettingsPage() {
       {activeTab === "profile" && (
         <>
           {/* Profile Section */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="bg-white rounded-xl border border-slate-100 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
                 <User className="w-5 h-5" />
                 {t("profile")}
               </h2>
               {!isEditing && (
                 <button
                   onClick={handleEditProfile}
-                  className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  className="flex items-center gap-1.5 text-sm text-[#03A9F4] hover:text-[#0288D1] font-medium"
                 >
                   <Pencil className="w-4 h-4" />
                   {t("editProfile")}
@@ -226,8 +229,8 @@ export default function SettingsPage() {
                   className="w-16 h-16 rounded-full"
                 />
               ) : (
-                <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
-                  <span className="text-2xl font-medium text-gray-600">
+                <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center">
+                  <span className="text-2xl font-medium text-slate-600">
                     {session?.user?.name?.charAt(0) || "U"}
                   </span>
                 </div>
@@ -238,7 +241,7 @@ export default function SettingsPage() {
                     <div>
                       <label
                         htmlFor="displayName"
-                        className="block text-sm font-medium text-gray-700 mb-1"
+                        className="block text-sm font-medium text-slate-700 mb-1"
                       >
                         {t("displayName")}
                       </label>
@@ -247,27 +250,27 @@ export default function SettingsPage() {
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] text-sm"
                         placeholder={t("displayName")}
                         disabled={isSaving}
                       />
                     </div>
-                    <p className="text-sm text-gray-500">{session?.user?.email}</p>
-                    <p className="text-xs text-gray-400 capitalize">
+                    <p className="text-sm text-slate-500">{session?.user?.email}</p>
+                    <p className="text-xs text-slate-400 capitalize">
                       {t("role")}: {session?.user?.role?.toLowerCase()}
                     </p>
                     <div className="flex gap-2">
                       <button
                         onClick={handleSaveProfile}
                         disabled={isSaving || !editName.trim()}
-                        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-4 py-2 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isSaving ? t("saving") : t("saveChanges")}
                       </button>
                       <button
                         onClick={handleCancelEdit}
                         disabled={isSaving}
-                        className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                        className="px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 disabled:opacity-50"
                       >
                         {tCommon("cancel")}
                       </button>
@@ -275,13 +278,13 @@ export default function SettingsPage() {
                   </div>
                 ) : (
                   <div>
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-slate-900">
                       {session?.user?.name}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-slate-500">
                       {session?.user?.email}
                     </p>
-                    <p className="text-xs text-gray-400 capitalize mt-1">
+                    <p className="text-xs text-slate-400 capitalize mt-1">
                       {t("role")}: {session?.user?.role?.toLowerCase()}
                     </p>
                   </div>
@@ -291,8 +294,8 @@ export default function SettingsPage() {
           </div>
 
           {/* Language Section */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <div className="bg-white rounded-xl border border-slate-100 p-6">
+            <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
               <Globe className="w-5 h-5" />
               {t("language")}
             </h2>
@@ -304,19 +307,19 @@ export default function SettingsPage() {
                   onClick={() => switchLocale(loc)}
                   className={`flex items-center justify-between p-4 rounded-lg border-2 transition-colors ${
                     loc === locale
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200 hover:border-gray-300"
+                      ? "border-[#03A9F4] bg-sky-50"
+                      : "border-slate-200 hover:border-slate-300"
                   }`}
                 >
                   <span
                     className={`font-medium ${
-                      loc === locale ? "text-blue-700" : "text-gray-700"
+                      loc === locale ? "text-sky-700" : "text-slate-700"
                     }`}
                   >
                     {localeNames[loc]}
                   </span>
                   {loc === locale && (
-                    <Check className="w-5 h-5 text-blue-600" />
+                    <Check className="w-5 h-5 text-[#03A9F4]" />
                   )}
                 </button>
               ))}
@@ -324,23 +327,23 @@ export default function SettingsPage() {
           </div>
 
           {/* App Info */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="bg-white rounded-xl border border-slate-100 p-6">
+            <h2 className="text-lg font-semibold text-slate-900 mb-4">
               {t("about")}
             </h2>
 
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500">{t("version")}</span>
-                <span className="text-gray-900">1.0.0</span>
+                <span className="text-slate-500">{t("version")}</span>
+                <span className="text-slate-900">1.0.0</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">{t("framework")}</span>
-                <span className="text-gray-900">Next.js 16</span>
+                <span className="text-slate-500">{t("framework")}</span>
+                <span className="text-slate-900">Next.js 16</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">{t("database")}</span>
-                <span className="text-gray-900">PostgreSQL</span>
+                <span className="text-slate-500">{t("database")}</span>
+                <span className="text-slate-900">PostgreSQL</span>
               </div>
             </div>
           </div>
@@ -364,8 +367,8 @@ export default function SettingsPage() {
           {/* Delete Account */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium text-gray-900">{t("deleteAccount")}</p>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="font-medium text-slate-900">{t("deleteAccount")}</p>
+              <p className="text-sm text-slate-500 mt-1">
                 {t("deleteAccountDesc")}
               </p>
             </div>
@@ -393,7 +396,7 @@ export default function SettingsPage() {
                 <button
                   onClick={() => setShowDeleteAccountConfirm(false)}
                   disabled={isDeletingAccount}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                  className="px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 disabled:opacity-50"
                 >
                   {tCommon("cancel")}
                 </button>
@@ -407,8 +410,8 @@ export default function SettingsPage() {
               <div className="border-t border-red-100 pt-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-gray-900">{tWorkspace("deleteWorkspace")}</p>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="font-medium text-slate-900">{tWorkspace("deleteWorkspace")}</p>
+                    <p className="text-sm text-slate-500 mt-1">
                       {tWorkspace("deleteWorkspaceDesc")}
                     </p>
                   </div>
@@ -462,7 +465,7 @@ export default function SettingsPage() {
                           setDeleteWorkspaceError(null);
                         }}
                         disabled={isDeletingWorkspace}
-                        className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                        className="px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 disabled:opacity-50"
                       >
                         {tCommon("cancel")}
                       </button>

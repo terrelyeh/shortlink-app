@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import {
   UTM_MEDIUMS,
@@ -15,7 +15,11 @@ import {
   Loader2,
   FileText,
   ChevronDown,
+  ArrowRight,
 } from "lucide-react";
+import Link from "next/link";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 interface Template {
   id: string;
@@ -127,7 +131,7 @@ export default function TemplatesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this template?")) return;
+    if (!confirm(t("deleteTemplateConfirm"))) return;
 
     try {
       await fetch(`/api/templates/${id}`, { method: "DELETE" });
@@ -137,96 +141,101 @@ export default function TemplatesPage() {
     }
   };
 
+  // Build UTM tag pills for a template
+  const getUtmPills = (template: Template) => {
+    const pills: { label: string; value: string }[] = [];
+    if (template.medium) pills.push({ label: "medium", value: template.medium });
+    if (template.source) pills.push({ label: "source", value: template.source });
+    if (template.campaign) pills.push({ label: "campaign", value: template.campaign });
+    if (template.content) pills.push({ label: "content", value: template.content });
+    if (template.term) pills.push({ label: "term", value: template.term });
+    return pills;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-[#03A9F4]" />
+        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">{t("templates")}</h1>
-        <button
-          onClick={openCreateForm}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white rounded-lg hover:bg-[#0288D1] transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Create Template
-        </button>
-      </div>
+      <PageHeader
+        title={t("templates")}
+        description={t("description")}
+        actions={
+          <button
+            onClick={openCreateForm}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            {t("createTemplate")}
+          </button>
+        }
+      />
 
       {/* Template List */}
       {templates.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
-          <div className="w-16 h-16 mx-auto bg-slate-100 rounded-full flex items-center justify-center mb-4">
-            <FileText className="w-8 h-8 text-slate-400" />
-          </div>
-          <p className="text-slate-500 mb-4">No templates yet</p>
-          <button
-            onClick={openCreateForm}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white rounded-lg hover:bg-[#0288D1] transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            Create your first template
-          </button>
-        </div>
+        <EmptyState
+          icon={<FileText className="w-10 h-10" />}
+          title={t("noTemplatesYet")}
+          description={t("description")}
+          action={{ label: t("createFirstTemplate"), onClick: openCreateForm }}
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {templates.map((template) => (
-            <div
-              key={template.id}
-              className="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <h3 className="font-semibold text-slate-900">{template.name}</h3>
-                <div className="flex gap-1">
+        <div className="bg-white rounded-xl border border-slate-100">
+          {templates.map((template, index) => {
+            const pills = getUtmPills(template);
+            return (
+              <div
+                key={template.id}
+                className={`flex items-center gap-4 px-4 py-3.5 hover:bg-slate-50 transition-colors ${
+                  index > 0 ? "border-t border-slate-100" : ""
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900">{template.name}</p>
+                  {pills.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {pills.map((pill) => (
+                        <span
+                          key={pill.label}
+                          className="inline-flex items-center text-xs text-slate-500 bg-slate-100 rounded px-1.5 py-0.5"
+                        >
+                          <span className="text-slate-400 mr-1">{pill.label}:</span>
+                          {pill.value}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <Link
+                    href={`/links/new?template=${template.id}`}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#03A9F4] hover:bg-sky-50 rounded-md transition-colors"
+                  >
+                    {t("useTemplate")}
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
                   <button
                     onClick={() => openEditForm(template)}
-                    className="p-1.5 hover:bg-slate-100 rounded transition-colors"
+                    className="p-1.5 hover:bg-slate-100 rounded-md transition-colors"
                   >
-                    <Edit className="w-4 h-4 text-slate-500" />
+                    <Edit className="w-4 h-4 text-slate-400" />
                   </button>
                   <button
                     onClick={() => handleDelete(template.id)}
-                    className="p-1.5 hover:bg-red-50 rounded transition-colors"
+                    className="p-1.5 hover:bg-red-50 rounded-md transition-colors"
                   >
-                    <Trash2 className="w-4 h-4 text-red-500" />
+                    <Trash2 className="w-4 h-4 text-slate-400 hover:text-red-500" />
                   </button>
                 </div>
               </div>
-
-              <div className="space-y-1 text-sm">
-                {template.source && (
-                  <p className="text-slate-600">
-                    <span className="text-slate-400">Source:</span> {template.source}
-                  </p>
-                )}
-                {template.medium && (
-                  <p className="text-slate-600">
-                    <span className="text-slate-400">Medium:</span> {template.medium}
-                  </p>
-                )}
-                {template.campaign && (
-                  <p className="text-slate-600">
-                    <span className="text-slate-400">Campaign:</span> {template.campaign}
-                  </p>
-                )}
-                {template.content && (
-                  <p className="text-slate-600">
-                    <span className="text-slate-400">Content:</span> {template.content}
-                  </p>
-                )}
-                {template.term && (
-                  <p className="text-slate-600">
-                    <span className="text-slate-400">Term:</span> {template.term}
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -234,15 +243,15 @@ export default function TemplatesPage() {
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold">
-                {editingId ? "Edit Template" : "Create Template"}
+            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+              <h2 className="text-lg font-semibold text-slate-900">
+                {editingId ? t("editTemplate") : t("createTemplate")}
               </h2>
               <button
                 onClick={() => setShowForm(false)}
                 className="p-1 hover:bg-slate-100 rounded"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
 
@@ -282,7 +291,6 @@ export default function TemplatesPage() {
                         const newMedium = e.target.value;
                         const newSources = getSourcesForMedium(newMedium);
                         const newFormData = { ...formData, medium: newMedium };
-                        // Clear source if not in new medium's sources
                         if (
                           newSources.length > 0 &&
                           !newSources.includes(formData.source) &&
@@ -394,7 +402,7 @@ export default function TemplatesPage() {
                   {saving ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Saving...
+                      {t("savingTemplate")}
                     </>
                   ) : (
                     tCommon("save")

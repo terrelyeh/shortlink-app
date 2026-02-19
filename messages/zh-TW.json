@@ -139,10 +139,19 @@
     "templateName": "模板名稱",
     "applyTemplate": "套用模板",
     "batchCreate": "批次建立",
-    "batchDescription": "輸入多組關鍵字，每行一個，將自動產生多組短網址"
+    "batchDescription": "輸入多組關鍵字，每行一個，將自動產生多組短網址",
+    "description": "儲存可重複使用的 UTM 參數組合，加速連結建立",
+    "createTemplate": "建立模板",
+    "editTemplate": "編輯模板",
+    "noTemplatesYet": "尚無模板",
+    "createFirstTemplate": "建立第一個模板",
+    "deleteTemplateConfirm": "確定要刪除此模板嗎？",
+    "savingTemplate": "儲存中...",
+    "useTemplate": "使用"
   },
   "analytics": {
     "title": "數據分析",
+    "description": "追蹤點擊數、訪客和行銷活動成效",
     "dateRange": "日期範圍",
     "today": "今天",
     "yesterday": "昨天",
@@ -158,6 +167,12 @@
     "countries": "國家/地區",
     "cities": "城市",
     "noData": "此期間無數據",
+    "sections": {
+      "overview": "概覽",
+      "audience": "受眾",
+      "traffic": "流量來源",
+      "campaigns": "活動成效"
+    },
     "utm": {
       "title": "UTM 行銷活動分析",
       "subtitle": "一眼掌握行銷活動成效",
@@ -192,6 +207,7 @@
   },
   "settings": {
     "title": "設定",
+    "description": "管理個人資料、工作區和偏好設定",
     "profile": "個人資料",
     "language": "語言",
     "theme": "主題",
@@ -247,6 +263,8 @@
       "description": "在建立短連結時加入活動名稱，即可追蹤行銷活動成效。",
       "createFirst": "建立第一個活動"
     },
+    "howItWorks": "當您在連結中加入 UTM 活動參數時，系統會自動建立行銷活動。建立帶有 UTM 參數的連結即可開始追蹤。",
+    "createLinkWithUTM": "建立帶有 UTM 的連結",
     "searchPlaceholder": "搜尋活動...",
     "allStatuses": "所有狀態",
     "allTags": "所有標籤",
