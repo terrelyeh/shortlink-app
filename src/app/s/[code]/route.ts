@@ -131,7 +131,7 @@ export async function GET(
     // Get request headers for tracking (headersList already fetched above for rate limiting)
     const ip = clientIp;
     const userAgent = headersList.get("user-agent");
-    const referrer = headersList.get("referer");
+    const referrer = headersList.get("referer") || headersList.get("referrer");
     const { device, os, browser } = parseUserAgent(userAgent);
 
     // Record the click (skip bots and duplicate clicks)
@@ -152,12 +152,15 @@ export async function GET(
 
         if (!recentClick) {
           const geo = await lookupIP(ip);
+          if (!geo.country) {
+            console.warn(`[click] No geo data for IP (first 8 chars): ${ip.substring(0, 8)}..., code: ${code}`);
+          }
           await prisma.click.create({
             data: {
               shortLinkId: shortLink.id,
               ipHash: ipHashed,
               userAgent,
-              referrer,
+              referrer: referrer || null,
               device,
               os,
               browser,
