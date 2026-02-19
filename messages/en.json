@@ -139,10 +139,19 @@
     "templateName": "Template Name",
     "applyTemplate": "Apply Template",
     "batchCreate": "Batch Create",
-    "batchDescription": "Enter multiple keywords, one per line, to generate multiple short URLs"
+    "batchDescription": "Enter multiple keywords, one per line, to generate multiple short URLs",
+    "description": "Save reusable UTM parameter sets to speed up link creation",
+    "createTemplate": "Create Template",
+    "editTemplate": "Edit Template",
+    "noTemplatesYet": "No templates yet",
+    "createFirstTemplate": "Create your first template",
+    "deleteTemplateConfirm": "Are you sure you want to delete this template?",
+    "savingTemplate": "Saving...",
+    "useTemplate": "Use"
   },
   "analytics": {
     "title": "Analytics",
+    "description": "Track clicks, visitors, and campaign performance",
     "dateRange": "Date Range",
     "today": "Today",
     "yesterday": "Yesterday",
@@ -158,6 +167,12 @@
     "countries": "Countries",
     "cities": "Cities",
     "noData": "No data for this period",
+    "sections": {
+      "overview": "Overview",
+      "audience": "Audience",
+      "traffic": "Traffic Sources",
+      "campaigns": "Campaign Performance"
+    },
     "utm": {
       "title": "UTM Campaign Analytics",
       "subtitle": "Track your marketing campaign performance at a glance",
@@ -192,6 +207,7 @@
   },
   "settings": {
     "title": "Settings",
+    "description": "Manage your profile, workspace, and preferences",
     "profile": "Profile",
     "language": "Language",
     "theme": "Theme",
@@ -247,6 +263,8 @@
       "description": "Add a campaign name when creating short links to track your marketing activities.",
       "createFirst": "Create your first campaign"
     },
+    "howItWorks": "Campaigns are created automatically when you add UTM campaign parameters to a link. Create a link with UTM parameters to start tracking.",
+    "createLinkWithUTM": "Create link with UTM",
     "searchPlaceholder": "Search campaigns...",
     "allStatuses": "All Statuses",
     "allTags": "All Tags",
