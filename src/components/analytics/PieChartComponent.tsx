@@ -30,7 +30,7 @@ export function PieChartComponent({ data, title }: PieChartProps) {
 
   if (total === 0) {
     return (
-      <div className="h-[250px] flex items-center justify-center text-gray-400">
+      <div className="h-[180px] flex items-center justify-center text-slate-400 text-sm">
         No data available
       </div>
     );
@@ -38,15 +38,15 @@ export function PieChartComponent({ data, title }: PieChartProps) {
 
   return (
     <div>
-      <h3 className="text-sm font-medium text-gray-700 mb-2">{title}</h3>
-      <ResponsiveContainer width="100%" height={250}>
+      <h3 className="text-sm font-medium text-slate-700 mb-1">{title}</h3>
+      <ResponsiveContainer width="100%" height={200}>
         <PieChart>
           <Pie
             data={data}
             cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={80}
+            cy="45%"
+            innerRadius={45}
+            outerRadius={65}
             paddingAngle={2}
             dataKey="value"
           >
@@ -67,16 +67,18 @@ export function PieChartComponent({ data, title }: PieChartProps) {
             }}
             contentStyle={{
               backgroundColor: "#fff",
-              border: "1px solid #e5e7eb",
+              border: "1px solid #e2e8f0",
               borderRadius: "8px",
+              fontSize: "12px",
             }}
           />
           <Legend
-            layout="vertical"
-            align="right"
-            verticalAlign="middle"
-            formatter={(value, entry) => (
-              <span className="text-sm text-gray-600">{value}</span>
+            layout="horizontal"
+            align="center"
+            verticalAlign="bottom"
+            iconSize={8}
+            formatter={(value) => (
+              <span className="text-xs text-slate-500">{value}</span>
             )}
           />
         </PieChart>

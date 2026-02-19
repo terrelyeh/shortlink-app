@@ -409,15 +409,15 @@ export default function AnalyticsPage() {
           {/* — Audience — */}
           <SectionDivider title={t("sections.audience")} id="audience" />
 
-          {/* Distribution Charts — 2-col for better readability */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl p-6 border border-slate-100">
+          {/* Distribution Charts — 3-col single row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl p-4 border border-slate-100">
               <PieChartComponent data={data.devices} title={t("devices")} />
             </div>
-            <div className="bg-white rounded-xl p-6 border border-slate-100">
+            <div className="bg-white rounded-xl p-4 border border-slate-100">
               <PieChartComponent data={data.browsers} title={t("browsers")} />
             </div>
-            <div className="bg-white rounded-xl p-6 border border-slate-100">
+            <div className="bg-white rounded-xl p-4 border border-slate-100">
               <PieChartComponent
                 data={data.operatingSystems}
                 title={t("operatingSystems")}
