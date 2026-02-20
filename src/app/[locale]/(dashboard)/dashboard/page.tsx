@@ -179,24 +179,32 @@ async function getTopCampaigns(userId: string, userRole: string, limit = 5) {
   });
 
   // Aggregate by campaign name
-  const campaignMap = new Map<string, { linkCount: number; clickCount: number; sources: Set<string> }>();
+  const campaignMap = new Map<string, { linkCount: number; clickCount: number; sources: Set<string>; mediums: Set<string> }>();
   links.forEach((link: { utmCampaign: string | null; utmSource: string | null; utmMedium: string | null; _count: { clicks: number } }) => {
     if (!link.utmCampaign) return;
     const existing = campaignMap.get(link.utmCampaign);
-    const source = [link.utmSource, link.utmMedium].filter(Boolean).join(" / ");
     if (existing) {
       existing.linkCount++;
       existing.clickCount += link._count.clicks;
-      if (source) existing.sources.add(source);
+      if (link.utmSource) existing.sources.add(link.utmSource);
+      if (link.utmMedium) existing.mediums.add(link.utmMedium);
     } else {
       const sources = new Set<string>();
-      if (source) sources.add(source);
-      campaignMap.set(link.utmCampaign, { linkCount: 1, clickCount: link._count.clicks, sources });
+      const mediums = new Set<string>();
+      if (link.utmSource) sources.add(link.utmSource);
+      if (link.utmMedium) mediums.add(link.utmMedium);
+      campaignMap.set(link.utmCampaign, { linkCount: 1, clickCount: link._count.clicks, sources, mediums });
     }
   });
 
   return Array.from(campaignMap.entries())
-    .map(([name, stats]) => ({ name, linkCount: stats.linkCount, clickCount: stats.clickCount, sources: Array.from(stats.sources).slice(0, 2) }))
+    .map(([name, stats]) => ({
+      name,
+      linkCount: stats.linkCount,
+      clickCount: stats.clickCount,
+      sources: Array.from(stats.sources).slice(0, 2),
+      mediums: Array.from(stats.mediums).slice(0, 2),
+    }))
     .sort((a, b) => b.clickCount - a.clickCount)
     .slice(0, limit);
 }
@@ -394,7 +402,7 @@ export default async function DashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-slate-400" />
-              <h2 className="text-sm font-semibold text-slate-700">{t("topLinks")}</h2>
+              <h2 className="text-base font-semibold text-slate-900">{t("topLinks")}</h2>
             </div>
             <Link href="/links" className="text-xs text-[#03A9F4] hover:text-[#0288D1] font-medium">
               {t("viewAll")} →
@@ -421,7 +429,7 @@ export default async function DashboardPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusColor(link.status)}`} />
-                      <p className="text-sm font-medium text-slate-900 truncate">
+                      <p className="text-sm font-semibold text-slate-900 truncate">
                         {link.title || `/${link.code}`}
                       </p>
                     </div>
@@ -457,7 +465,7 @@ export default async function DashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-slate-400" />
-              <h2 className="text-sm font-semibold text-slate-700">{t("recentLinks")}</h2>
+              <h2 className="text-base font-semibold text-slate-900">{t("recentLinks")}</h2>
             </div>
             <Link href="/links" className="text-xs text-[#03A9F4] hover:text-[#0288D1] font-medium">
               {t("viewAll")} →
@@ -477,7 +485,7 @@ export default async function DashboardPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusColor(link.status)}`} />
-                      <p className="text-sm font-medium text-slate-900 truncate">
+                      <p className="text-sm font-semibold text-slate-900 truncate">
                         {link.title || `/${link.code}`}
                       </p>
                       {link.tags.length > 0 && (
@@ -520,7 +528,7 @@ export default async function DashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Megaphone className="w-4 h-4 text-slate-400" />
-              <h2 className="text-sm font-semibold text-slate-700">{t("topCampaigns")}</h2>
+              <h2 className="text-base font-semibold text-slate-900">{t("topCampaigns")}</h2>
             </div>
             <Link href="/campaigns" className="text-xs text-[#03A9F4] hover:text-[#0288D1] font-medium">
               {t("viewAll")} →
@@ -528,33 +536,42 @@ export default async function DashboardPage() {
           </div>
           <div className="bg-white rounded-xl border border-slate-100">
             {/* Table header */}
-            <div className="flex items-center gap-4 px-4 py-2 border-b border-slate-100">
-              <span className="flex-1 text-[10px] font-medium text-slate-400 uppercase tracking-wider">{t("campaignName")}</span>
-              <span className="w-24 text-[10px] font-medium text-slate-400 uppercase tracking-wider text-center">{t("source")}</span>
-              <span className="w-14 text-[10px] font-medium text-slate-400 uppercase tracking-wider text-right">{t("linksLabel")}</span>
-              <span className="w-28 text-[10px] font-medium text-slate-400 uppercase tracking-wider text-right">{t("clicksLabel")}</span>
+            <div className="flex items-center gap-4 px-4 py-2.5 border-b border-slate-100">
+              <span className="flex-1 text-xs font-medium text-slate-400 uppercase tracking-wider">{t("campaignName")}</span>
+              <span className="w-32 text-xs font-medium text-slate-400 uppercase tracking-wider">{t("sourceMedium")}</span>
+              <span className="w-14 text-xs font-medium text-slate-400 uppercase tracking-wider text-right">{t("linksLabel")}</span>
+              <span className="w-28 text-xs font-medium text-slate-400 uppercase tracking-wider text-right">{t("clicksLabel")}</span>
             </div>
-            {topCampaigns.map((campaign: { name: string; linkCount: number; clickCount: number; sources: string[] }, index: number) => (
+            {topCampaigns.map((campaign: { name: string; linkCount: number; clickCount: number; sources: string[]; mediums: string[] }, index: number) => (
               <div
                 key={campaign.name}
-                className={`flex items-center gap-4 px-4 py-3 hover:bg-slate-50 transition-colors ${
-                  index > 0 ? "border-t border-slate-100" : ""
+                className={`flex items-center gap-4 px-4 py-3 hover:bg-slate-50/50 transition-colors ${
+                  index > 0 ? "border-t border-slate-50" : ""
                 }`}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">{campaign.name}</p>
-                  {campaign.sources.length > 0 && (
-                    <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                      {campaign.sources.join(", ")}
-                    </p>
-                  )}
+                  <span className="inline-flex items-center px-2 py-0.5 bg-violet-50 text-violet-700 border border-violet-100 rounded-md text-sm font-medium font-mono truncate max-w-full">
+                    {campaign.name}
+                  </span>
                 </div>
-                <div className="w-24 flex justify-center">
-                  {campaign.sources.length > 0 ? (
-                    <span className="text-xs text-slate-500 bg-slate-100 rounded px-1.5 py-0.5 truncate max-w-full">
-                      {campaign.sources[0].split(" / ")[0]}
+                <div className="w-32 flex flex-wrap items-center gap-1">
+                  {campaign.sources.slice(0, 2).map((src: string) => (
+                    <span
+                      key={src}
+                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-cyan-50 text-cyan-700 border border-cyan-100"
+                    >
+                      {src}
                     </span>
-                  ) : (
+                  ))}
+                  {campaign.mediums.slice(0, 1).map((med: string) => (
+                    <span
+                      key={med}
+                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-100"
+                    >
+                      {med}
+                    </span>
+                  ))}
+                  {campaign.sources.length === 0 && campaign.mediums.length === 0 && (
                     <span className="text-xs text-slate-300">—</span>
                   )}
                 </div>

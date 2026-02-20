@@ -307,7 +307,7 @@ export default function AnalyticsPage() {
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <Link2 className="w-4 h-4 text-slate-400" />
-              <h3 className="text-sm font-semibold text-slate-800">
+              <h3 className="text-sm font-semibold text-slate-900">
                 {t("campaignLinks")}{" "}
                 <span className="font-mono text-[#03A9F4]">{selectedCampaign}</span>
               </h3>
