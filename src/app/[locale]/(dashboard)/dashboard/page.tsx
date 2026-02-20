@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { Link2, MousePointerClick, Users, TrendingUp, Plus, ArrowRight, Megaphone, FileText, Zap, ExternalLink } from "lucide-react";
+import { Link2, MousePointerClick, Users, TrendingUp, Plus, ArrowRight, Megaphone, FileText, Zap, ExternalLink, BarChart3, Clock, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
@@ -18,9 +18,10 @@ async function getDashboardStats(userId: string, userRole: string) {
   const whereClause = isAdminOrManager ? { deletedAt: null } : { createdById: userId, deletedAt: null };
 
   // Get total links and active links
-  const [totalLinks, activeLinks] = await Promise.all([
+  const [totalLinks, activeLinks, pausedLinks] = await Promise.all([
     prisma.shortLink.count({ where: whereClause }),
     prisma.shortLink.count({ where: { ...whereClause, status: "ACTIVE" } }),
+    prisma.shortLink.count({ where: { ...whereClause, status: "PAUSED" } }),
   ]);
 
   // Get click stats for last 30 days
@@ -30,6 +31,10 @@ async function getDashboardStats(userId: string, userRole: string) {
   const sixtyDaysAgo = new Date();
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
+  // Get today's clicks
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
   // Get link IDs for the user
   const userLinks = await prisma.shortLink.findMany({
     where: whereClause,
@@ -37,41 +42,51 @@ async function getDashboardStats(userId: string, userRole: string) {
   });
   const linkIds = userLinks.map((l: { id: string }) => l.id);
 
-  // Current period clicks (last 30 days)
-  const currentPeriodClicks = linkIds.length > 0 ? await prisma.click.count({
-    where: {
-      shortLinkId: { in: linkIds },
-      timestamp: { gte: thirtyDaysAgo },
-    },
-  }) : 0;
-
-  // Previous period clicks (30-60 days ago)
-  const previousPeriodClicks = linkIds.length > 0 ? await prisma.click.count({
-    where: {
-      shortLinkId: { in: linkIds },
-      timestamp: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
-    },
-  }) : 0;
-
-  // Unique visitors (by ipHash)
-  const uniqueVisitors = linkIds.length > 0 ? await prisma.click.groupBy({
-    by: ['ipHash'],
-    where: {
-      shortLinkId: { in: linkIds },
-      timestamp: { gte: thirtyDaysAgo },
-    },
-  }).then((results: { ipHash: string | null }[]) => results.length) : 0;
+  // Current period clicks (last 30 days), previous period, today, and unique visitors
+  const [currentPeriodClicks, previousPeriodClicks, todayClicks, uniqueVisitors] = await Promise.all([
+    linkIds.length > 0 ? prisma.click.count({
+      where: {
+        shortLinkId: { in: linkIds },
+        timestamp: { gte: thirtyDaysAgo },
+      },
+    }) : 0,
+    linkIds.length > 0 ? prisma.click.count({
+      where: {
+        shortLinkId: { in: linkIds },
+        timestamp: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
+      },
+    }) : 0,
+    linkIds.length > 0 ? prisma.click.count({
+      where: {
+        shortLinkId: { in: linkIds },
+        timestamp: { gte: todayStart },
+      },
+    }) : 0,
+    linkIds.length > 0 ? prisma.click.groupBy({
+      by: ['ipHash'],
+      where: {
+        shortLinkId: { in: linkIds },
+        timestamp: { gte: thirtyDaysAgo },
+      },
+    }).then((results: { ipHash: string | null }[]) => results.length) : 0,
+  ]);
 
   // Calculate trend
   const clicksTrend = previousPeriodClicks > 0
     ? ((currentPeriodClicks - previousPeriodClicks) / previousPeriodClicks) * 100
     : 0;
 
+  // Calculate avg clicks per link
+  const avgClicksPerLink = activeLinks > 0 ? Math.round(currentPeriodClicks / activeLinks) : 0;
+
   return {
     totalClicks: currentPeriodClicks,
+    todayClicks,
     uniqueVisitors,
     totalLinks,
     activeLinks,
+    pausedLinks,
+    avgClicksPerLink,
     clicksTrend: Math.round(clicksTrend * 10) / 10,
   };
 }
@@ -87,6 +102,10 @@ async function getTopLinks(userId: string, userRole: string, limit = 5) {
       _count: {
         select: { clicks: true },
       },
+      tags: {
+        include: { tag: true },
+        take: 2,
+      },
     },
     orderBy: {
       clicks: {
@@ -96,11 +115,15 @@ async function getTopLinks(userId: string, userRole: string, limit = 5) {
     take: limit,
   });
 
-  return links.map((link: { id: string; code: string; originalUrl: string; _count: { clicks: number } }) => ({
+  return links.map((link: { id: string; code: string; originalUrl: string; title: string | null; status: string; createdAt: Date; _count: { clicks: number }; tags: { tag: { id: string; name: string; color?: string | null } }[] }) => ({
     id: link.id,
     code: link.code,
     originalUrl: link.originalUrl,
+    title: link.title,
+    status: link.status,
     clicks: link._count.clicks,
+    createdAt: link.createdAt,
+    tags: link.tags.map((t: { tag: { id: string; name: string; color?: string | null } }) => t.tag),
   }));
 }
 
@@ -115,6 +138,10 @@ async function getRecentLinks(userId: string, userRole: string, limit = 5) {
       _count: {
         select: { clicks: true },
       },
+      tags: {
+        include: { tag: true },
+        take: 2,
+      },
     },
     orderBy: {
       createdAt: 'desc',
@@ -122,12 +149,15 @@ async function getRecentLinks(userId: string, userRole: string, limit = 5) {
     take: limit,
   });
 
-  return links.map((link: { id: string; code: string; originalUrl: string; createdAt: Date; _count: { clicks: number } }) => ({
+  return links.map((link: { id: string; code: string; originalUrl: string; title: string | null; status: string; createdAt: Date; _count: { clicks: number }; tags: { tag: { id: string; name: string; color?: string | null } }[] }) => ({
     id: link.id,
     code: link.code,
     originalUrl: link.originalUrl,
+    title: link.title,
+    status: link.status,
     clicks: link._count.clicks,
     createdAt: link.createdAt,
+    tags: link.tags.map((t: { tag: { id: string; name: string; color?: string | null } }) => t.tag),
   }));
 }
 
@@ -142,27 +172,65 @@ async function getTopCampaigns(userId: string, userRole: string, limit = 5) {
     where: whereClause,
     select: {
       utmCampaign: true,
+      utmSource: true,
+      utmMedium: true,
       _count: { select: { clicks: true } },
     },
   });
 
   // Aggregate by campaign name
-  const campaignMap = new Map<string, { linkCount: number; clickCount: number }>();
-  links.forEach((link: { utmCampaign: string | null; _count: { clicks: number } }) => {
+  const campaignMap = new Map<string, { linkCount: number; clickCount: number; sources: Set<string> }>();
+  links.forEach((link: { utmCampaign: string | null; utmSource: string | null; utmMedium: string | null; _count: { clicks: number } }) => {
     if (!link.utmCampaign) return;
     const existing = campaignMap.get(link.utmCampaign);
+    const source = [link.utmSource, link.utmMedium].filter(Boolean).join(" / ");
     if (existing) {
       existing.linkCount++;
       existing.clickCount += link._count.clicks;
+      if (source) existing.sources.add(source);
     } else {
-      campaignMap.set(link.utmCampaign, { linkCount: 1, clickCount: link._count.clicks });
+      const sources = new Set<string>();
+      if (source) sources.add(source);
+      campaignMap.set(link.utmCampaign, { linkCount: 1, clickCount: link._count.clicks, sources });
     }
   });
 
   return Array.from(campaignMap.entries())
-    .map(([name, stats]) => ({ name, ...stats }))
+    .map(([name, stats]) => ({ name, linkCount: stats.linkCount, clickCount: stats.clickCount, sources: Array.from(stats.sources).slice(0, 2) }))
     .sort((a, b) => b.clickCount - a.clickCount)
     .slice(0, limit);
+}
+
+// Helper: relative time
+function getRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - new Date(date).getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  return new Date(date).toLocaleDateString();
+}
+
+// Helper: status dot color
+function statusColor(status: string) {
+  switch (status) {
+    case "ACTIVE": return "bg-emerald-400";
+    case "PAUSED": return "bg-amber-400";
+    case "ARCHIVED": return "bg-slate-300";
+    default: return "bg-slate-300";
+  }
+}
+
+// Helper: truncate URL for display
+function displayUrl(url: string, maxLen = 45) {
+  const clean = url.replace(/^https?:\/\/(www\.)?/, "");
+  return clean.length > maxLen ? clean.slice(0, maxLen) + "..." : clean;
 }
 
 export default async function DashboardPage() {
@@ -182,6 +250,8 @@ export default async function DashboardPage() {
     getRecentLinks(userId, userRole),
     getTopCampaigns(userId, userRole),
   ]);
+
+  const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
 
   // Show empty state if no links
   if (stats.totalLinks === 0) {
@@ -228,6 +298,12 @@ export default async function DashboardPage() {
 
   const showQuickStart = stats.totalLinks < 5;
 
+  // Find the max clicks for Top Links bar chart
+  const maxClicks = topLinks.length > 0 ? Math.max(...topLinks.map((l: { clicks: number }) => l.clicks), 1) : 1;
+
+  // Find the max clicks for campaigns bar
+  const maxCampaignClicks = topCampaigns.length > 0 ? Math.max(...topCampaigns.map((c: { clickCount: number }) => c.clickCount), 1) : 1;
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -245,125 +321,255 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      {/* Inline Stats Row */}
-      <div className="flex items-start gap-8 pb-6 border-b border-slate-100">
+      {/* Stat Cards Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Clicks — primary stat */}
+        <div className="bg-white rounded-xl border border-slate-100 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-sky-50 flex items-center justify-center">
+              <MousePointerClick className="w-4 h-4 text-[#03A9F4]" />
+            </div>
+            <span className="text-xs font-medium text-slate-500">{t("totalClicks")}</span>
+          </div>
+          <p className="text-3xl font-semibold text-slate-900">{stats.totalClicks.toLocaleString()}</p>
+          <div className="flex items-center gap-2 mt-1.5">
+            {stats.clicksTrend !== 0 && (
+              <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${stats.clicksTrend >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                {stats.clicksTrend >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                {Math.abs(stats.clicksTrend)}%
+              </span>
+            )}
+            {stats.todayClicks > 0 && (
+              <span className="text-xs text-slate-400">{t("todayCount", { count: stats.todayClicks })}</span>
+            )}
+          </div>
+        </div>
+
+        {/* Unique Visitors */}
+        <div className="bg-white rounded-xl border border-slate-100 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center">
+              <Users className="w-4 h-4 text-violet-500" />
+            </div>
+            <span className="text-xs font-medium text-slate-500">{t("uniqueVisitors")}</span>
+          </div>
+          <p className="text-3xl font-semibold text-slate-900">{stats.uniqueVisitors.toLocaleString()}</p>
+          <p className="text-xs text-slate-400 mt-1.5">{t("avgPerLink", { count: stats.avgClicksPerLink })}</p>
+        </div>
+
+        {/* Total Links */}
+        <div className="bg-white rounded-xl border border-slate-100 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+              <Link2 className="w-4 h-4 text-amber-500" />
+            </div>
+            <span className="text-xs font-medium text-slate-500">{t("totalLinks")}</span>
+          </div>
+          <p className="text-3xl font-semibold text-slate-900">{stats.totalLinks}</p>
+          <p className="text-xs text-slate-400 mt-1.5">
+            <span className="text-emerald-600">{stats.activeLinks} {t("activeLabel")}</span>
+            {stats.pausedLinks > 0 && (
+              <span className="text-slate-400"> · {stats.pausedLinks} {t("pausedLabel")}</span>
+            )}
+          </p>
+        </div>
+
+        {/* Click Rate */}
+        <div className="bg-white rounded-xl border border-slate-100 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-emerald-500" />
+            </div>
+            <span className="text-xs font-medium text-slate-500">{t("avgPerLink")}</span>
+          </div>
+          <p className="text-3xl font-semibold text-slate-900">{stats.avgClicksPerLink}</p>
+          <p className="text-xs text-slate-400 mt-1.5">{t("clicksPerActiveLink")}</p>
+        </div>
+      </div>
+
+      {/* Two-column layout: Top Links + Recent Links */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Links */}
         <div>
-          <p className="text-xs text-slate-400 uppercase tracking-wider font-medium">{t("totalClicks")}</p>
-          <p className="text-3xl font-semibold text-slate-900 mt-1">{stats.totalClicks.toLocaleString()}</p>
-          {stats.clicksTrend !== 0 && (
-            <p className={`text-xs mt-1 ${stats.clicksTrend >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-              {stats.clicksTrend >= 0 ? "+" : ""}{t("vsLastPeriod", { value: stats.clicksTrend })}
-            </p>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-slate-400" />
+              <h2 className="text-sm font-semibold text-slate-700">{t("topLinks")}</h2>
+            </div>
+            <Link href="/links" className="text-xs text-[#03A9F4] hover:text-[#0288D1] font-medium">
+              {t("viewAll")} →
+            </Link>
+          </div>
+          {topLinks.length > 0 ? (
+            <div className="bg-white rounded-xl border border-slate-100">
+              {topLinks.map((link: { id: string; code: string; originalUrl: string; title: string | null; status: string; clicks: number; createdAt: Date; tags: { id: string; name: string; color?: string | null }[] }, index: number) => (
+                <Link
+                  key={link.id}
+                  href={`/links/${link.id}/edit`}
+                  className={`flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group ${
+                    index > 0 ? "border-t border-slate-100" : ""
+                  }`}
+                >
+                  {/* Rank badge */}
+                  <span className={`w-6 h-6 rounded-md text-xs font-semibold flex items-center justify-center shrink-0 ${
+                    index === 0 ? "bg-sky-50 text-[#03A9F4]" : index === 1 ? "bg-slate-100 text-slate-500" : "bg-slate-50 text-slate-400"
+                  }`}>
+                    {index + 1}
+                  </span>
+
+                  {/* Link info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusColor(link.status)}`} />
+                      <p className="text-sm font-medium text-slate-900 truncate">
+                        {link.title || `/${link.code}`}
+                      </p>
+                    </div>
+                    <p className="text-xs text-slate-400 truncate mt-0.5 pl-3">
+                      {shortBaseUrl}/{link.code} → {displayUrl(link.originalUrl)}
+                    </p>
+                  </div>
+
+                  {/* Click count with visual bar */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#03A9F4] rounded-full"
+                        style={{ width: `${Math.max((link.clicks / maxClicks) * 100, 4)}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-medium text-slate-700 tabular-nums w-12 text-right">
+                      {link.clicks.toLocaleString()}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-slate-100 py-8 text-center">
+              <p className="text-sm text-slate-400">{t("noLinksYet")}</p>
+            </div>
           )}
         </div>
-        <div className="border-l border-slate-100 pl-8">
-          <p className="text-xs text-slate-400 uppercase tracking-wider font-medium">{t("uniqueVisitors")}</p>
-          <p className="text-2xl font-semibold text-slate-900 mt-1">{stats.uniqueVisitors.toLocaleString()}</p>
-        </div>
-        <div className="border-l border-slate-100 pl-8">
-          <p className="text-xs text-slate-400 uppercase tracking-wider font-medium">{t("totalLinks")}</p>
-          <p className="text-2xl font-semibold text-slate-900 mt-1">{stats.totalLinks}</p>
-        </div>
-        <div className="border-l border-slate-100 pl-8">
-          <p className="text-xs text-slate-400 uppercase tracking-wider font-medium">{t("activeLinks")}</p>
-          <p className="text-2xl font-semibold text-slate-900 mt-1">{stats.activeLinks}</p>
-        </div>
-      </div>
 
-      {/* Top Links */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-medium text-slate-400 uppercase tracking-wider">{t("topLinks")}</h2>
-          <Link href="/links" className="text-xs text-[#03A9F4] hover:text-[#0288D1] font-medium">
-            {t("viewAll")}
-          </Link>
-        </div>
-        {topLinks.length > 0 ? (
-          <div className="bg-white rounded-xl border border-slate-100">
-            {topLinks.map((link: { id: string; code: string; originalUrl: string; clicks: number }, index: number) => (
-              <div
-                key={link.id}
-                className={`flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors ${
-                  index > 0 ? "border-t border-slate-100" : ""
-                }`}
-              >
-                <span className="w-5 h-5 rounded text-xs font-medium flex items-center justify-center text-slate-400">
-                  {index + 1}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">/{link.code}</p>
-                  <p className="text-xs text-slate-400 truncate flex items-center gap-1">
-                    <ExternalLink className="w-3 h-3 shrink-0" />
-                    {link.originalUrl}
-                  </p>
-                </div>
-                <span className="text-sm font-medium text-slate-600 tabular-nums">
-                  {link.clicks.toLocaleString()}
-                </span>
-              </div>
-            ))}
+        {/* Recent Links */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-slate-400" />
+              <h2 className="text-sm font-semibold text-slate-700">{t("recentLinks")}</h2>
+            </div>
+            <Link href="/links" className="text-xs text-[#03A9F4] hover:text-[#0288D1] font-medium">
+              {t("viewAll")} →
+            </Link>
           </div>
-        ) : (
-          <p className="text-sm text-slate-400 py-4">{t("noLinksYet")}</p>
-        )}
-      </div>
+          {recentLinks.length > 0 ? (
+            <div className="bg-white rounded-xl border border-slate-100">
+              {recentLinks.map((link: { id: string; code: string; originalUrl: string; title: string | null; status: string; clicks: number; createdAt: Date; tags: { id: string; name: string; color?: string | null }[] }, index: number) => (
+                <Link
+                  key={link.id}
+                  href={`/links/${link.id}/edit`}
+                  className={`flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group ${
+                    index > 0 ? "border-t border-slate-100" : ""
+                  }`}
+                >
+                  {/* Status dot + info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusColor(link.status)}`} />
+                      <p className="text-sm font-medium text-slate-900 truncate">
+                        {link.title || `/${link.code}`}
+                      </p>
+                      {link.tags.length > 0 && (
+                        <div className="flex items-center gap-1 ml-1">
+                          {link.tags.map((tag: { id: string; name: string }) => (
+                            <span key={tag.id} className="text-[10px] text-slate-400 bg-slate-100 rounded px-1.5 py-0.5">{tag.name}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 truncate mt-0.5 pl-3">
+                      {displayUrl(link.originalUrl)}
+                    </p>
+                  </div>
 
-      {/* Recent Links */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-medium text-slate-400 uppercase tracking-wider">{t("recentLinks")}</h2>
-          <Link href="/links" className="text-xs text-[#03A9F4] hover:text-[#0288D1] font-medium">
-            {t("viewAll")}
-          </Link>
+                  {/* Clicks */}
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-medium text-slate-700 tabular-nums">{link.clicks.toLocaleString()}</p>
+                    <p className="text-[10px] text-slate-400">{t("clicksLabel")}</p>
+                  </div>
+
+                  {/* Relative time */}
+                  <span className="text-xs text-slate-400 tabular-nums shrink-0 w-14 text-right">
+                    {getRelativeTime(link.createdAt)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-slate-100 py-8 text-center">
+              <p className="text-sm text-slate-400">{t("noLinksYet")}</p>
+            </div>
+          )}
         </div>
-        {recentLinks.length > 0 ? (
-          <div className="bg-white rounded-xl border border-slate-100">
-            {recentLinks.map((link: { id: string; code: string; originalUrl: string; clicks: number; createdAt: Date }, index: number) => (
-              <div
-                key={link.id}
-                className={`flex items-center gap-4 px-4 py-3 hover:bg-slate-50 transition-colors ${
-                  index > 0 ? "border-t border-slate-100" : ""
-                }`}
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">/{link.code}</p>
-                  <p className="text-xs text-slate-400 truncate">{link.originalUrl}</p>
-                </div>
-                <span className="text-xs text-slate-400 tabular-nums shrink-0">
-                  {t("clicksCount", { count: link.clicks })}
-                </span>
-                <span className="text-xs text-slate-400 tabular-nums shrink-0">
-                  {new Date(link.createdAt).toLocaleDateString()}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-slate-400 py-4">{t("noLinksYet")}</p>
-        )}
       </div>
 
       {/* Top Campaigns */}
       {topCampaigns.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-medium text-slate-400 uppercase tracking-wider">{t("topCampaigns")}</h2>
+            <div className="flex items-center gap-2">
+              <Megaphone className="w-4 h-4 text-slate-400" />
+              <h2 className="text-sm font-semibold text-slate-700">{t("topCampaigns")}</h2>
+            </div>
             <Link href="/campaigns" className="text-xs text-[#03A9F4] hover:text-[#0288D1] font-medium">
-              {t("viewAll")}
+              {t("viewAll")} →
             </Link>
           </div>
           <div className="bg-white rounded-xl border border-slate-100">
-            {topCampaigns.map((campaign: { name: string; linkCount: number; clickCount: number }, index: number) => (
+            {/* Table header */}
+            <div className="flex items-center gap-4 px-4 py-2 border-b border-slate-100">
+              <span className="flex-1 text-[10px] font-medium text-slate-400 uppercase tracking-wider">{t("campaignName")}</span>
+              <span className="w-24 text-[10px] font-medium text-slate-400 uppercase tracking-wider text-center">{t("source")}</span>
+              <span className="w-14 text-[10px] font-medium text-slate-400 uppercase tracking-wider text-right">{t("linksLabel")}</span>
+              <span className="w-28 text-[10px] font-medium text-slate-400 uppercase tracking-wider text-right">{t("clicksLabel")}</span>
+            </div>
+            {topCampaigns.map((campaign: { name: string; linkCount: number; clickCount: number; sources: string[] }, index: number) => (
               <div
                 key={campaign.name}
                 className={`flex items-center gap-4 px-4 py-3 hover:bg-slate-50 transition-colors ${
                   index > 0 ? "border-t border-slate-100" : ""
                 }`}
               >
-                <Megaphone className="w-4 h-4 text-slate-400 shrink-0" />
-                <span className="flex-1 font-mono text-sm text-slate-900 truncate">{campaign.name}</span>
-                <span className="text-xs text-slate-400 shrink-0">{campaign.linkCount} links</span>
-                <span className="text-sm font-medium text-slate-600 tabular-nums shrink-0">{campaign.clickCount.toLocaleString()}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">{campaign.name}</p>
+                  {campaign.sources.length > 0 && (
+                    <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                      {campaign.sources.join(", ")}
+                    </p>
+                  )}
+                </div>
+                <div className="w-24 flex justify-center">
+                  {campaign.sources.length > 0 ? (
+                    <span className="text-xs text-slate-500 bg-slate-100 rounded px-1.5 py-0.5 truncate max-w-full">
+                      {campaign.sources[0].split(" / ")[0]}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-300">—</span>
+                  )}
+                </div>
+                <span className="w-14 text-sm text-slate-500 tabular-nums text-right">{campaign.linkCount}</span>
+                <div className="w-28 flex items-center gap-2 justify-end">
+                  <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-violet-400 rounded-full"
+                      style={{ width: `${Math.max((campaign.clickCount / maxCampaignClicks) * 100, 8)}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-slate-700 tabular-nums">
+                    {campaign.clickCount.toLocaleString()}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
