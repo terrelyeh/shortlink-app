@@ -45,11 +45,11 @@ interface ShortLink {
 }
 
 const dateRanges = [
-  { value: "24h", label: "24h" },
-  { value: "7d", label: "7 Days" },
-  { value: "30d", label: "30 Days" },
-  { value: "90d", label: "90 Days" },
-  { value: "custom", label: "Custom" },
+  { value: "24h", labelKey: "range24h" },
+  { value: "7d", labelKey: "range7d" },
+  { value: "30d", labelKey: "range30d" },
+  { value: "90d", labelKey: "range90d" },
+  { value: "custom", labelKey: "custom" },
 ];
 
 function StatCard({
@@ -57,12 +57,14 @@ function StatCard({
   value,
   icon,
   change,
+  changeLabel,
   iconBg,
 }: {
   title: string;
   value: string | number;
   icon: React.ReactNode;
   change?: number;
+  changeLabel?: string;
   iconBg?: string;
 }) {
   return (
@@ -73,7 +75,7 @@ function StatCard({
           <p className="text-2xl font-semibold text-slate-900 mt-1">{value}</p>
           {change !== undefined && change !== 0 && (
             <p className={`text-xs mt-1 ${change > 0 ? "text-emerald-600" : "text-red-500"}`}>
-              {change > 0 ? "+" : ""}{change}% vs previous period
+              {change > 0 ? "+" : ""}{change}% {changeLabel}
             </p>
           )}
         </div>
@@ -90,32 +92,6 @@ function SectionDivider({ title, id }: { title: string; id: string }) {
       <h2 className="text-xs font-medium text-slate-400 uppercase tracking-wider whitespace-nowrap">{title}</h2>
       <div className="flex-1 h-px bg-slate-100" />
     </div>
-  );
-}
-
-// Collapsible section wrapper for empty data
-function CollapsibleSection({
-  title,
-  hasData,
-  children,
-}: {
-  title: string;
-  hasData: boolean;
-  children: React.ReactNode;
-}) {
-  const [expanded, setExpanded] = useState(!hasData ? false : true);
-
-  if (hasData) return <>{children}</>;
-
-  return (
-    <button
-      onClick={() => setExpanded(!expanded)}
-      className="w-full flex items-center gap-2 py-3 px-4 bg-slate-50/50 rounded-xl border border-dashed border-slate-200 text-left hover:bg-slate-50 transition-colors"
-    >
-      <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${expanded ? "rotate-90" : ""}`} />
-      <span className="text-sm text-slate-500">{title}</span>
-      <span className="text-xs text-slate-400 ml-1">— No data</span>
-    </button>
   );
 }
 
@@ -207,47 +183,49 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4">
-        <PageHeader
-          title={t("title")}
-          description={t("description")}
-          actions={
-            <div className="flex gap-2 items-center">
-              <a
-                href={`/api/export/analytics?range=${range}${selectedCampaign ? `&campaign=${selectedCampaign}` : ""}${selectedLinkId ? `&linkId=${selectedLinkId}` : ""}`}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                CSV
-              </a>
-              {dateRanges.map((r) => (
-                <button
-                  key={r.value}
-                  onClick={() => setRange(r.value)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    range === r.value
-                      ? "bg-slate-900 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-          }
-        />
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        actions={
+          <a
+            href={`/api/export/analytics?range=${range}${selectedCampaign ? `&campaign=${selectedCampaign}` : ""}${selectedLinkId ? `&linkId=${selectedLinkId}` : ""}`}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            CSV
+          </a>
+        }
+      />
 
-        {/* Custom Date Range Picker */}
+      {/* Date Range + Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* Date range segmented control */}
+        <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
+          {dateRanges.map((r) => (
+            <button
+              key={r.value}
+              onClick={() => setRange(r.value)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                range === r.value
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              {t(r.labelKey)}
+            </button>
+          ))}
+        </div>
+
+        {/* Custom date range */}
         {range === "custom" && (
-          <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-            <label className="text-sm text-slate-600">From:</label>
+          <div className="flex items-center gap-2">
             <input
               type="date"
               value={customFrom}
               onChange={(e) => setCustomFrom(e.target.value)}
               className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
             />
-            <label className="text-sm text-slate-600">To:</label>
+            <span className="text-sm text-slate-400">–</span>
             <input
               type="date"
               value={customTo}
@@ -257,95 +235,76 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        {/* Campaign & Link Filters */}
-        <div className="bg-white rounded-xl p-4 border border-slate-100">
-          <div className="flex flex-col gap-3">
-            {/* Campaign Filter Row */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Megaphone className="w-4 h-4" />
-                <span className="font-medium">Campaign:</span>
-              </div>
-              <div className="flex-1 flex items-center gap-2">
-                <CampaignFilter
-                  value={selectedCampaign}
-                  onChange={handleCampaignChange}
-                  showNoCampaign
-                />
-                {selectedCampaign && (
-                  <span className="text-xs text-sky-600 bg-sky-50 px-2 py-1 rounded-lg font-mono">
-                    {selectedCampaign === "__none__" ? "No Campaign" : selectedCampaign}
-                  </span>
-                )}
-              </div>
-            </div>
+        {/* Campaign filter */}
+        <CampaignFilter
+          value={selectedCampaign}
+          onChange={handleCampaignChange}
+          showNoCampaign
+        />
 
-            {/* Link Filter Row */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Link2 className="w-4 h-4" />
-                <span className="font-medium">Link:</span>
-              </div>
-
-              <div className="flex-1 flex items-center gap-2">
-                <div className="relative flex-1 max-w-md">
-                  <select
-                    value={selectedLinkId}
-                    onChange={(e) => setSelectedLinkId(e.target.value)}
-                    disabled={loadingLinks}
-                    className="w-full px-4 py-2.5 pr-10 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] appearance-none bg-white text-slate-700 disabled:opacity-50"
-                  >
-                    <option value="">All Links (Aggregated)</option>
-                    {links.map((link) => (
-                      <option key={link.id} value={link.id}>
-                        /{link.code} {link.title ? `- ${link.title}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    {loadingLinks ? (
-                      <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-slate-400" />
-                    )}
-                  </div>
-                </div>
-
-                {selectedLinkId && (
-                  <button
-                    onClick={() => setSelectedLinkId("")}
-                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                    title="Clear filter"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Selected Link Info */}
-          {selectedLink && (
-            <div className="mt-3 p-3 bg-sky-50 rounded-lg border border-sky-100">
-              <p className="text-sm text-sky-700">
-                <span className="font-semibold">Viewing analytics for:</span>{" "}
-                <span className="font-mono">/{selectedLink.code}</span>
-                {selectedLink.title && (
-                  <span className="text-[#03A9F4]"> ({selectedLink.title})</span>
-                )}
-              </p>
-              <p className="text-xs text-sky-500 mt-1 truncate">
-                {selectedLink.originalUrl}
-              </p>
-            </div>
+        {/* Link selector */}
+        <div className="relative flex-1 max-w-xs">
+          <select
+            value={selectedLinkId}
+            onChange={(e) => setSelectedLinkId(e.target.value)}
+            disabled={loadingLinks}
+            className="w-full appearance-none pl-8 pr-7 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] cursor-pointer disabled:opacity-50"
+          >
+            <option value="">{t("allLinks")}</option>
+            {links.map((link) => (
+              <option key={link.id} value={link.id}>
+                /{link.code} {link.title ? `- ${link.title}` : ""}
+              </option>
+            ))}
+          </select>
+          <Link2 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          {loadingLinks ? (
+            <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin pointer-events-none" />
+          ) : (
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           )}
         </div>
+
+        {/* Clear link filter */}
+        {selectedLinkId && (
+          <button
+            onClick={() => setSelectedLinkId("")}
+            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            title={t("clearFilter")}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
+
+      {/* Selected link info — compact callout */}
+      {selectedLink && (
+        <div className="flex items-center gap-3 bg-sky-50/50 border-l-2 border-[#03A9F4] rounded-r-lg px-4 py-2.5">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-slate-700">
+              <span className="font-medium">{t("viewingLinkAnalytics")}</span>{" "}
+              <span className="font-mono text-[#03A9F4]">/{selectedLink.code}</span>
+              {selectedLink.title && (
+                <span className="text-slate-500"> — {selectedLink.title}</span>
+              )}
+            </p>
+            <p className="text-xs text-slate-400 mt-0.5 truncate">
+              {selectedLink.originalUrl}
+            </p>
+          </div>
+          <button
+            onClick={() => setSelectedLinkId("")}
+            className="p-1 hover:bg-sky-100 rounded shrink-0"
+          >
+            <X className="w-3.5 h-3.5 text-slate-400" />
+          </button>
+        </div>
+      )}
 
       {/* Campaign Links — shown when a real campaign is selected */}
       {selectedCampaign && selectedCampaign !== "__none__" && (
         <div className="bg-white rounded-xl border border-slate-100">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <Link2 className="w-4 h-4 text-slate-400" />
               <h3 className="text-sm font-semibold text-slate-800">
@@ -353,7 +312,7 @@ export default function AnalyticsPage() {
                 <span className="font-mono text-[#03A9F4]">{selectedCampaign}</span>
               </h3>
               {!loadingLinks && (
-                <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
+                <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full tabular-nums">
                   {links.length}
                 </span>
               )}
@@ -370,14 +329,14 @@ export default function AnalyticsPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-slate-50">
-                    <th className="pl-5 py-2 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  <tr className="border-b border-slate-100">
+                    <th className="pl-4 py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                       {t("shortUrl")}
                     </th>
-                    <th className="py-2 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                       {t("destination")}
                     </th>
-                    <th className="py-2 pr-5 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <th className="py-2.5 pr-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                       {t("action")}
                     </th>
                   </tr>
@@ -388,7 +347,7 @@ export default function AnalyticsPage() {
                       key={link.id}
                       className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors"
                     >
-                      <td className="pl-5 py-2.5 pr-3">
+                      <td className="pl-4 py-2.5 pr-3">
                         <span className="text-[#03A9F4] font-mono text-sm font-medium">
                           /{link.code}
                         </span>
@@ -402,7 +361,7 @@ export default function AnalyticsPage() {
                           {link.originalUrl.length > 63 ? "…" : ""}
                         </span>
                       </td>
-                      <td className="py-2.5 pr-5 text-right">
+                      <td className="py-2.5 pr-4 text-right">
                         <button
                           onClick={() => setSelectedLinkId(link.id)}
                           className={`text-xs font-medium px-2.5 py-1 rounded-lg transition-colors ${
@@ -458,6 +417,7 @@ export default function AnalyticsPage() {
               icon={<MousePointerClick className="w-6 h-6 text-[#03A9F4]" />}
               iconBg="bg-sky-100"
               change={data.summary.clicksChange}
+              changeLabel={t("vsPreviousPeriod")}
             />
             <StatCard
               title={t("uniqueClicks")}
@@ -466,7 +426,7 @@ export default function AnalyticsPage() {
               iconBg="bg-cyan-100"
             />
             <StatCard
-              title="Unique Rate"
+              title={t("uniqueRate")}
               value={
                 data.summary.totalClicks > 0
                   ? `${((data.summary.uniqueVisitors / data.summary.totalClicks) * 100).toFixed(1)}%`
@@ -478,14 +438,14 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Clicks Over Time */}
-          <div className="bg-white rounded-xl p-6 border border-slate-100">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">
-              Clicks Over Time
+          <div className="bg-white rounded-xl p-5 border border-slate-100">
+            <h2 className="text-sm font-semibold text-slate-900 mb-4">
+              {t("clicksOverTime")}
             </h2>
             {data.clicksByDay.length > 0 ? (
               <ClicksChart data={data.clicksByDay} />
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-slate-400">
+              <div className="h-[300px] flex items-center justify-center text-slate-400 text-sm">
                 {t("noData")}
               </div>
             )}
@@ -514,87 +474,97 @@ export default function AnalyticsPage() {
           <SectionDivider title={t("sections.traffic")} id="traffic" />
 
           {/* Referrers & Countries */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl p-6 border border-slate-100">
-              <h2 className="text-lg font-semibold text-slate-900 mb-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-white rounded-xl p-5 border border-slate-100">
+              <h2 className="text-sm font-semibold text-slate-900 mb-4">
                 {t("referrers")}
               </h2>
               {data.referrers.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {data.referrers.map((referrer, i) => (
                     <div key={i} className="flex items-center justify-between">
                       <span className="text-sm text-slate-600 truncate flex-1">
                         {referrer.name}
                       </span>
-                      <span className="text-sm font-semibold text-slate-900 ml-4">
+                      <span className="text-sm font-medium text-slate-900 ml-4 tabular-nums">
                         {referrer.value.toLocaleString()}
                       </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-slate-400 text-center py-8">{t("noData")}</p>
+                <p className="text-slate-400 text-center py-8 text-sm">{t("noData")}</p>
               )}
             </div>
 
-            <div className="bg-white rounded-xl p-6 border border-slate-100">
-              <h2 className="text-lg font-semibold text-slate-900 mb-4">
+            <div className="bg-white rounded-xl p-5 border border-slate-100">
+              <h2 className="text-sm font-semibold text-slate-900 mb-4">
                 {t("countries")}
               </h2>
               {data.countries.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {data.countries.map((country, i) => (
                     <div key={i} className="flex items-center justify-between">
                       <span className="text-sm text-slate-600">{country.name}</span>
-                      <span className="text-sm font-semibold text-slate-900">
+                      <span className="text-sm font-medium text-slate-900 tabular-nums">
                         {country.value.toLocaleString()}
                       </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-slate-400 text-center py-8">{t("noData")}</p>
+                <p className="text-slate-400 text-center py-8 text-sm">{t("noData")}</p>
               )}
             </div>
           </div>
 
           {/* Top Links - Only show when viewing all links */}
           {!selectedLinkId && (
-            <div className="bg-white rounded-xl p-6 border border-slate-100">
-              <h2 className="text-lg font-semibold text-slate-900 mb-4">
-                Top Performing Links
-              </h2>
+            <div className="bg-white rounded-xl border border-slate-100">
+              <div className="px-4 py-3 border-b border-slate-100">
+                <h2 className="text-sm font-semibold text-slate-900">
+                  {t("topPerformingLinks")}
+                </h2>
+              </div>
               {data.topLinks.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="text-left text-sm text-slate-500 border-b border-slate-100">
-                        <th className="pb-3 font-medium">Short URL</th>
-                        <th className="pb-3 font-medium">Title</th>
-                        <th className="pb-3 font-medium text-right">Clicks</th>
-                        <th className="pb-3 font-medium text-right">Action</th>
+                      <tr className="border-b border-slate-100">
+                        <th className="pl-4 py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                          {t("shortUrl")}
+                        </th>
+                        <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                          {t("linkTitle")}
+                        </th>
+                        <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                          {t("clicks")}
+                        </th>
+                        <th className="py-2.5 pr-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                          {t("action")}
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.topLinks.map((link) => (
-                        <tr key={link.id} className="border-b border-slate-50 hover:bg-slate-50">
-                          <td className="py-3">
-                            <span className="text-[#03A9F4] font-medium font-mono">
+                        <tr key={link.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                          <td className="pl-4 py-2.5 pr-3">
+                            <span className="text-[#03A9F4] font-medium font-mono text-sm">
                               /{link.code}
                             </span>
                           </td>
-                          <td className="py-3 text-slate-600 max-w-xs truncate">
+                          <td className="py-2.5 pr-3 text-sm text-slate-600 max-w-xs truncate">
                             {link.title || link.originalUrl}
                           </td>
-                          <td className="py-3 text-right font-semibold text-slate-900">
+                          <td className="py-2.5 pr-3 text-right text-sm font-medium text-slate-900 tabular-nums">
                             {link.clicks.toLocaleString()}
                           </td>
-                          <td className="py-3 text-right">
+                          <td className="py-2.5 pr-4 text-right">
                             <button
                               onClick={() => setSelectedLinkId(link.id)}
-                              className="text-sm text-[#03A9F4] hover:text-[#0288D1] font-medium"
+                              className="text-xs text-[#03A9F4] hover:text-[#0288D1] font-medium"
                             >
-                              View Details →
+                              {t("viewDetails")} →
                             </button>
                           </td>
                         </tr>
@@ -603,7 +573,7 @@ export default function AnalyticsPage() {
                   </table>
                 </div>
               ) : (
-                <p className="text-slate-400 text-center py-8">{t("noData")}</p>
+                <p className="text-slate-400 text-center py-8 text-sm">{t("noData")}</p>
               )}
             </div>
           )}
@@ -612,26 +582,26 @@ export default function AnalyticsPage() {
           <SectionDivider title={t("sections.campaigns")} id="campaigns" />
 
           {/* UTM Analytics Section */}
-          <div className="space-y-6">
+          <div className="space-y-4">
 
             {/* Empty State when no UTM data */}
             {(!data.utm || (data.utm.campaigns.length === 0 && data.utm.sources.length === 0)) && (
               <div className="bg-white rounded-xl p-8 border border-slate-100 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Target className="w-8 h-8 text-amber-600" />
+                <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                  <Target className="w-6 h-6 text-amber-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">{t("utm.emptyState.title")}</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-1">{t("utm.emptyState.title")}</h3>
                 <p className="text-sm text-slate-500 mb-4 max-w-md mx-auto">{t("utm.emptyState.description")}</p>
                 <div className="flex items-center justify-center gap-3">
                   <a
                     href="/links/new"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg hover:from-amber-600 hover:to-orange-600 transition-all font-medium text-sm"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white rounded-lg hover:bg-[#0288D1] transition-colors font-medium text-sm"
                   >
                     {t("utm.emptyState.createLink")}
                   </a>
                   <a
                     href="/campaigns"
-                    className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-all font-medium text-sm"
+                    className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium text-sm"
                   >
                     <Megaphone className="w-4 h-4" />
                     {t("utm.emptyState.manageCampaigns")}
@@ -645,12 +615,12 @@ export default function AnalyticsPage() {
               <>
 
               {/* Campaign, Source, Medium Cards */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* By Campaign */}
-                <div className="bg-white rounded-xl p-6 border border-slate-100">
+                <div className="bg-white rounded-xl p-5 border border-slate-100">
                   <div className="flex items-center gap-2 mb-4">
-                    <Megaphone className="w-5 h-5 text-amber-500" />
-                    <h3 className="font-semibold text-slate-900">{t("utm.byCampaign")}</h3>
+                    <Megaphone className="w-4 h-4 text-amber-500" />
+                    <h3 className="text-sm font-semibold text-slate-900">{t("utm.byCampaign")}</h3>
                   </div>
                   {data.utm.campaigns.length > 0 ? (
                     <div className="space-y-3">
@@ -663,13 +633,13 @@ export default function AnalyticsPage() {
                               <span className="text-slate-700 font-medium truncate max-w-[150px]" title={item.name}>
                                 {item.name}
                               </span>
-                              <span className="text-slate-900 font-semibold">
+                              <span className="text-slate-900 font-medium tabular-nums">
                                 {item.clicks.toLocaleString()}
                               </span>
                             </div>
-                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-full"
+                                className="h-full bg-amber-400 rounded-full"
                                 style={{ width: `${percentage}%` }}
                               />
                             </div>
@@ -683,10 +653,10 @@ export default function AnalyticsPage() {
                 </div>
 
                 {/* By Source */}
-                <div className="bg-white rounded-xl p-6 border border-slate-100">
+                <div className="bg-white rounded-xl p-5 border border-slate-100">
                   <div className="flex items-center gap-2 mb-4">
-                    <Globe className="w-5 h-5 text-cyan-500" />
-                    <h3 className="font-semibold text-slate-900">{t("utm.bySource")}</h3>
+                    <Globe className="w-4 h-4 text-cyan-500" />
+                    <h3 className="text-sm font-semibold text-slate-900">{t("utm.bySource")}</h3>
                   </div>
                   {data.utm.sources.length > 0 ? (
                     <div className="space-y-3">
@@ -699,13 +669,13 @@ export default function AnalyticsPage() {
                               <span className="text-slate-700 font-medium truncate max-w-[150px]" title={item.name}>
                                 {item.name}
                               </span>
-                              <span className="text-slate-900 font-semibold">
+                              <span className="text-slate-900 font-medium tabular-nums">
                                 {item.clicks.toLocaleString()}
                               </span>
                             </div>
-                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full"
+                                className="h-full bg-cyan-400 rounded-full"
                                 style={{ width: `${percentage}%` }}
                               />
                             </div>
@@ -719,10 +689,10 @@ export default function AnalyticsPage() {
                 </div>
 
                 {/* By Medium */}
-                <div className="bg-white rounded-xl p-6 border border-slate-100">
+                <div className="bg-white rounded-xl p-5 border border-slate-100">
                   <div className="flex items-center gap-2 mb-4">
-                    <TrendingUp className="w-5 h-5 text-emerald-500" />
-                    <h3 className="font-semibold text-slate-900">{t("utm.byMedium")}</h3>
+                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                    <h3 className="text-sm font-semibold text-slate-900">{t("utm.byMedium")}</h3>
                   </div>
                   {data.utm.mediums.length > 0 ? (
                     <div className="space-y-3">
@@ -735,13 +705,13 @@ export default function AnalyticsPage() {
                               <span className="text-slate-700 font-medium truncate max-w-[150px]" title={item.name}>
                                 {item.name}
                               </span>
-                              <span className="text-slate-900 font-semibold">
+                              <span className="text-slate-900 font-medium tabular-nums">
                                 {item.clicks.toLocaleString()}
                               </span>
                             </div>
-                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full"
+                                className="h-full bg-emerald-400 rounded-full"
                                 style={{ width: `${percentage}%` }}
                               />
                             </div>
@@ -757,16 +727,26 @@ export default function AnalyticsPage() {
 
               {/* Campaign × Source Table */}
               {data.utm.campaignSource.length > 0 && (
-                <div className="bg-white rounded-xl p-6 border border-slate-100">
-                  <h3 className="font-semibold text-slate-900 mb-4">{t("utm.campaignSource")}</h3>
+                <div className="bg-white rounded-xl border border-slate-100">
+                  <div className="px-4 py-3 border-b border-slate-100">
+                    <h3 className="text-sm font-semibold text-slate-900">{t("utm.campaignSource")}</h3>
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="text-left text-sm text-slate-500 border-b border-slate-100">
-                          <th className="pb-3 font-medium">Campaign</th>
-                          <th className="pb-3 font-medium">Source</th>
-                          <th className="pb-3 font-medium text-right">{t("clicks")}</th>
-                          <th className="pb-3 font-medium text-right w-32">{t("utm.performance")}</th>
+                        <tr className="border-b border-slate-100">
+                          <th className="pl-4 py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                            {t("utm.campaign")}
+                          </th>
+                          <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                            {t("utm.source")}
+                          </th>
+                          <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                            {t("clicks")}
+                          </th>
+                          <th className="py-2.5 pr-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider w-28">
+                            {t("utm.performance")}
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -774,24 +754,24 @@ export default function AnalyticsPage() {
                           const maxClicks = data.utm.campaignSource[0]?.clicks || 1;
                           const percentage = (item.clicks / maxClicks) * 100;
                           return (
-                            <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
-                              <td className="py-3">
-                                <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-md text-sm font-medium">
+                            <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                              <td className="pl-4 py-2.5 pr-3">
+                                <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-medium border border-amber-100">
                                   {item.campaign}
                                 </span>
                               </td>
-                              <td className="py-3">
-                                <span className="px-2 py-1 bg-cyan-100 text-cyan-700 rounded-md text-sm font-medium">
+                              <td className="py-2.5 pr-3">
+                                <span className="px-1.5 py-0.5 bg-cyan-50 text-cyan-700 rounded text-xs font-medium border border-cyan-100">
                                   {item.source}
                                 </span>
                               </td>
-                              <td className="py-3 text-right font-semibold text-slate-900">
+                              <td className="py-2.5 pr-3 text-right text-sm font-medium text-slate-900 tabular-nums">
                                 {item.clicks.toLocaleString()}
                               </td>
-                              <td className="py-3 pl-4">
-                                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <td className="py-2.5 pr-4">
+                                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                   <div
-                                    className="h-full bg-gradient-to-r from-violet-400 to-purple-500 rounded-full"
+                                    className="h-full bg-violet-400 rounded-full"
                                     style={{ width: `${percentage}%` }}
                                   />
                                 </div>
@@ -807,17 +787,27 @@ export default function AnalyticsPage() {
 
               {/* Campaign × Content Table */}
               {data.utm.campaignContent.length > 0 && (
-                <div className="bg-white rounded-xl p-6 border border-slate-100">
-                  <h3 className="font-semibold text-slate-900 mb-4">{t("utm.campaignContent")}</h3>
-                  <p className="text-sm text-slate-500 mb-4">{t("utm.campaignContentDesc")}</p>
+                <div className="bg-white rounded-xl border border-slate-100">
+                  <div className="px-4 py-3 border-b border-slate-100">
+                    <h3 className="text-sm font-semibold text-slate-900">{t("utm.campaignContent")}</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">{t("utm.campaignContentDesc")}</p>
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="text-left text-sm text-slate-500 border-b border-slate-100">
-                          <th className="pb-3 font-medium">Campaign</th>
-                          <th className="pb-3 font-medium">Content</th>
-                          <th className="pb-3 font-medium text-right">{t("clicks")}</th>
-                          <th className="pb-3 font-medium text-right w-32">{t("utm.performance")}</th>
+                        <tr className="border-b border-slate-100">
+                          <th className="pl-4 py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                            {t("utm.campaign")}
+                          </th>
+                          <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                            {t("utm.content")}
+                          </th>
+                          <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                            {t("clicks")}
+                          </th>
+                          <th className="py-2.5 pr-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider w-28">
+                            {t("utm.performance")}
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -825,24 +815,24 @@ export default function AnalyticsPage() {
                           const maxClicks = data.utm.campaignContent[0]?.clicks || 1;
                           const percentage = (item.clicks / maxClicks) * 100;
                           return (
-                            <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
-                              <td className="py-3">
-                                <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-md text-sm font-medium">
+                            <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                              <td className="pl-4 py-2.5 pr-3">
+                                <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-medium border border-amber-100">
                                   {item.campaign}
                                 </span>
                               </td>
-                              <td className="py-3">
-                                <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-md text-sm font-medium">
+                              <td className="py-2.5 pr-3">
+                                <span className="px-1.5 py-0.5 bg-violet-50 text-violet-700 rounded text-xs font-medium border border-violet-100">
                                   {item.content}
                                 </span>
                               </td>
-                              <td className="py-3 text-right font-semibold text-slate-900">
+                              <td className="py-2.5 pr-3 text-right text-sm font-medium text-slate-900 tabular-nums">
                                 {item.clicks.toLocaleString()}
                               </td>
-                              <td className="py-3 pl-4">
-                                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <td className="py-2.5 pr-4">
+                                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                   <div
-                                    className="h-full bg-gradient-to-r from-pink-400 to-rose-500 rounded-full"
+                                    className="h-full bg-rose-400 rounded-full"
                                     style={{ width: `${percentage}%` }}
                                   />
                                 </div>
