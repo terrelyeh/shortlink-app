@@ -144,11 +144,11 @@ export default function TemplatesPage() {
   // Build UTM tag pills for a template
   const getUtmPills = (template: Template) => {
     const pills: { label: string; value: string }[] = [];
-    if (template.medium) pills.push({ label: "medium", value: template.medium });
-    if (template.source) pills.push({ label: "source", value: template.source });
-    if (template.campaign) pills.push({ label: "campaign", value: template.campaign });
-    if (template.content) pills.push({ label: "content", value: template.content });
-    if (template.term) pills.push({ label: "term", value: template.term });
+    if (template.medium) pills.push({ label: t("medium"), value: template.medium });
+    if (template.source) pills.push({ label: t("source"), value: template.source });
+    if (template.campaign) pills.push({ label: t("campaign"), value: template.campaign });
+    if (template.content) pills.push({ label: t("content"), value: template.content });
+    if (template.term) pills.push({ label: t("term"), value: template.term });
     return pills;
   };
 
@@ -191,12 +191,12 @@ export default function TemplatesPage() {
             return (
               <div
                 key={template.id}
-                className={`flex items-center gap-4 px-4 py-3.5 hover:bg-slate-50 transition-colors ${
-                  index > 0 ? "border-t border-slate-100" : ""
+                className={`flex items-center gap-4 px-4 py-3.5 hover:bg-slate-50/50 transition-colors ${
+                  index > 0 ? "border-t border-slate-50" : ""
                 }`}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900">{template.name}</p>
+                  <p className="text-sm font-semibold text-slate-900">{template.name}</p>
                   {pills.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
                       {pills.map((pill) => (

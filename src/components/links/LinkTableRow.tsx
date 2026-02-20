@@ -40,10 +40,10 @@ interface LinkTableRowProps {
   onClone?: (id: string) => void;
 }
 
-const statusConfig = {
-  ACTIVE: { dot: "bg-emerald-500", label: "Active" },
-  PAUSED: { dot: "bg-amber-500", label: "Paused" },
-  ARCHIVED: { dot: "bg-slate-400", label: "Archived" },
+const statusDotConfig = {
+  ACTIVE: "bg-emerald-500",
+  PAUSED: "bg-amber-500",
+  ARCHIVED: "bg-slate-400",
 };
 
 export function LinkTableRow({
@@ -76,7 +76,8 @@ export function LinkTableRow({
   }, [showMenu]);
 
   const shortUrl = `${shortBaseUrl}/${link.code}`;
-  const status = statusConfig[link.status as keyof typeof statusConfig] || statusConfig.ARCHIVED;
+  const statusDot = statusDotConfig[link.status as keyof typeof statusDotConfig] || statusDotConfig.ARCHIVED;
+  const statusLabel = link.status === "ACTIVE" ? t("active") : link.status === "PAUSED" ? t("paused") : t("archived");
 
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(shortUrl);
@@ -121,7 +122,7 @@ export function LinkTableRow({
         {/* Title / Code + Original URL */}
         <td className="py-2.5 pr-3 min-w-[200px]">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-900 truncate">
+            <p className="text-sm font-semibold text-slate-900 truncate">
               {link.title || `/${link.code}`}
             </p>
             <p className="text-xs text-slate-400 truncate max-w-[360px]">
@@ -171,8 +172,8 @@ export function LinkTableRow({
         {/* Status */}
         <td className="py-2.5 pr-3 whitespace-nowrap">
           <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
-            <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
-            {status.label}
+            <span className={`w-1.5 h-1.5 rounded-full ${statusDot}`} />
+            {statusLabel}
           </span>
         </td>
 
@@ -213,7 +214,7 @@ export function LinkTableRow({
                   onClick={() => setShowMenu(false)}
                 >
                   <Edit className="w-4 h-4" />
-                  Edit
+                  {t("editLink")}
                 </Link>
                 <Link
                   href={`/analytics?linkId=${link.id}`}
@@ -221,30 +222,30 @@ export function LinkTableRow({
                   onClick={() => setShowMenu(false)}
                 >
                   <BarChart3 className="w-4 h-4" />
-                  Analytics
+                  {t("menuAnalytics")}
                 </Link>
                 <button
                   onClick={() => { setShowQR(!showQR); setShowMenu(false); }}
                   className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 >
                   <QrCode className="w-4 h-4" />
-                  QR Code
+                  {t("qrCode")}
                 </button>
                 <button
                   onClick={() => { onClone?.(link.id); setShowMenu(false); }}
                   className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 >
                   <CopyPlus className="w-4 h-4" />
-                  Clone
+                  {t("clone")}
                 </button>
                 <button
                   onClick={toggleStatus}
                   className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 >
                   {link.status === "ACTIVE" ? (
-                    <><Pause className="w-4 h-4" /> Pause</>
+                    <><Pause className="w-4 h-4" /> {t("menuPause")}</>
                   ) : (
-                    <><Play className="w-4 h-4" /> Activate</>
+                    <><Play className="w-4 h-4" /> {t("menuActivate")}</>
                   )}
                 </button>
                 <hr className="my-1 border-slate-100" />
@@ -253,7 +254,7 @@ export function LinkTableRow({
                   className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Delete
+                  {t("menuDelete")}
                 </button>
               </div>
             </>
@@ -299,7 +300,7 @@ export function LinkTableRow({
                   }}
                   className="text-[#03A9F4] hover:text-[#0288D1] font-medium"
                 >
-                  Download PNG
+                  {t("downloadPng")}
                 </button>
                 <span className="text-slate-300">|</span>
                 <button
@@ -319,7 +320,7 @@ export function LinkTableRow({
                   }}
                   className="text-[#03A9F4] hover:text-[#0288D1] font-medium"
                 >
-                  Download SVG
+                  {t("downloadSvg")}
                 </button>
               </div>
             </div>

@@ -62,6 +62,7 @@ export default function EditLinkPage() {
   const tCommon = useTranslations("common");
   const tErrors = useTranslations("errors");
   const tCampaigns = useTranslations("campaigns");
+  const tUtm = useTranslations("utm");
 
   const linkId = params.id as string;
 
@@ -491,8 +492,8 @@ export default function EditLinkPage() {
                   <Target className="w-5 h-5 text-slate-500" />
                 </div>
                 <div className="text-left">
-                  <span className="font-semibold text-slate-700 block">UTM Parameters</span>
-                  <span className="text-xs text-slate-500">Add tracking parameters to your link</span>
+                  <span className="font-semibold text-slate-700 block">{tUtm("title")}</span>
+                  <span className="text-xs text-slate-500">{t("utmDescription")}</span>
                 </div>
               </div>
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${showUTM ? "bg-sky-100" : "bg-slate-100"}`}>
@@ -522,8 +523,8 @@ export default function EditLinkPage() {
                   <Settings2 className="w-5 h-5 text-slate-500" />
                 </div>
                 <div className="text-left">
-                  <span className="font-semibold text-slate-700 block">Advanced Options</span>
-                  <span className="text-xs text-slate-500">Redirect type, expiration, click limits</span>
+                  <span className="font-semibold text-slate-700 block">{t("advancedOptions")}</span>
+                  <span className="text-xs text-slate-500">{t("advancedOptionsDesc")}</span>
                 </div>
               </div>
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${showAdvanced ? "bg-slate-200" : "bg-slate-100"}`}>
@@ -553,7 +554,7 @@ export default function EditLinkPage() {
                       />
                       <div>
                         <span className="text-sm font-medium text-slate-700 block">{t("temporary")}</span>
-                        <span className="text-xs text-slate-500">302 redirect</span>
+                        <span className="text-xs text-slate-500">{t("redirect302")}</span>
                       </div>
                       {redirectType === "TEMPORARY" && <CheckCircle className="w-5 h-5 text-[#03A9F4] ml-auto" />}
                     </label>
@@ -572,7 +573,7 @@ export default function EditLinkPage() {
                       />
                       <div>
                         <span className="text-sm font-medium text-slate-700 block">{t("permanent")}</span>
-                        <span className="text-xs text-slate-500">301 redirect</span>
+                        <span className="text-xs text-slate-500">{t("redirect301")}</span>
                       </div>
                       {redirectType === "PERMANENT" && <CheckCircle className="w-5 h-5 text-[#03A9F4] ml-auto" />}
                     </label>
