@@ -67,6 +67,7 @@
     "clicksPerActiveLink": "每啟用連結的點擊數",
     "campaignName": "活動名稱",
     "source": "來源",
+    "sourceMedium": "來源 / 媒介",
     "vsLastPeriod": "{value}% 較上期",
     "quickStart": {
       "title": "快速開始",

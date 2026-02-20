@@ -67,6 +67,7 @@
     "clicksPerActiveLink": "clicks per active link",
     "campaignName": "Campaign",
     "source": "Source",
+    "sourceMedium": "Source / Medium",
     "vsLastPeriod": "{value}% vs last period",
     "quickStart": {
       "title": "Quick Start",
