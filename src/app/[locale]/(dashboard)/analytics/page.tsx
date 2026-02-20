@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ClicksChart } from "@/components/analytics/ClicksChart";
 import { PieChartComponent } from "@/components/analytics/PieChartComponent";
@@ -120,10 +121,13 @@ function CollapsibleSection({
 
 export default function AnalyticsPage() {
   const t = useTranslations("analytics");
+  const searchParams = useSearchParams();
   const [range, setRange] = useState("7d");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
-  const [selectedCampaign, setSelectedCampaign] = useState<string>("");
+  const [selectedCampaign, setSelectedCampaign] = useState<string>(
+    searchParams.get("campaign") || ""
+  );
   const [selectedLinkId, setSelectedLinkId] = useState<string>("");
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(true);
@@ -337,6 +341,87 @@ export default function AnalyticsPage() {
           )}
         </div>
       </div>
+
+      {/* Campaign Links — shown when a real campaign is selected */}
+      {selectedCampaign && selectedCampaign !== "__none__" && (
+        <div className="bg-white rounded-xl border border-slate-100">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <Link2 className="w-4 h-4 text-slate-400" />
+              <h3 className="text-sm font-semibold text-slate-800">
+                {t("campaignLinks")}{" "}
+                <span className="font-mono text-[#03A9F4]">{selectedCampaign}</span>
+              </h3>
+              {!loadingLinks && (
+                <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
+                  {links.length}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {loadingLinks ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+            </div>
+          ) : links.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-8">{t("noLinksInCampaign")}</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-50">
+                    <th className="pl-5 py-2 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      {t("shortUrl")}
+                    </th>
+                    <th className="py-2 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      {t("destination")}
+                    </th>
+                    <th className="py-2 pr-5 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      {t("action")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {links.map((link) => (
+                    <tr
+                      key={link.id}
+                      className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors"
+                    >
+                      <td className="pl-5 py-2.5 pr-3">
+                        <span className="text-[#03A9F4] font-mono text-sm font-medium">
+                          /{link.code}
+                        </span>
+                        {link.title && (
+                          <span className="ml-2 text-xs text-slate-400">{link.title}</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 pr-3 max-w-xs">
+                        <span className="text-xs text-slate-500 truncate block" title={link.originalUrl}>
+                          {link.originalUrl.replace(/^https?:\/\//, "").substring(0, 60)}
+                          {link.originalUrl.length > 63 ? "…" : ""}
+                        </span>
+                      </td>
+                      <td className="py-2.5 pr-5 text-right">
+                        <button
+                          onClick={() => setSelectedLinkId(link.id)}
+                          className={`text-xs font-medium px-2.5 py-1 rounded-lg transition-colors ${
+                            selectedLinkId === link.id
+                              ? "bg-[#03A9F4] text-white"
+                              : "text-[#03A9F4] hover:bg-sky-50"
+                          }`}
+                        >
+                          {selectedLinkId === link.id ? t("viewing") : t("viewDetails")}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-16">

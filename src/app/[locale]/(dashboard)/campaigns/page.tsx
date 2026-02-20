@@ -24,6 +24,8 @@ interface CampaignStats {
   linkCount: number;
   clickCount: number;
   lastUsed: string;
+  sources: string[];
+  mediums: string[];
 }
 
 export default function CampaignsPage() {
@@ -60,7 +62,7 @@ export default function CampaignsPage() {
   const totalClicks = campaigns.reduce((sum, c) => sum + c.clickCount, 0);
 
   const handleCampaignClick = (campaignName: string) => {
-    router.push(`/links?campaign=${encodeURIComponent(campaignName)}`);
+    router.push(`/analytics?campaign=${encodeURIComponent(campaignName)}`);
   };
 
   if (loading) {
@@ -152,17 +154,20 @@ export default function CampaignsPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-t border-b border-slate-100">
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <tr className="border-b border-slate-100">
+                  <th className="pl-4 py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                     {t("name")}
                   </th>
-                  <th className="text-center px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    {t("sourceMedium")}
+                  </th>
+                  <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                     {t("linksCount")}
                   </th>
-                  <th className="text-center px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                     {t("clicksCount")}
                   </th>
-                  <th className="text-right px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  <th className="py-2.5 pr-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                     {t("endDate")}
                   </th>
                 </tr>
@@ -172,25 +177,53 @@ export default function CampaignsPage() {
                   <tr
                     key={campaign.name}
                     onClick={() => handleCampaignClick(campaign.name)}
-                    className="border-b border-slate-50 last:border-b-0 hover:bg-slate-50 cursor-pointer transition-colors"
+                    className="group border-b border-slate-50 hover:bg-slate-50/50 cursor-pointer transition-colors"
                   >
-                    <td className="px-4 py-3">
+                    <td className="pl-4 py-2.5 pr-3">
                       <span className="font-mono text-sm font-medium text-slate-900">
                         {campaign.name}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center text-sm text-slate-600">
+                    <td className="py-2.5 pr-3">
+                      <div className="flex flex-wrap items-center gap-1">
+                        {campaign.sources.slice(0, 2).map((src) => (
+                          <span
+                            key={src}
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-cyan-50 text-cyan-700 border border-cyan-100"
+                          >
+                            {src}
+                          </span>
+                        ))}
+                        {campaign.mediums.slice(0, 2).map((med) => (
+                          <span
+                            key={med}
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-50 text-violet-700 border border-violet-100"
+                          >
+                            {med}
+                          </span>
+                        ))}
+                        {(campaign.sources.length + campaign.mediums.length) > 4 && (
+                          <span className="text-[10px] text-slate-400">
+                            +{campaign.sources.length + campaign.mediums.length - 4}
+                          </span>
+                        )}
+                        {campaign.sources.length === 0 && campaign.mediums.length === 0 && (
+                          <span className="text-xs text-slate-300">—</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2.5 pr-3 text-right text-sm text-slate-600 tabular-nums">
                       {campaign.linkCount}
                     </td>
-                    <td className="px-4 py-3 text-center text-sm font-medium text-slate-900">
+                    <td className="py-2.5 pr-3 text-right text-sm font-medium text-slate-900 tabular-nums">
                       {campaign.clickCount.toLocaleString()}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="py-2.5 pr-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <span className="text-sm text-slate-400">
+                        <span className="text-xs text-slate-400 tabular-nums">
                           {new Date(campaign.lastUsed).toLocaleDateString()}
                         </span>
-                        <ArrowUpRight className="w-3.5 h-3.5 text-slate-300" />
+                        <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </td>
                   </tr>

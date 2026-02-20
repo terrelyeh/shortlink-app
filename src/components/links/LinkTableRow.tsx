@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { QRCodeCanvas } from "qrcode.react";
 import {
@@ -59,6 +59,21 @@ export function LinkTableRow({
   const [copied, setCopied] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (showMenu && menuBtnRef.current) {
+      const rect = menuBtnRef.current.getBoundingClientRect();
+      const menuWidth = 176; // w-44 = 11rem = 176px
+      const menuHeight = 280; // approximate menu height
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setMenuPos({
+        top: spaceBelow < menuHeight ? rect.top - menuHeight : rect.bottom + 4,
+        left: rect.right - menuWidth,
+      });
+    }
+  }, [showMenu]);
 
   const shortUrl = `${shortBaseUrl}/${link.code}`;
   const status = statusConfig[link.status as keyof typeof statusConfig] || statusConfig.ARCHIVED;
@@ -177,70 +192,72 @@ export function LinkTableRow({
 
         {/* Actions */}
         <td className="py-2.5 pr-4 text-right w-10">
-          <div className="relative">
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="p-1.5 rounded-md hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100"
-            >
-              <MoreVertical className="w-4 h-4" />
-            </button>
+          <button
+            ref={menuBtnRef}
+            onClick={() => setShowMenu(!showMenu)}
+            className="p-1.5 rounded-md hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
 
-            {showMenu && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 mt-1 w-44 bg-white rounded-lg shadow-lg border border-slate-200 z-20 py-1">
-                  <Link
-                    href={`/links/${link.id}`}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    onClick={() => setShowMenu(false)}
-                  >
-                    <Edit className="w-4 h-4" />
-                    Edit
-                  </Link>
-                  <Link
-                    href={`/analytics?linkId=${link.id}`}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    onClick={() => setShowMenu(false)}
-                  >
-                    <BarChart3 className="w-4 h-4" />
-                    Analytics
-                  </Link>
-                  <button
-                    onClick={() => { setShowQR(!showQR); setShowMenu(false); }}
-                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    <QrCode className="w-4 h-4" />
-                    QR Code
-                  </button>
-                  <button
-                    onClick={() => { onClone?.(link.id); setShowMenu(false); }}
-                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    <CopyPlus className="w-4 h-4" />
-                    Clone
-                  </button>
-                  <button
-                    onClick={toggleStatus}
-                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    {link.status === "ACTIVE" ? (
-                      <><Pause className="w-4 h-4" /> Pause</>
-                    ) : (
-                      <><Play className="w-4 h-4" /> Activate</>
-                    )}
-                  </button>
-                  <hr className="my-1 border-slate-100" />
-                  <button
-                    onClick={handleDelete}
-                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          {showMenu && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+              <div
+                className="fixed w-44 bg-white rounded-lg shadow-lg border border-slate-200 z-50 py-1"
+                style={{ top: menuPos.top, left: menuPos.left }}
+              >
+                <Link
+                  href={`/links/${link.id}`}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  onClick={() => setShowMenu(false)}
+                >
+                  <Edit className="w-4 h-4" />
+                  Edit
+                </Link>
+                <Link
+                  href={`/analytics?linkId=${link.id}`}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  onClick={() => setShowMenu(false)}
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  Analytics
+                </Link>
+                <button
+                  onClick={() => { setShowQR(!showQR); setShowMenu(false); }}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  <QrCode className="w-4 h-4" />
+                  QR Code
+                </button>
+                <button
+                  onClick={() => { onClone?.(link.id); setShowMenu(false); }}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  <CopyPlus className="w-4 h-4" />
+                  Clone
+                </button>
+                <button
+                  onClick={toggleStatus}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  {link.status === "ACTIVE" ? (
+                    <><Pause className="w-4 h-4" /> Pause</>
+                  ) : (
+                    <><Play className="w-4 h-4" /> Activate</>
+                  )}
+                </button>
+                <hr className="my-1 border-slate-100" />
+                <button
+                  onClick={handleDelete}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              </div>
+            </>
+          )}
         </td>
       </tr>
 

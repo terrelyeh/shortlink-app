@@ -405,7 +405,7 @@ export default async function DashboardPage() {
               {topLinks.map((link: { id: string; code: string; originalUrl: string; title: string | null; status: string; clicks: number; createdAt: Date; tags: { id: string; name: string; color?: string | null }[] }, index: number) => (
                 <Link
                   key={link.id}
-                  href={`/links/${link.id}/edit`}
+                  href={`/links/${link.id}`}
                   className={`flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group ${
                     index > 0 ? "border-t border-slate-100" : ""
                   }`}
@@ -468,7 +468,7 @@ export default async function DashboardPage() {
               {recentLinks.map((link: { id: string; code: string; originalUrl: string; title: string | null; status: string; clicks: number; createdAt: Date; tags: { id: string; name: string; color?: string | null }[] }, index: number) => (
                 <Link
                   key={link.id}
-                  href={`/links/${link.id}/edit`}
+                  href={`/links/${link.id}`}
                   className={`flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group ${
                     index > 0 ? "border-t border-slate-100" : ""
                   }`}
