@@ -17,6 +17,8 @@ interface ClickCountResult {
 interface LinkWithCampaign {
   id: string;
   utmCampaign: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
 }
 
 // GET - List unique utm_campaign values with stats
@@ -96,6 +98,8 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         utmCampaign: true,
+        utmSource: true,
+        utmMedium: true,
       },
     })) as LinkWithCampaign[];
 
@@ -105,11 +109,23 @@ export async function GET(request: NextRequest) {
     );
 
     const clicksByCampaign = new Map<string, number>();
+    const sourcesByCampaign = new Map<string, Set<string>>();
+    const mediumsByCampaign = new Map<string, Set<string>>();
+
     for (const link of linksWithCampaigns) {
       if (link.utmCampaign) {
         const current = clicksByCampaign.get(link.utmCampaign) || 0;
         const linkClicks = clicksByLinkId.get(link.id) || 0;
         clicksByCampaign.set(link.utmCampaign, current + linkClicks);
+
+        if (link.utmSource) {
+          if (!sourcesByCampaign.has(link.utmCampaign)) sourcesByCampaign.set(link.utmCampaign, new Set());
+          sourcesByCampaign.get(link.utmCampaign)!.add(link.utmSource);
+        }
+        if (link.utmMedium) {
+          if (!mediumsByCampaign.has(link.utmCampaign)) mediumsByCampaign.set(link.utmCampaign, new Set());
+          mediumsByCampaign.get(link.utmCampaign)!.add(link.utmMedium);
+        }
       }
     }
 
@@ -120,6 +136,8 @@ export async function GET(request: NextRequest) {
         linkCount: c._count.id,
         clickCount: clicksByCampaign.get(c.utmCampaign!) || 0,
         lastUsed: c._max.createdAt,
+        sources: Array.from(sourcesByCampaign.get(c.utmCampaign!) || []),
+        mediums: Array.from(mediumsByCampaign.get(c.utmCampaign!) || []),
       }));
 
     return NextResponse.json({ campaigns: result });

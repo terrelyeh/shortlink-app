@@ -24,6 +24,8 @@ interface CampaignStats {
   linkCount: number;
   clickCount: number;
   lastUsed: string;
+  sources: string[];
+  mediums: string[];
 }
 
 export default function CampaignsPage() {
@@ -60,7 +62,7 @@ export default function CampaignsPage() {
   const totalClicks = campaigns.reduce((sum, c) => sum + c.clickCount, 0);
 
   const handleCampaignClick = (campaignName: string) => {
-    router.push(`/links?campaign=${encodeURIComponent(campaignName)}`);
+    router.push(`/analytics?campaign=${encodeURIComponent(campaignName)}`);
   };
 
   if (loading) {
@@ -156,6 +158,9 @@ export default function CampaignsPage() {
                   <th className="pl-4 py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                     {t("name")}
                   </th>
+                  <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    {t("sourceMedium")}
+                  </th>
                   <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                     {t("linksCount")}
                   </th>
@@ -178,6 +183,34 @@ export default function CampaignsPage() {
                       <span className="font-mono text-sm font-medium text-slate-900">
                         {campaign.name}
                       </span>
+                    </td>
+                    <td className="py-2.5 pr-3">
+                      <div className="flex flex-wrap items-center gap-1">
+                        {campaign.sources.slice(0, 2).map((src) => (
+                          <span
+                            key={src}
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-cyan-50 text-cyan-700 border border-cyan-100"
+                          >
+                            {src}
+                          </span>
+                        ))}
+                        {campaign.mediums.slice(0, 2).map((med) => (
+                          <span
+                            key={med}
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-50 text-violet-700 border border-violet-100"
+                          >
+                            {med}
+                          </span>
+                        ))}
+                        {(campaign.sources.length + campaign.mediums.length) > 4 && (
+                          <span className="text-[10px] text-slate-400">
+                            +{campaign.sources.length + campaign.mediums.length - 4}
+                          </span>
+                        )}
+                        {campaign.sources.length === 0 && campaign.mediums.length === 0 && (
+                          <span className="text-xs text-slate-300">—</span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-2.5 pr-3 text-right text-sm text-slate-600 tabular-nums">
                       {campaign.linkCount}
