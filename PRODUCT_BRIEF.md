@@ -56,6 +56,14 @@ Group related links under a Campaign entity with:
 - Default UTM source and medium (auto-applied to new links)
 - Status lifecycle: Draft → Active → Completed → Archived
 - Campaign-level tags for categorization
+- **KPI goal tracking** — set a target click count, with live progress bar (% achieved, clicks remaining, 🎉 on completion)
+
+**Campaign Detail page** (`/campaigns/[name]`) provides:
+- Summary stats: total links, total clicks, avg clicks per link
+- Full link table sorted by clicks, with source / medium / content UTM badges
+- Copy All Links button (batch-copies all short URLs to clipboard)
+- Direct link to campaign-level Analytics
+- Add Link shortcut (pre-fills `utm_campaign`)
 
 Campaign acts as the **primary organizational unit** — users can filter links, analytics, and dashboard metrics by campaign across all pages.
 
@@ -66,11 +74,11 @@ Real-time click tracking captures:
 - **Device breakdown** — Mobile, Tablet, Desktop
 - **Browser & OS distribution** — Chrome, Safari, Firefox; iOS, Android, Windows, macOS
 - **Geographic data** — Country and city-level via GeoIP
-- **Referrer tracking** — Where traffic originates
+- **Referrer tracking** — Where traffic originates with percentage bars
 - **Hourly heatmap** — Peak click times within a day
-- **UTM cross-analysis** — Campaign x Source, Campaign x Content breakdowns
+- **UTM cross-analysis** — Campaign x Source, Campaign x Content breakdowns (Campaign Performance shown first)
 
-All analytics support **campaign-level and link-level filtering** for drill-down analysis.
+Analytics support **three cascading filters**: campaign → tag → individual link.
 
 **Export**: Links list and raw click data can be exported as CSV.
 
@@ -80,7 +88,15 @@ All analytics support **campaign-level and link-level filtering** for drill-down
 
 Save frequently used UTM parameter combinations as templates. When creating a new link, apply a template to auto-fill source, medium, campaign, content, and term — reducing setup time and ensuring consistency.
 
-### 5. Team Collaboration
+### 5. UTM Naming Governance
+
+Admins and Managers can define **approved UTM sources and mediums** at the workspace level (Settings → UTM Rules tab).
+
+- Add/remove approved values with a tag-style editor
+- When a team member enters a non-approved source or medium in the link creation form, an **inline warning badge** is shown (non-blocking, informational)
+- Enforces naming consistency across the team without hard-blocking creativity
+
+### 6. Team Collaboration
 
 **Multi-workspace architecture** — Each team or business unit gets its own workspace with isolated links, campaigns, and member management.
 
@@ -130,29 +146,33 @@ Save frequently used UTM parameter combinations as templates. When creating a ne
 ```
 Dashboard
 ├── Stats overview (clicks, visitors, links, active links)
+├── Now panel (active campaigns count + expiring links alert)
 ├── Top Campaigns (by clicks)
 ├── Top Links (by clicks)
 └── Recent Links
 
 Links
 ├── Search + filter (status, campaign, tag, sort)
-├── Batch actions (activate, pause, archive, delete)
-├── Create new link (with UTM builder + campaign association)
-└── Batch create (multi-content variant generation)
+├── Batch actions (activate, pause, archive, delete, tag)
+├── Campaign column (utm_campaign badge per link)
+├── Create new link (UTM builder + campaign + slug availability checker)
+└── Batch create (multi-content variant generation + Copy All URLs)
 
 Campaigns
-├── Campaign list with stats (links, clicks, CTR)
-└── Click-through to filtered Links view
+├── Campaign list with stats (links, clicks, last used)
+└── Campaign Detail [/campaigns/:name]
+    ├── Summary stats (links, total clicks, avg clicks)
+    ├── KPI goal progress bar (set/edit/clear click target)
+    └── Links table (sorted by clicks, UTM badges, copy, analytics)
 
 Analytics
 ├── Date range selector (24h / 7d / 30d / 90d / custom)
-├── Campaign filter → Link filter (cascading)
-├── Summary cards (clicks, unique visitors, trend)
-├── Clicks over time chart
-├── Distribution charts (device, browser, OS, country)
-├── Referrer & hourly heatmap
-├── UTM breakdown (campaign, source, medium, cross-tables)
-└── Top performing links
+├── Campaign filter → Tag filter → Link filter (cascading)
+├── Campaign Performance (first — UTM campaign/source/medium breakdown)
+├── Overview (clicks, unique visitors, trend chart)
+├── Traffic Sources (referrers + countries with percentage bars)
+├── Top performing links
+└── Audience (device, browser, OS pie charts)
 
 Templates
 ├── Template list
@@ -160,8 +180,9 @@ Templates
 
 Settings
 ├── Profile management
+├── Member management & invitations
 ├── Workspace settings
-└── Member management & invitations
+└── UTM Rules (Admin/Manager only — approved sources & mediums)
 ```
 
 ---
@@ -169,13 +190,13 @@ Settings
 ## Data Model (Simplified)
 
 ```
-Workspace ──┬── WorkspaceMember ── User
-            ├── ShortLink ──┬── Click
-            │               ├── Tag (many-to-many)
-            │               └── ShareToken
-            ├── Campaign ──── CampaignTag
-            ├── UTMTemplate
-            └── AuditLog
+Workspace [+utmSettings: JSON] ──┬── WorkspaceMember ── User
+                                  ├── ShortLink ──┬── Click
+                                  │               ├── TagOnLink (many-to-many)
+                                  │               └── ShareToken
+                                  ├── Campaign [+goalClicks: Int?] ──── TagOnCampaign
+                                  ├── UTMTemplate
+                                  └── AuditLog
 ```
 
 ---

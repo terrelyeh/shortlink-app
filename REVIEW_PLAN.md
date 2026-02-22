@@ -49,9 +49,9 @@
 | # | 建議 | 原因 | 影響範圍 |
 |---|------|------|---------|
 | F5 | **Loading skeleton** | 多頁面載入時無骨架屏，體驗差 | Dashboard/Analytics/Links |
-| F6 | **Toast 通知系統** | 操作成功/失敗無統一回饋 | 全站 |
-| F7 | **確認對話框一致化** | 部分刪除操作無確認、角色變更無確認 | Links/Users/Templates |
-| F8 | **搜尋 Debounce** | Links 頁搜尋每次按鍵都觸發 API | Links 頁 |
+| F6 ✅ | ~~**Toast 通知系統**~~ | ~~操作成功/失敗無統一回饋~~ **已實作**：全站統一 toast 元件 | 全站 |
+| F7 ✅ | ~~**確認對話框一致化**~~ | ~~部分刪除操作無確認、角色變更無確認~~ **已實作**：ConfirmDialog 元件，覆蓋刪除/角色變更 | Links/Users/Templates |
+| F8 ✅ | ~~**搜尋 Debounce**~~ | ~~Links 頁搜尋每次按鍵都觸發 API~~ **已實作**：slug 可用性檢查 + 搜尋欄 debounce | Links 頁 |
 | F9 | **自訂網域支援** | 專業用途必備 | 重導/設定 |
 | F10 | **進階 Analytics（漏斗/A-B Test）** | 行銷團隊常見需求 | Analytics |
 | F11 | **批次匯入（CSV）** | 大量建立連結的反向功能 | Links |
@@ -67,6 +67,18 @@
 | F16 | **瀏覽器擴充功能** | 快速建立短連結 | 新產品 |
 | F17 | **稽核日誌匯出** | 合規需求 | Audit Log |
 | F18 | **鍵盤導航/無障礙優化** | Dropdown/Modal 缺 focus 管理 | 全站元件 |
+
+---
+
+## 二-B、已額外實作的新功能（Phase 3）
+
+以下為審查後額外規劃並實作的功能，超出原始 18 項建議範圍：
+
+| # | 功能 | 說明 | 影響範圍 |
+|---|------|------|---------|
+| N1 ✅ | **Campaign KPI 目標追蹤** | 在 Campaign 詳情頁設定目標點擊數，顯示即時進度條（%、剩餘點擊、達標 🎉）；Schema 新增 `goalClicks Int?` | Campaigns 頁、`/api/utm-campaigns/[name]` |
+| N2 ✅ | **Analytics 標籤篩選器** | Analytics 頁新增 Tag 下拉篩選，與 Campaign/Link 串聯為三層過濾；Analytics API 支援 `tagId` 參數 | Analytics 頁、`/api/analytics` |
+| N3 ✅ | **UTM 命名規範治理** | Settings → UTM Rules 分頁（Admin/Manager 限定）：以標籤 UI 管理核准的 Source/Medium 清單；建立連結時若輸入未核准值顯示警告 badge；Schema 新增 `utmSettings Json?` | Settings 頁、CreateLinkForm、`/api/workspace/utm-settings` |
 
 ---
 
