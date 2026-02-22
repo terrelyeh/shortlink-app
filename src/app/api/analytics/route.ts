@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
     const range = searchParams.get("range") || "7d";
     const linkId = searchParams.get("linkId");
     const campaign = searchParams.get("campaign");
+    const tagId = searchParams.get("tagId");
     const customFrom = searchParams.get("from");
     const customTo = searchParams.get("to");
 
@@ -63,6 +64,16 @@ export async function GET(request: NextRequest) {
       } else {
         whereLinks.utmCampaign = campaign;
       }
+    }
+
+    // Filter by tag — find link IDs that have this tag
+    if (tagId) {
+      const taggedLinks = await prisma.tagOnLink.findMany({
+        where: { tagId },
+        select: { shortLinkId: true },
+      });
+      const taggedLinkIds = taggedLinks.map((t: { shortLinkId: string }) => t.shortLinkId);
+      whereLinks.id = { in: taggedLinkIds };
     }
 
     if (linkId) {

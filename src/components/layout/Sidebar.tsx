@@ -50,6 +50,11 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       icon: <Link2 className="w-5 h-5" />,
     },
     {
+      href: "/analytics",
+      labelKey: "analytics",
+      icon: <BarChart3 className="w-5 h-5" />,
+    },
+    {
       href: "/campaigns",
       labelKey: "campaigns",
       icon: <Megaphone className="w-5 h-5" />,
@@ -58,11 +63,6 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       href: "/templates",
       labelKey: "templates",
       icon: <FileText className="w-5 h-5" />,
-    },
-    {
-      href: "/analytics",
-      labelKey: "analytics",
-      icon: <BarChart3 className="w-5 h-5" />,
     },
     {
       href: "/users",

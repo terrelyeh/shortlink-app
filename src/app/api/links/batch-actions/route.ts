@@ -6,7 +6,8 @@ import { z } from "zod";
 
 const batchActionSchema = z.object({
   ids: z.array(z.string()).min(1).max(100),
-  action: z.enum(["delete", "pause", "activate", "archive"]),
+  action: z.enum(["delete", "pause", "activate", "archive", "add_tag"]),
+  tagId: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { ids, action } = batchActionSchema.parse(body);
+    const { ids, action, tagId } = batchActionSchema.parse(body);
 
     // Verify ownership/workspace scope
     const workspaceId = getWorkspaceId(request);
@@ -58,6 +59,22 @@ export async function POST(request: NextRequest) {
           where: { id: { in: ids }, deletedAt: null },
           data: { status: "ARCHIVED" },
         });
+        break;
+      case "add_tag":
+        if (!tagId) {
+          return NextResponse.json({ error: "tagId required for add_tag action" }, { status: 400 });
+        }
+        // Create TagOnLink records; skip duplicates using upsert pattern
+        await Promise.all(
+          ids.map((linkId) =>
+            prisma.tagOnLink.upsert({
+              where: { shortLinkId_tagId: { shortLinkId: linkId, tagId } },
+              create: { shortLinkId: linkId, tagId },
+              update: {},
+            })
+          )
+        );
+        result = { count: ids.length };
         break;
     }
 
