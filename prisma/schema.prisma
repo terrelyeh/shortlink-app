@@ -107,6 +107,9 @@ model Workspace {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // UTM governance settings (JSON: { approvedSources: string[], approvedMediums: string[] })
+  utmSettings Json?  @map("utm_settings")
+
   // Relations
   members     WorkspaceMember[]
   invitations WorkspaceInvitation[]
@@ -306,6 +309,9 @@ model Campaign {
   status      CampaignStatus @default(ACTIVE)
   startDate   DateTime?      @map("start_date")
   endDate     DateTime?      @map("end_date")
+
+  // KPI goal tracking
+  goalClicks  Int?           @map("goal_clicks")
 
   // Default UTM values for links in this campaign
   defaultSource String?      @map("default_source")

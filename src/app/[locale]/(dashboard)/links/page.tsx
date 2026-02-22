@@ -7,7 +7,9 @@ import { Link } from "@/i18n/routing";
 import { useDebounce } from "@/hooks/useDebounce";
 import { LinkTableRow } from "@/components/links/LinkTableRow";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Plus, Search, Loader2, Link2, Layers, ChevronLeft, ChevronRight, Tag, Trash2, Pause, Play, Archive, Download, ArrowUpDown } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/Toast";
+import { Plus, Search, Loader2, Link2, Layers, ChevronLeft, ChevronRight, Tag, Trash2, Pause, Play, Archive, Download, ArrowUpDown, Check, ChevronDown } from "lucide-react";
 import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
 
 interface LinkTag {
@@ -28,6 +30,7 @@ interface ShortLink {
   title: string | null;
   status: string;
   createdAt: string;
+  utmCampaign?: string | null;
   _count: { clicks: number };
   tags?: LinkTag[];
 }
@@ -43,6 +46,7 @@ export default function LinksPage() {
   const t = useTranslations("links");
   const tCommon = useTranslations("common");
   const searchParams = useSearchParams();
+  const { success, error: toastError } = useToast();
 
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -57,6 +61,14 @@ export default function LinksPage() {
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState("desc");
   const [campaignFilter, setCampaignFilter] = useState(searchParams.get("campaign") || "");
+
+  // Delete confirmation state
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
+
+  // Batch tag state
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const [batchTagLoading, setBatchTagLoading] = useState(false);
 
   // Fetch tags for filter
   useEffect(() => {
@@ -92,27 +104,38 @@ export default function LinksPage() {
 
       setLinks(data.links || []);
       setPagination(data.pagination);
-    } catch (error) {
-      console.error("Failed to fetch links:", error);
+    } catch (err) {
+      console.error("Failed to fetch links:", err);
       setLinks([]);
     } finally {
       setLoading(false);
     }
   }, [debouncedSearch, statusFilter, campaignFilter, tagFilter, sortBy, sortOrder]);
 
-  // Fetch links on mount, when filter changes, or when navigating to this page
   useEffect(() => {
     fetchLinks();
   }, [fetchLinks, searchParams]);
 
-  const handleDelete = async (id: string) => {
+  // Called from row — opens confirm modal
+  const confirmDelete = (id: string) => {
+    setDeleteConfirmId(id);
+  };
+
+  // Executes actual single delete after modal confirm
+  const executeDelete = async () => {
+    if (!deleteConfirmId) return;
+    const id = deleteConfirmId;
+    setDeleteConfirmId(null);
     try {
       const response = await fetch(`/api/links/${id}`, { method: "DELETE" });
       if (response.ok) {
-        setLinks(links.filter((link) => link.id !== id));
+        setLinks((prev) => prev.filter((link) => link.id !== id));
+        success("Link deleted.");
+      } else {
+        toastError("Failed to delete link.");
       }
-    } catch (error) {
-      console.error("Failed to delete link:", error);
+    } catch {
+      toastError("Failed to delete link.");
     }
   };
 
@@ -124,14 +147,15 @@ export default function LinksPage() {
         body: JSON.stringify({ status }),
       });
       if (response.ok) {
-        setLinks(
-          links.map((link) =>
-            link.id === id ? { ...link, status } : link
-          )
+        setLinks((prev) =>
+          prev.map((link) => (link.id === id ? { ...link, status } : link))
         );
+        success(status === "ACTIVE" ? "Link activated." : status === "PAUSED" ? "Link paused." : "Link archived.");
+      } else {
+        toastError("Failed to update status.");
       }
-    } catch (error) {
-      console.error("Failed to update link:", error);
+    } catch {
+      toastError("Failed to update status.");
     }
   };
 
@@ -140,9 +164,12 @@ export default function LinksPage() {
       const response = await fetch(`/api/links/${id}/clone`, { method: "POST" });
       if (response.ok) {
         fetchLinks(pagination?.page || 1);
+        success("Link cloned successfully.");
+      } else {
+        toastError("Failed to clone link.");
       }
-    } catch (error) {
-      console.error("Failed to clone link:", error);
+    } catch {
+      toastError("Failed to clone link.");
     }
   };
 
@@ -163,10 +190,54 @@ export default function LinksPage() {
     }
   };
 
-  const handleBatchAction = async (action: "delete" | "pause" | "activate" | "archive") => {
-    if (selectedIds.size === 0) return;
-    if (action === "delete" && !confirm(t("deleteConfirm"))) return;
+  const handleBatchTag = async (tagId: string) => {
+    if (selectedIds.size === 0 || !tagId) return;
+    setShowTagDropdown(false);
+    setBatchTagLoading(true);
+    try {
+      const response = await fetch("/api/links/batch-actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selectedIds), action: "add_tag", tagId }),
+      });
+      if (response.ok) {
+        fetchLinks(pagination?.page || 1);
+        success(`Tag added to ${selectedIds.size} link${selectedIds.size > 1 ? "s" : ""}.`);
+      } else {
+        toastError("Failed to add tag.");
+      }
+    } catch {
+      toastError("Failed to add tag.");
+    } finally {
+      setBatchTagLoading(false);
+    }
+  };
 
+  const executeBatchDelete = async () => {
+    setBatchDeleteConfirm(false);
+    setBatchLoading(true);
+    try {
+      const response = await fetch("/api/links/batch-actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selectedIds), action: "delete" }),
+      });
+      if (response.ok) {
+        setSelectedIds(new Set());
+        fetchLinks(pagination?.page || 1);
+        success(`${selectedIds.size} link${selectedIds.size > 1 ? "s" : ""} deleted.`);
+      } else {
+        toastError("Batch delete failed.");
+      }
+    } catch {
+      toastError("Batch delete failed.");
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
+  const handleBatchAction = async (action: "pause" | "activate" | "archive") => {
+    if (selectedIds.size === 0) return;
     setBatchLoading(true);
     try {
       const response = await fetch("/api/links/batch-actions", {
@@ -177,9 +248,13 @@ export default function LinksPage() {
       if (response.ok) {
         setSelectedIds(new Set());
         fetchLinks(pagination?.page || 1);
+        const label = action === "activate" ? "activated" : action === "pause" ? "paused" : "archived";
+        success(`${selectedIds.size} link${selectedIds.size > 1 ? "s" : ""} ${label}.`);
+      } else {
+        toastError("Batch action failed.");
       }
-    } catch (error) {
-      console.error("Batch action failed:", error);
+    } catch {
+      toastError("Batch action failed.");
     } finally {
       setBatchLoading(false);
     }
@@ -187,6 +262,28 @@ export default function LinksPage() {
 
   return (
     <div className="space-y-6">
+      {/* Delete confirmation modals */}
+      <ConfirmDialog
+        open={!!deleteConfirmId}
+        title="Delete this link?"
+        description="This action cannot be undone. All click data for this link will be permanently lost."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={executeDelete}
+        onCancel={() => setDeleteConfirmId(null)}
+        variant="danger"
+      />
+      <ConfirmDialog
+        open={batchDeleteConfirm}
+        title={`Delete ${selectedIds.size} link${selectedIds.size > 1 ? "s" : ""}?`}
+        description="This action cannot be undone. All click data for these links will be permanently lost."
+        confirmLabel="Delete All"
+        cancelLabel="Cancel"
+        onConfirm={executeBatchDelete}
+        onCancel={() => setBatchDeleteConfirm(false)}
+        variant="danger"
+      />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -212,18 +309,18 @@ export default function LinksPage() {
             {tCommon("export")}
           </a>
           <Link
-            href="/links/batch"
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            <Layers className="w-4 h-4" />
-            Batch
-          </Link>
-          <Link
             href="/links/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
           >
             <Plus className="w-4 h-4" />
             {t("createNew")}
+          </Link>
+          <Link
+            href="/links/batch"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors"
+          >
+            <Layers className="w-4 h-4" />
+            Batch Create
           </Link>
         </div>
       </div>
@@ -302,7 +399,41 @@ export default function LinksPage() {
           <span className="text-sm font-medium text-slate-700">
             {selectedIds.size} selected
           </span>
-          <div className="flex gap-1 ml-auto">
+          <div className="flex gap-1 ml-auto flex-wrap">
+            {/* Add Tag dropdown */}
+            {allTags.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowTagDropdown(!showTagDropdown)}
+                  disabled={batchLoading || batchTagLoading}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors disabled:opacity-50"
+                >
+                  <Tag className="w-3.5 h-3.5" />
+                  Add Tag
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                {showTagDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowTagDropdown(false)} />
+                    <div className="absolute top-full mt-1 left-0 z-50 bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[140px]">
+                      {allTags.map((tag) => (
+                        <button
+                          key={tag.id}
+                          onClick={() => handleBatchTag(tag.id)}
+                          className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: tag.color || "#94a3b8" }}
+                          />
+                          {tag.name}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             <button
               onClick={() => handleBatchAction("activate")}
               disabled={batchLoading}
@@ -328,7 +459,7 @@ export default function LinksPage() {
               {t("archived")}
             </button>
             <button
-              onClick={() => handleBatchAction("delete")}
+              onClick={() => setBatchDeleteConfirm(true)}
               disabled={batchLoading}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
             >
@@ -336,7 +467,7 @@ export default function LinksPage() {
               {tCommon("delete")}
             </button>
           </div>
-          {batchLoading && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
+          {(batchLoading || batchTagLoading) && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
         </div>
       )}
 
@@ -381,6 +512,9 @@ export default function LinksPage() {
                     {t("title")}
                   </th>
                   <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    Campaign
+                  </th>
+                  <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                     {t("shortUrl")}
                   </th>
                   <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
@@ -406,7 +540,7 @@ export default function LinksPage() {
                     shortBaseUrl={shortBaseUrl}
                     selected={selectedIds.has(link.id)}
                     onSelect={toggleSelect}
-                    onDelete={handleDelete}
+                    onDelete={confirmDelete}
                     onStatusChange={handleStatusChange}
                     onClone={handleClone}
                   />

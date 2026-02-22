@@ -16,6 +16,7 @@ import {
   CopyPlus,
 } from "lucide-react";
 import Link from "next/link";
+import { useToast } from "@/components/ui/Toast";
 
 interface LinkTag {
   tag: { id: string; name: string; color?: string | null };
@@ -29,6 +30,7 @@ interface LinkTableRowProps {
     title?: string | null;
     status: string;
     createdAt: string;
+    utmCampaign?: string | null;
     _count: { clicks: number };
     tags?: LinkTag[];
   };
@@ -56,6 +58,7 @@ export function LinkTableRow({
   onClone,
 }: LinkTableRowProps) {
   const t = useTranslations("links");
+  const { success } = useToast();
   const [copied, setCopied] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showQR, setShowQR] = useState(false);
@@ -82,13 +85,12 @@ export function LinkTableRow({
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(shortUrl);
     setCopied(true);
+    success(t("copySuccess") || "Link copied!");
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDelete = () => {
-    if (confirm(t("deleteConfirm"))) {
-      onDelete?.(link.id);
-    }
+    onDelete?.(link.id);
     setShowMenu(false);
   };
 
@@ -131,13 +133,24 @@ export function LinkTableRow({
           </div>
         </td>
 
+        {/* Campaign */}
+        <td className="py-2.5 pr-3 whitespace-nowrap">
+          {link.utmCampaign ? (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium font-mono bg-violet-50 text-violet-700 border border-violet-100 max-w-[120px] truncate" title={link.utmCampaign}>
+              {link.utmCampaign}
+            </span>
+          ) : (
+            <span className="text-xs text-slate-300">—</span>
+          )}
+        </td>
+
         {/* Short URL + Copy */}
         <td className="py-2.5 pr-3 whitespace-nowrap">
           <div className="flex items-center gap-1.5">
             <code className="text-sm text-[#03A9F4] font-medium">/{link.code}</code>
             <button
               onClick={copyToClipboard}
-              className="p-1 rounded hover:bg-slate-100 transition-colors opacity-0 group-hover:opacity-100"
+              className="p-1 rounded hover:bg-slate-100 transition-colors"
               title={t("copyLink")}
             >
               {copied ? (
@@ -265,7 +278,7 @@ export function LinkTableRow({
       {/* QR Code expandable row */}
       {showQR && (
         <tr className="border-b border-slate-50 bg-slate-50/30">
-          <td colSpan={8} className="px-4 py-4">
+          <td colSpan={9} className="px-4 py-4">
             <div className="flex items-center gap-4">
               <div className="p-2 bg-white rounded-lg border border-slate-200">
                 <QRCodeCanvas

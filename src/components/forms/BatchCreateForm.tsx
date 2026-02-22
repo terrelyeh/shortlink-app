@@ -116,30 +116,48 @@ export function BatchCreateForm() {
   };
 
   if (createdLinks.length > 0) {
+    const copyAllUrls = async () => {
+      const allUrls = createdLinks.map((l) => l.shortUrl).join("\n");
+      await navigator.clipboard.writeText(allUrls);
+      setCopiedId("__all__");
+      setTimeout(() => setCopiedId(null), 2000);
+    };
+
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-semibold text-slate-900">
-            Created {createdLinks.length} Links
+            ✅ Created {createdLinks.length} Links
           </h2>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={copyAllUrls}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors font-medium text-sm ${
+                copiedId === "__all__"
+                  ? "bg-emerald-600 text-white"
+                  : "bg-[#03A9F4] hover:bg-[#0288D1] text-white"
+              }`}
+            >
+              {copiedId === "__all__" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copiedId === "__all__" ? "Copied!" : "Copy All URLs"}
+            </button>
             <button
               onClick={downloadCSV}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-sm"
             >
               <Download className="w-4 h-4" />
-              Download CSV
+              CSV
             </button>
             <button
               onClick={downloadAllQRCodes}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-sm"
             >
               <Download className="w-4 h-4" />
-              Download All QR Codes
+              QR Codes
             </button>
             <button
               onClick={() => setCreatedLinks([])}
-              className="px-4 py-2 bg-[#03A9F4] text-white rounded-lg hover:bg-[#0288D1] transition-colors"
+              className="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm"
             >
               Create More
             </button>

@@ -62,7 +62,7 @@ export default function CampaignsPage() {
   const totalClicks = campaigns.reduce((sum, c) => sum + c.clickCount, 0);
 
   const handleCampaignClick = (campaignName: string) => {
-    router.push(`/analytics?campaign=${encodeURIComponent(campaignName)}`);
+    router.push(`/campaigns/${encodeURIComponent(campaignName)}`);
   };
 
   if (loading) {

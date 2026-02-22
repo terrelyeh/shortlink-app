@@ -1,16 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter, usePathname } from "next/navigation";
 import { locales, localeNames, type Locale } from "@/i18n/config";
-import { Globe, User, Check, Pencil, AlertTriangle, Users, Building2, Trash2, Loader2 } from "lucide-react";
+import { Globe, User, Check, Pencil, AlertTriangle, Users, Building2, Trash2, Loader2, ShieldCheck, Plus, X as XIcon } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { MembersTab } from "@/components/settings/MembersTab";
 import { WorkspaceTab } from "@/components/settings/WorkspaceTab";
 
-type SettingsTab = "profile" | "members" | "workspace";
+type SettingsTab = "profile" | "members" | "workspace" | "governance";
 
 export default function SettingsPage() {
   const t = useTranslations("settings");
@@ -42,6 +42,49 @@ export default function SettingsPage() {
   const [deleteWorkspaceError, setDeleteWorkspaceError] = useState<string | null>(null);
 
   const isWorkspaceOwner = currentWorkspace?.role === "OWNER";
+  const isAdminOrManager = ["ADMIN", "MANAGER"].includes(session?.user?.role || "");
+
+  // UTM Governance state
+  const [approvedSources, setApprovedSources] = useState<string[]>([]);
+  const [approvedMediums, setApprovedMediums] = useState<string[]>([]);
+  const [newSource, setNewSource] = useState("");
+  const [newMedium, setNewMedium] = useState("");
+  const [governanceLoading, setGovernanceLoading] = useState(false);
+  const [governanceSaving, setGovernanceSaving] = useState(false);
+  const [governanceSaved, setGovernanceSaved] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === "governance" && currentWorkspace?.id) {
+      setGovernanceLoading(true);
+      fetch("/api/workspace/utm-settings")
+        .then((r) => r.json())
+        .then((data) => {
+          setApprovedSources(data.approvedSources || []);
+          setApprovedMediums(data.approvedMediums || []);
+        })
+        .catch(console.error)
+        .finally(() => setGovernanceLoading(false));
+    }
+  }, [activeTab, currentWorkspace?.id]);
+
+  const saveGovernanceSettings = async () => {
+    setGovernanceSaving(true);
+    try {
+      const response = await fetch("/api/workspace/utm-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approvedSources, approvedMediums }),
+      });
+      if (response.ok) {
+        setGovernanceSaved(true);
+        setTimeout(() => setGovernanceSaved(false), 2500);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setGovernanceSaving(false);
+    }
+  };
 
   const switchLocale = (newLocale: Locale) => {
     const segments = pathname.split("/");
@@ -156,6 +199,9 @@ export default function SettingsPage() {
     { id: "profile" as const, label: t("profile"), icon: User },
     { id: "members" as const, label: tWorkspace("members"), icon: Users },
     { id: "workspace" as const, label: tWorkspace("title"), icon: Building2 },
+    ...(isAdminOrManager && currentWorkspace
+      ? [{ id: "governance" as const, label: "UTM Rules", icon: ShieldCheck }]
+      : []),
   ];
 
   return (
@@ -355,6 +401,155 @@ export default function SettingsPage() {
 
       {/* ===== Workspace Tab ===== */}
       {activeTab === "workspace" && <WorkspaceTab />}
+
+      {/* ===== UTM Governance Tab ===== */}
+      {activeTab === "governance" && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl border border-slate-100 p-6">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-violet-500" />
+                UTM Naming Governance
+              </h2>
+              {governanceSaved && (
+                <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
+                  <Check className="w-3.5 h-3.5" /> Saved
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-slate-500 mb-6">
+              Define approved UTM sources and mediums. When set, team members will see a warning when entering non-approved values.
+            </p>
+
+            {governanceLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Approved Sources */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-3">
+                    Approved Sources
+                    <span className="ml-2 text-xs font-normal text-slate-400">(e.g. google, facebook, email)</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {approvedSources.map((src) => (
+                      <span
+                        key={src}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-50 text-cyan-700 border border-cyan-200 rounded-full text-sm font-medium"
+                      >
+                        {src}
+                        <button
+                          onClick={() => setApprovedSources(approvedSources.filter((s) => s !== src))}
+                          className="text-cyan-400 hover:text-cyan-700 ml-0.5"
+                        >
+                          <XIcon className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                    {approvedSources.length === 0 && (
+                      <span className="text-sm text-slate-400 italic">No restrictions — all sources allowed</span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newSource}
+                      onChange={(e) => setNewSource(e.target.value.toLowerCase().trim())}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newSource && !approvedSources.includes(newSource)) {
+                          setApprovedSources([...approvedSources, newSource]);
+                          setNewSource("");
+                        }
+                      }}
+                      placeholder="Add source…"
+                      className="flex-1 max-w-xs px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-300 focus:border-violet-400"
+                    />
+                    <button
+                      onClick={() => {
+                        if (newSource && !approvedSources.includes(newSource)) {
+                          setApprovedSources([...approvedSources, newSource]);
+                          setNewSource("");
+                        }
+                      }}
+                      disabled={!newSource}
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:opacity-40 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add
+                    </button>
+                  </div>
+                </div>
+
+                {/* Approved Mediums */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-3">
+                    Approved Mediums
+                    <span className="ml-2 text-xs font-normal text-slate-400">(e.g. cpc, email, social, organic)</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {approvedMediums.map((med) => (
+                      <span
+                        key={med}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-violet-50 text-violet-700 border border-violet-200 rounded-full text-sm font-medium"
+                      >
+                        {med}
+                        <button
+                          onClick={() => setApprovedMediums(approvedMediums.filter((m) => m !== med))}
+                          className="text-violet-400 hover:text-violet-700 ml-0.5"
+                        >
+                          <XIcon className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                    {approvedMediums.length === 0 && (
+                      <span className="text-sm text-slate-400 italic">No restrictions — all mediums allowed</span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newMedium}
+                      onChange={(e) => setNewMedium(e.target.value.toLowerCase().trim())}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newMedium && !approvedMediums.includes(newMedium)) {
+                          setApprovedMediums([...approvedMediums, newMedium]);
+                          setNewMedium("");
+                        }
+                      }}
+                      placeholder="Add medium…"
+                      className="flex-1 max-w-xs px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-300 focus:border-violet-400"
+                    />
+                    <button
+                      onClick={() => {
+                        if (newMedium && !approvedMediums.includes(newMedium)) {
+                          setApprovedMediums([...approvedMediums, newMedium]);
+                          setNewMedium("");
+                        }
+                      }}
+                      disabled={!newMedium}
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:opacity-40 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    onClick={saveGovernanceSettings}
+                    disabled={governanceSaving}
+                    className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 transition-colors disabled:opacity-50"
+                  >
+                    {governanceSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                    {governanceSaving ? "Saving…" : "Save Rules"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ===== Danger Zone (always visible) ===== */}
       <div className="bg-white rounded-xl border border-red-200 p-6">

@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { Link2, MousePointerClick, Users, TrendingUp, Plus, ArrowRight, Megaphone, FileText, Zap, ExternalLink, BarChart3, Clock, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Link2, MousePointerClick, Users, TrendingUp, Plus, ArrowRight, Megaphone, FileText, Zap, BarChart3, Clock, ArrowUpRight, ArrowDownRight, AlertTriangle, Calendar } from "lucide-react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
@@ -161,6 +161,27 @@ async function getRecentLinks(userId: string, userRole: string, limit = 5) {
   }));
 }
 
+// Get alert counts: expiring links, links near max clicks, inactive campaign links
+async function getAlerts(userId: string, userRole: string) {
+  const isAdminOrManager = userRole === "ADMIN" || userRole === "MANAGER";
+  const whereClause = isAdminOrManager ? { deletedAt: null } : { createdById: userId, deletedAt: null };
+
+  const sevenDaysFromNow = new Date();
+  sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+
+  const [expiringLinks] = await Promise.all([
+    prisma.shortLink.count({
+      where: {
+        ...whereClause,
+        status: "ACTIVE",
+        expiresAt: { gte: new Date(), lte: sevenDaysFromNow },
+      },
+    }),
+  ]);
+
+  return { expiringLinks };
+}
+
 // Get top campaigns by click count
 async function getTopCampaigns(userId: string, userRole: string, limit = 5) {
   const isAdminOrManager = userRole === "ADMIN" || userRole === "MANAGER";
@@ -252,11 +273,12 @@ export default async function DashboardPage() {
   const userRole = session.user.role;
 
   // Fetch real data
-  const [stats, topLinks, recentLinks, topCampaigns] = await Promise.all([
+  const [stats, topLinks, recentLinks, topCampaigns, alerts] = await Promise.all([
     getDashboardStats(userId, userRole),
     getTopLinks(userId, userRole),
     getRecentLinks(userId, userRole),
     getTopCampaigns(userId, userRole),
+    getAlerts(userId, userRole),
   ]);
 
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
@@ -394,6 +416,37 @@ export default async function DashboardPage() {
           <p className="text-xs text-slate-400 mt-1.5">{t("clicksPerActiveLink")}</p>
         </div>
       </div>
+
+      {/* Campaign Health + Alerts — only when there are active campaigns or alerts */}
+      {(topCampaigns.length > 0 || alerts.expiringLinks > 0) && (
+        <div className="flex flex-wrap items-center gap-3 p-4 bg-white rounded-xl border border-slate-100">
+          <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Now</span>
+          {topCampaigns.length > 0 && (
+            <Link
+              href="/campaigns"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 text-violet-700 border border-violet-100 rounded-lg text-xs font-medium hover:bg-violet-100 transition-colors"
+            >
+              <Megaphone className="w-3.5 h-3.5" />
+              {topCampaigns.length} active campaign{topCampaigns.length !== 1 ? "s" : ""}
+            </Link>
+          )}
+          {alerts.expiringLinks > 0 && (
+            <Link
+              href="/links?status=ACTIVE"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-100 rounded-lg text-xs font-medium hover:bg-amber-100 transition-colors"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              {alerts.expiringLinks} link{alerts.expiringLinks !== 1 ? "s" : ""} expiring in 7 days
+            </Link>
+          )}
+          {alerts.expiringLinks === 0 && topCampaigns.length > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-xs font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              No expiring links
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Two-column layout: Top Links + Recent Links */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
