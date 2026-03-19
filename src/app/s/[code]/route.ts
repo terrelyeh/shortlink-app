@@ -1,30 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createHash } from "crypto";
 import { headers } from "next/headers";
-import { checkRateLimit } from "@/lib/rate-limit";
-import { lookupIP } from "@/lib/geoip";
+import { getGeoFromHeaders } from "@/lib/geoip";
 
-// Validate IP_HASH_SALT at module load time
-const IP_HASH_SALT = process.env.IP_HASH_SALT;
-if (!IP_HASH_SALT && process.env.NODE_ENV === "production") {
-  throw new Error(
-    "IP_HASH_SALT environment variable is required in production. " +
-    "IP addresses cannot be properly anonymized without it."
-  );
-} else if (!IP_HASH_SALT) {
-  console.warn(
-    "WARNING: IP_HASH_SALT environment variable is not set. " +
-    "Please set IP_HASH_SALT before deploying to production."
-  );
-}
-
-// Helper to hash IP address
+// Helper to hash IP address — validates IP_HASH_SALT at runtime (not module load)
+// so Vercel build can succeed without env vars present
 function hashIP(ip: string): string {
-  if (!IP_HASH_SALT) {
-    throw new Error("IP_HASH_SALT environment variable is required");
+  const salt = process.env.IP_HASH_SALT;
+  if (!salt) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("IP_HASH_SALT environment variable is required in production");
+    }
+    console.warn("WARNING: IP_HASH_SALT not set, using fallback for development");
+    return createHash("sha256").update(ip + "dev-fallback-salt").digest("hex");
   }
-  return createHash("sha256").update(ip + IP_HASH_SALT).digest("hex");
+  return createHash("sha256").update(ip + salt).digest("hex");
 }
 
 // Known bot User-Agent patterns
@@ -86,13 +78,10 @@ export async function GET(
 ) {
   const { code } = await params;
 
-  // Rate limit: 100 requests per minute per IP
   const headersList = await headers();
   const clientIp = headersList.get("x-forwarded-for")?.split(",")[0] ||
                    headersList.get("x-real-ip") ||
                    "unknown";
-  const rateLimitResponse = checkRateLimit(clientIp, "redirect", { limit: 100, windowSeconds: 60 });
-  if (rateLimitResponse) return rateLimitResponse;
 
   try {
     // Find the short link
@@ -128,20 +117,31 @@ export async function GET(
       }
     }
 
-    // Redirect immediately — record click in the background (non-blocking)
+    // Redirect immediately
     const redirectStatus = shortLink.redirectType === "PERMANENT" ? 301 : 302;
     const response = NextResponse.redirect(shortLink.originalUrl, redirectStatus);
 
-    // Fire-and-forget: record click after redirect response is sent
-    const ip = clientIp;
+    // Extract data before after() — headers are not available inside after()
     const userAgent = headersList.get("user-agent");
     const referrer = headersList.get("referer") || headersList.get("referrer");
+    const geo = getGeoFromHeaders(headersList);
 
+    // Record click AFTER the response is sent using Next.js after() API
+    // This is guaranteed to complete on Vercel (unlike fire-and-forget)
     if (!isBot(userAgent)) {
-      const shortLinkId = shortLink.id;
-      // Use waitUntil-style pattern: don't await, let it run in background
-      recordClick({ shortLinkId, ip, userAgent, referrer, code }).catch((err) => {
-        console.error("Failed to record click:", err);
+      after(async () => {
+        try {
+          await recordClick({
+            shortLinkId: shortLink.id,
+            ip: clientIp,
+            userAgent,
+            referrer,
+            geo,
+            code,
+          });
+        } catch (err) {
+          console.error("Failed to record click:", err);
+        }
       });
     }
 
@@ -152,18 +152,20 @@ export async function GET(
   }
 }
 
-// Background click recording — extracted so redirect is not blocked
+// Background click recording — runs after response via after() API
 async function recordClick({
   shortLinkId,
   ip,
   userAgent,
   referrer,
+  geo,
   code,
 }: {
   shortLinkId: string;
   ip: string;
   userAgent: string | null;
   referrer: string | null;
+  geo: { country: string | null; city: string | null };
   code: string;
 }) {
   const ipHashed = hashIP(ip);
@@ -182,9 +184,8 @@ async function recordClick({
   if (recentClick) return;
 
   const { device, os, browser } = parseUserAgent(userAgent);
-  const geo = await lookupIP(ip);
   if (!geo.country) {
-    console.warn(`[click] No geo data for IP (first 8 chars): ${ip.substring(0, 8)}..., code: ${code}`);
+    console.warn(`[click] No geo data for code: ${code}`);
   }
 
   await prisma.click.create({

@@ -1,6 +1,9 @@
 /**
- * Simple in-memory rate limiter using a sliding window.
- * For production, consider using Redis-based rate limiting.
+ * Simple in-memory rate limiter.
+ *
+ * On Vercel serverless this is best-effort only (each instance has its own memory).
+ * Sufficient for password brute-force protection on low-traffic endpoints.
+ * For high-traffic rate limiting, use Upstash Redis or Vercel KV.
  */
 
 interface RateLimitEntry {
@@ -10,15 +13,18 @@ interface RateLimitEntry {
 
 const store = new Map<string, RateLimitEntry>();
 
-// Cleanup old entries periodically
-setInterval(() => {
+// Lazy cleanup: evict stale entries when store exceeds threshold
+const MAX_STORE_SIZE = 1000;
+
+function cleanupIfNeeded() {
+  if (store.size <= MAX_STORE_SIZE) return;
   const now = Date.now();
   for (const [key, entry] of store.entries()) {
     if (now > entry.resetTime) {
       store.delete(key);
     }
   }
-}, 60_000);
+}
 
 interface RateLimitOptions {
   /** Maximum number of requests in the window */
@@ -37,6 +43,8 @@ export function rateLimit(
   key: string,
   options: RateLimitOptions = { limit: 60, windowSeconds: 60 }
 ): RateLimitResult {
+  cleanupIfNeeded();
+
   const now = Date.now();
   const entry = store.get(key);
 
