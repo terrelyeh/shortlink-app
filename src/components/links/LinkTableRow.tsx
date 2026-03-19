@@ -14,8 +14,12 @@ import {
   Pause,
   Play,
   CopyPlus,
+  TrendingUp,
+  TrendingDown,
+  Download,
 } from "lucide-react";
 import Link from "next/link";
+import { Badge, StatusDot } from "@/components/ui/Badge";
 import { useToast } from "@/components/ui/Toast";
 
 interface LinkTag {
@@ -31,6 +35,8 @@ interface LinkTableRowProps {
     status: string;
     createdAt: string;
     utmCampaign?: string | null;
+    clicksLast7d?: number;
+    trendPct?: number | null;
     _count: { clicks: number };
     tags?: LinkTag[];
   };
@@ -41,12 +47,6 @@ interface LinkTableRowProps {
   onStatusChange?: (id: string, status: string) => void;
   onClone?: (id: string) => void;
 }
-
-const statusDotConfig = {
-  ACTIVE: "bg-emerald-500",
-  PAUSED: "bg-amber-500",
-  ARCHIVED: "bg-slate-400",
-};
 
 export function LinkTableRow({
   link,
@@ -68,8 +68,8 @@ export function LinkTableRow({
   useEffect(() => {
     if (showMenu && menuBtnRef.current) {
       const rect = menuBtnRef.current.getBoundingClientRect();
-      const menuWidth = 176; // w-44 = 11rem = 176px
-      const menuHeight = 280; // approximate menu height
+      const menuWidth = 176;
+      const menuHeight = 260;
       const spaceBelow = window.innerHeight - rect.bottom;
       setMenuPos({
         top: spaceBelow < menuHeight ? rect.top - menuHeight : rect.bottom + 4,
@@ -79,8 +79,8 @@ export function LinkTableRow({
   }, [showMenu]);
 
   const shortUrl = `${shortBaseUrl}/${link.code}`;
-  const statusDot = statusDotConfig[link.status as keyof typeof statusDotConfig] || statusDotConfig.ARCHIVED;
-  const statusLabel = link.status === "ACTIVE" ? t("active") : link.status === "PAUSED" ? t("paused") : t("archived");
+  const statusLabel =
+    link.status === "ACTIVE" ? t("active") : link.status === "PAUSED" ? t("paused") : t("archived");
 
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(shortUrl);
@@ -90,28 +90,59 @@ export function LinkTableRow({
   };
 
   const handleDelete = () => {
+    // Delegate to parent which handles the ConfirmDialog
     onDelete?.(link.id);
     setShowMenu(false);
   };
 
-  const toggleStatus = () => {
+  const toggleStatus = async () => {
     const newStatus = link.status === "ACTIVE" ? "PAUSED" : "ACTIVE";
     onStatusChange?.(link.id, newStatus);
     setShowMenu(false);
   };
 
+  const handleClone = () => {
+    onClone?.(link.id);
+    setShowMenu(false);
+  };
+
+  const downloadQR = (format: "png" | "svg") => {
+    const canvas = document.getElementById(`qr-${link.id}`) as HTMLCanvasElement;
+    if (!canvas) return;
+    if (format === "png") {
+      const url = canvas.toDataURL("image/png");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `qr-${link.code}.png`;
+      a.click();
+    } else {
+      const dataUrl = canvas.toDataURL("image/png");
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="white"/><image href="${dataUrl}" width="200" height="200"/></svg>`;
+      const blob = new Blob([svg], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `qr-${link.code}.svg`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  // Trend display
+  const trendPct = link.trendPct ?? null;
+  const hasTrend = trendPct !== null;
+
   return (
     <>
       <tr className="group border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
         {/* Checkbox */}
-        <td className="pl-4 pr-2 py-2.5 w-10">
+        <td className="pl-4 pr-2 py-2 w-8">
           <button
             onClick={() => onSelect(link.id)}
-            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-              selected
+            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${selected
                 ? "bg-[#03A9F4] border-[#03A9F4] text-white"
                 : "border-slate-300 hover:border-slate-400"
-            }`}
+              }`}
           >
             {selected && (
               <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -121,97 +152,88 @@ export function LinkTableRow({
           </button>
         </td>
 
-        {/* Title / Code + Original URL */}
-        <td className="py-2.5 pr-3 min-w-[200px]">
+        {/* Title + Original URL */}
+        <td className="py-2 pr-3 min-w-[160px] max-w-[220px]">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-slate-900 truncate">
               {link.title || `/${link.code}`}
             </p>
-            <p className="text-xs text-slate-400 truncate max-w-[360px]">
-              {link.originalUrl}
+            <p className="text-[11px] text-slate-400 truncate" title={link.originalUrl}>
+              {link.originalUrl.replace(/^https?:\/\/(www\.)?/, "").substring(0, 50)}
             </p>
           </div>
         </td>
 
         {/* Campaign */}
-        <td className="py-2.5 pr-3 whitespace-nowrap">
+        <td className="py-2.5 pr-3 max-w-[120px]">
           {link.utmCampaign ? (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium font-mono bg-violet-50 text-violet-700 border border-violet-100 max-w-[120px] truncate" title={link.utmCampaign}>
-              {link.utmCampaign}
-            </span>
+            <Badge label={link.utmCampaign} variant="campaign" />
           ) : (
-            <span className="text-xs text-slate-300">—</span>
+            <span className="text-[11px] text-slate-300">—</span>
           )}
         </td>
 
         {/* Short URL + Copy */}
-        <td className="py-2.5 pr-3 whitespace-nowrap">
-          <div className="flex items-center gap-1.5">
-            <code className="text-sm text-[#03A9F4] font-medium">/{link.code}</code>
+        <td className="py-2 pr-3 whitespace-nowrap">
+          <div className="flex items-center gap-1">
+            <code className="text-[11px] text-[#03A9F4] font-medium">/{link.code}</code>
             <button
               onClick={copyToClipboard}
               className="p-1 rounded hover:bg-slate-100 transition-colors"
               title={t("copyLink")}
             >
               {copied ? (
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                <Check className="w-3 h-3 text-emerald-600" />
               ) : (
-                <Copy className="w-3.5 h-3.5 text-slate-400" />
+                <Copy className="w-3 h-3 text-slate-400" />
               )}
             </button>
           </div>
         </td>
 
         {/* Tags */}
-        <td className="py-2.5 pr-3">
+        <td className="py-2 pr-3 max-w-[100px]">
           {link.tags && link.tags.length > 0 && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-wrap">
               {link.tags.slice(0, 2).map(({ tag }) => (
-                <span
-                  key={tag.id}
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 max-w-[80px] truncate"
-                  style={tag.color ? { backgroundColor: tag.color + "20", color: tag.color } : undefined}
-                >
-                  {tag.name}
-                </span>
+                <Badge key={tag.id} label={tag.name} variant="tag" color={tag.color} />
               ))}
               {link.tags.length > 2 && (
-                <span className="text-xs text-slate-400">+{link.tags.length - 2}</span>
+                <span className="text-[10px] text-slate-400">+{link.tags.length - 2}</span>
               )}
             </div>
           )}
         </td>
 
         {/* Status */}
-        <td className="py-2.5 pr-3 whitespace-nowrap">
+        <td className="py-2 pr-3 whitespace-nowrap">
           <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
-            <span className={`w-1.5 h-1.5 rounded-full ${statusDot}`} />
+            <StatusDot status={link.status} />
             {statusLabel}
           </span>
         </td>
 
-        {/* Clicks */}
-        <td className="py-2.5 pr-3 text-right whitespace-nowrap">
+        {/* Clicks + 7d trend */}
+        <td className="py-2 pr-3 text-right whitespace-nowrap">
           <span className="text-sm font-medium text-slate-900 tabular-nums">
             {link._count.clicks.toLocaleString()}
           </span>
-        </td>
-
-        {/* Created */}
-        <td className="py-2.5 pr-3 text-right whitespace-nowrap">
-          <span className="text-xs text-slate-400 tabular-nums">
-            {new Date(link.createdAt).toLocaleDateString()}
-          </span>
+          {hasTrend && trendPct !== 0 && (
+            <div className={`flex items-center justify-end gap-0.5 text-[10px] font-medium ${trendPct! > 0 ? "text-emerald-600" : "text-red-500"}`}>
+              {trendPct! > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+              {Math.abs(trendPct!)}%
+            </div>
+          )}
         </td>
 
         {/* Actions */}
-        <td className="py-2.5 pr-4 text-right w-10">
+        <td className="py-2 pr-3 text-right w-10">
           <button
             ref={menuBtnRef}
             onClick={() => setShowMenu(!showMenu)}
-            className="p-1.5 rounded-md hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100"
+            className="p-1.5 rounded-md hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600"
           >
-            <MoreVertical className="w-4 h-4" />
+            <MoreVertical className="w-3.5 h-3.5" />
           </button>
 
           {showMenu && (
@@ -223,50 +245,50 @@ export function LinkTableRow({
               >
                 <Link
                   href={`/links/${link.id}`}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
                   onClick={() => setShowMenu(false)}
                 >
-                  <Edit className="w-4 h-4" />
+                  <Edit className="w-3.5 h-3.5" />
                   {t("editLink")}
                 </Link>
                 <Link
                   href={`/analytics?linkId=${link.id}`}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
                   onClick={() => setShowMenu(false)}
                 >
-                  <BarChart3 className="w-4 h-4" />
+                  <BarChart3 className="w-3.5 h-3.5" />
                   {t("menuAnalytics")}
                 </Link>
                 <button
                   onClick={() => { setShowQR(!showQR); setShowMenu(false); }}
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
                 >
-                  <QrCode className="w-4 h-4" />
+                  <QrCode className="w-3.5 h-3.5" />
                   {t("qrCode")}
                 </button>
                 <button
-                  onClick={() => { onClone?.(link.id); setShowMenu(false); }}
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  onClick={handleClone}
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
                 >
-                  <CopyPlus className="w-4 h-4" />
+                  <CopyPlus className="w-3.5 h-3.5" />
                   {t("clone")}
                 </button>
                 <button
                   onClick={toggleStatus}
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
                 >
                   {link.status === "ACTIVE" ? (
-                    <><Pause className="w-4 h-4" /> {t("menuPause")}</>
+                    <><Pause className="w-3.5 h-3.5" /> {t("menuPause")}</>
                   ) : (
-                    <><Play className="w-4 h-4" /> {t("menuActivate")}</>
+                    <><Play className="w-3.5 h-3.5" /> {t("menuActivate")}</>
                   )}
                 </button>
                 <hr className="my-1 border-slate-100" />
                 <button
                   onClick={handleDelete}
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
                   {t("menuDelete")}
                 </button>
               </div>
@@ -284,7 +306,7 @@ export function LinkTableRow({
                 <QRCodeCanvas
                   id={`qr-${link.id}`}
                   value={shortUrl}
-                  size={120}
+                  size={96}
                   level="H"
                   fgColor="#0F172A"
                   bgColor="#FFFFFF"
@@ -293,46 +315,26 @@ export function LinkTableRow({
                     src: "/icon.svg",
                     x: undefined,
                     y: undefined,
-                    height: 24,
-                    width: 24,
+                    height: 20,
+                    width: 20,
                     excavate: true,
                   }}
                 />
               </div>
-              <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center gap-3">
                 <button
-                  onClick={() => {
-                    const canvas = document.getElementById(`qr-${link.id}`) as HTMLCanvasElement;
-                    if (canvas) {
-                      const url = canvas.toDataURL("image/png");
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `qr-${link.code}.png`;
-                      a.click();
-                    }
-                  }}
-                  className="text-[#03A9F4] hover:text-[#0288D1] font-medium"
+                  onClick={() => downloadQR("png")}
+                  className="inline-flex items-center gap-1.5 text-sm text-[#03A9F4] hover:text-[#0288D1] font-medium"
                 >
+                  <Download className="w-3.5 h-3.5" />
                   {t("downloadPng")}
                 </button>
                 <span className="text-slate-300">|</span>
                 <button
-                  onClick={() => {
-                    const canvas = document.getElementById(`qr-${link.id}`) as HTMLCanvasElement;
-                    if (canvas) {
-                      const dataUrl = canvas.toDataURL("image/png");
-                      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="white"/><image href="${dataUrl}" width="200" height="200"/></svg>`;
-                      const blob = new Blob([svg], { type: "image/svg+xml" });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `qr-${link.code}.svg`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    }
-                  }}
-                  className="text-[#03A9F4] hover:text-[#0288D1] font-medium"
+                  onClick={() => downloadQR("svg")}
+                  className="inline-flex items-center gap-1.5 text-sm text-[#03A9F4] hover:text-[#0288D1] font-medium"
                 >
+                  <Download className="w-3.5 h-3.5" />
                   {t("downloadSvg")}
                 </button>
               </div>

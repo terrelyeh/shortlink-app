@@ -32,9 +32,10 @@ interface UTMBuilderProps {
   values: UTMParams;
   onChange: (values: UTMParams) => void;
   originalUrl: string;
+  campaignLocked?: boolean; // When a Campaign entity is selected, lock the campaign field
 }
 
-export function UTMBuilder({ values, onChange, originalUrl }: UTMBuilderProps) {
+export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UTMBuilderProps) {
   const t = useTranslations("utm");
   const [templates, setTemplates] = useState<UTMTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
@@ -271,13 +272,23 @@ export function UTMBuilder({ values, onChange, originalUrl }: UTMBuilderProps) {
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
             {t("campaign")}
+            {campaignLocked && (
+              <span className="ml-1.5 text-[10px] text-violet-500 font-normal bg-violet-50 px-1.5 py-0.5 rounded">
+                from Campaign
+              </span>
+            )}
           </label>
           <input
             type="text"
             value={values.utmCampaign}
             onChange={(e) => handleChange("utmCampaign", e.target.value)}
             placeholder={t("campaignPlaceholder")}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
+            readOnly={campaignLocked}
+            className={`w-full px-3 py-2 border rounded-lg ${
+              campaignLocked
+                ? "border-violet-200 bg-violet-50/50 text-violet-700 cursor-not-allowed"
+                : "border-slate-200 focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
+            }`}
           />
         </div>
 

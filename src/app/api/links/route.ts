@@ -75,6 +75,11 @@ export async function GET(request: NextRequest) {
       where.tags = { some: { tagId } };
     }
 
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+
     const [links, total] = await Promise.all([
       prisma.shortLink.findMany({
         where,
@@ -91,8 +96,35 @@ export async function GET(request: NextRequest) {
       prisma.shortLink.count({ where }),
     ]);
 
+    // Add 7d and prev-7d click counts for trend display
+    const linkIds = links.map((l: { id: string }) => l.id);
+    const [clicks7d, clicksPrev7d] = linkIds.length > 0
+      ? await Promise.all([
+        prisma.click.groupBy({
+          by: ["shortLinkId"],
+          where: { shortLinkId: { in: linkIds }, timestamp: { gte: sevenDaysAgo } },
+          _count: { _all: true },
+        }),
+        prisma.click.groupBy({
+          by: ["shortLinkId"],
+          where: { shortLinkId: { in: linkIds }, timestamp: { gte: fourteenDaysAgo, lt: sevenDaysAgo } },
+          _count: { _all: true },
+        }),
+      ])
+      : [[], []];
+
+    const clicks7dMap = new Map((clicks7d as { shortLinkId: string; _count: { _all: number } }[]).map((r) => [r.shortLinkId, r._count._all]));
+    const clicksPrev7dMap = new Map((clicksPrev7d as { shortLinkId: string; _count: { _all: number } }[]).map((r) => [r.shortLinkId, r._count._all]));
+
+    const enrichedLinks = links.map((link: { id: string }) => {
+      const c7 = clicks7dMap.get(link.id) ?? 0;
+      const cp = clicksPrev7dMap.get(link.id) ?? 0;
+      const trendPct = cp > 0 ? Math.round(((c7 - cp) / cp) * 100) : null;
+      return { ...link, clicksLast7d: c7, trendPct };
+    });
+
     return NextResponse.json({
-      links,
+      links: enrichedLinks,
       pagination: {
         page,
         limit,
@@ -162,15 +194,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // If campaignId is provided, fetch Campaign entity and auto-fill UTM values
+    let utmSource = validated.utmSource;
+    let utmMedium = validated.utmMedium;
+    let utmCampaign = validated.utmCampaign;
+    const utmContent = validated.utmContent;
+    const utmTerm = validated.utmTerm;
+
+    if (validated.campaignId) {
+      const campaign = await prisma.campaign.findUnique({
+        where: { id: validated.campaignId },
+        select: { name: true, defaultSource: true, defaultMedium: true },
+      });
+      if (campaign) {
+        // Campaign.name → utmCampaign (always sync)
+        utmCampaign = campaign.name;
+        // Use campaign defaults only if not explicitly provided
+        if (!utmSource && campaign.defaultSource) utmSource = campaign.defaultSource;
+        if (!utmMedium && campaign.defaultMedium) utmMedium = campaign.defaultMedium;
+      }
+    }
+
     // Build final URL with UTM parameters
     let finalUrl = validated.originalUrl;
-    if (validated.utmSource || validated.utmMedium || validated.utmCampaign) {
+    if (utmSource || utmMedium || utmCampaign) {
       const url = new URL(validated.originalUrl);
-      if (validated.utmSource) url.searchParams.set("utm_source", validated.utmSource);
-      if (validated.utmMedium) url.searchParams.set("utm_medium", validated.utmMedium);
-      if (validated.utmCampaign) url.searchParams.set("utm_campaign", validated.utmCampaign);
-      if (validated.utmContent) url.searchParams.set("utm_content", validated.utmContent);
-      if (validated.utmTerm) url.searchParams.set("utm_term", validated.utmTerm);
+      if (utmSource) url.searchParams.set("utm_source", utmSource);
+      if (utmMedium) url.searchParams.set("utm_medium", utmMedium);
+      if (utmCampaign) url.searchParams.set("utm_campaign", utmCampaign);
+      if (utmContent) url.searchParams.set("utm_content", utmContent);
+      if (utmTerm) url.searchParams.set("utm_term", utmTerm);
       finalUrl = url.toString();
     }
 
@@ -184,11 +237,11 @@ export async function POST(request: NextRequest) {
         redirectType: validated.redirectType,
         expiresAt: validated.expiresAt ? new Date(validated.expiresAt) : null,
         maxClicks: validated.maxClicks,
-        utmSource: validated.utmSource,
-        utmMedium: validated.utmMedium,
-        utmCampaign: validated.utmCampaign,
-        utmContent: validated.utmContent,
-        utmTerm: validated.utmTerm,
+        utmSource,
+        utmMedium,
+        utmCampaign,
+        utmContent,
+        utmTerm,
         createdById: session.user.id,
         workspaceId: workspaceId || undefined,
         groupId: validated.groupId,

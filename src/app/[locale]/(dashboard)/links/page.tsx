@@ -31,6 +31,8 @@ interface ShortLink {
   status: string;
   createdAt: string;
   utmCampaign?: string | null;
+  clicksLast7d?: number;
+  trendPct?: number | null;
   _count: { clicks: number };
   tags?: LinkTag[];
 }
@@ -45,8 +47,8 @@ interface Pagination {
 export default function LinksPage() {
   const t = useTranslations("links");
   const tCommon = useTranslations("common");
-  const searchParams = useSearchParams();
   const { success, error: toastError } = useToast();
+  const searchParams = useSearchParams();
 
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -223,9 +225,10 @@ export default function LinksPage() {
         body: JSON.stringify({ ids: Array.from(selectedIds), action: "delete" }),
       });
       if (response.ok) {
+        const count = selectedIds.size;
         setSelectedIds(new Set());
         fetchLinks(pagination?.page || 1);
-        success(`${selectedIds.size} link${selectedIds.size > 1 ? "s" : ""} deleted.`);
+        success(`${count} link${count > 1 ? "s" : ""} deleted.`);
       } else {
         toastError("Batch delete failed.");
       }
@@ -246,10 +249,11 @@ export default function LinksPage() {
         body: JSON.stringify({ ids: Array.from(selectedIds), action }),
       });
       if (response.ok) {
+        const count = selectedIds.size;
         setSelectedIds(new Set());
         fetchLinks(pagination?.page || 1);
         const label = action === "activate" ? "activated" : action === "pause" ? "paused" : "archived";
-        success(`${selectedIds.size} link${selectedIds.size > 1 ? "s" : ""} ${label}.`);
+        success(`${count} link${count > 1 ? "s" : ""} ${label}.`);
       } else {
         toastError("Batch action failed.");
       }
@@ -262,7 +266,7 @@ export default function LinksPage() {
 
   return (
     <div className="space-y-6">
-      {/* Delete confirmation modals */}
+      {/* Delete confirmation modals — rendered outside pagination so they always work */}
       <ConfirmDialog
         open={!!deleteConfirmId}
         title="Delete this link?"
@@ -347,11 +351,10 @@ export default function LinksPage() {
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                statusFilter === status
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${statusFilter === status
                   ? "bg-white text-slate-900 shadow-sm"
                   : "text-slate-600 hover:text-slate-900"
-              }`}
+                }`}
             >
               {status === "" ? tCommon("all") : status === "ACTIVE" ? t("active") : status === "PAUSED" ? t("paused") : t("archived")}
             </button>
@@ -495,11 +498,10 @@ export default function LinksPage() {
                   <th className="pl-4 pr-2 py-2.5 w-10">
                     <button
                       onClick={toggleSelectAll}
-                      className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                        selectedIds.size === links.length && links.length > 0
+                      className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${selectedIds.size === links.length && links.length > 0
                           ? "bg-[#03A9F4] border-[#03A9F4] text-white"
                           : "border-slate-300 hover:border-slate-400"
-                      }`}
+                        }`}
                     >
                       {selectedIds.size === links.length && links.length > 0 && (
                         <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -524,12 +526,9 @@ export default function LinksPage() {
                     {t("status")}
                   </th>
                   <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    {t("clicks")}
+                    {t("clicks")} <span className="text-[10px] normal-case font-normal text-slate-300">7d ↑↓</span>
                   </th>
-                  <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    {t("createdAt")}
-                  </th>
-                  <th className="py-2.5 pr-4 w-10" />
+                  <th className="py-2.5 pr-3 w-10" />
                 </tr>
               </thead>
               <tbody>
@@ -579,11 +578,10 @@ export default function LinksPage() {
                 <button
                   key={pageNum}
                   onClick={() => fetchLinks(pageNum)}
-                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                    pagination.page === pageNum
+                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${pagination.page === pageNum
                       ? "bg-[#03A9F4] text-white"
                       : "text-slate-600 hover:bg-slate-100"
-                  }`}
+                    }`}
                 >
                   {pageNum}
                 </button>

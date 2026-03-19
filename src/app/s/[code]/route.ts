@@ -128,58 +128,76 @@ export async function GET(
       }
     }
 
-    // Get request headers for tracking (headersList already fetched above for rate limiting)
+    // Redirect immediately — record click in the background (non-blocking)
+    const redirectStatus = shortLink.redirectType === "PERMANENT" ? 301 : 302;
+    const response = NextResponse.redirect(shortLink.originalUrl, redirectStatus);
+
+    // Fire-and-forget: record click after redirect response is sent
     const ip = clientIp;
     const userAgent = headersList.get("user-agent");
     const referrer = headersList.get("referer") || headersList.get("referrer");
-    const { device, os, browser } = parseUserAgent(userAgent);
 
-    // Record the click (skip bots and duplicate clicks)
-    try {
-      if (!isBot(userAgent)) {
-        const ipHashed = hashIP(ip);
-
-        // Check for duplicate clicks (same IP + same link within dedup window)
-        const dedupCutoff = new Date(Date.now() - DEDUP_WINDOW_SECONDS * 1000);
-        const recentClick = await prisma.click.findFirst({
-          where: {
-            shortLinkId: shortLink.id,
-            ipHash: ipHashed,
-            timestamp: { gte: dedupCutoff },
-          },
-          select: { id: true },
-        });
-
-        if (!recentClick) {
-          const geo = await lookupIP(ip);
-          if (!geo.country) {
-            console.warn(`[click] No geo data for IP (first 8 chars): ${ip.substring(0, 8)}..., code: ${code}`);
-          }
-          await prisma.click.create({
-            data: {
-              shortLinkId: shortLink.id,
-              ipHash: ipHashed,
-              userAgent,
-              referrer: referrer || null,
-              device,
-              os,
-              browser,
-              country: geo.country,
-              city: geo.city,
-            },
-          });
-        }
-      }
-    } catch (clickError) {
-      // Log but don't fail the redirect if click recording fails
-      console.error("Failed to record click:", clickError);
+    if (!isBot(userAgent)) {
+      const shortLinkId = shortLink.id;
+      // Use waitUntil-style pattern: don't await, let it run in background
+      recordClick({ shortLinkId, ip, userAgent, referrer, code }).catch((err) => {
+        console.error("Failed to record click:", err);
+      });
     }
 
-    // Redirect
-    const redirectStatus = shortLink.redirectType === "PERMANENT" ? 301 : 302;
-    return NextResponse.redirect(shortLink.originalUrl, redirectStatus);
+    return response;
   } catch (error) {
     console.error("Redirect error:", error);
     return NextResponse.redirect(new URL("/error", request.url));
   }
+}
+
+// Background click recording — extracted so redirect is not blocked
+async function recordClick({
+  shortLinkId,
+  ip,
+  userAgent,
+  referrer,
+  code,
+}: {
+  shortLinkId: string;
+  ip: string;
+  userAgent: string | null;
+  referrer: string | null;
+  code: string;
+}) {
+  const ipHashed = hashIP(ip);
+
+  // Dedup check
+  const dedupCutoff = new Date(Date.now() - DEDUP_WINDOW_SECONDS * 1000);
+  const recentClick = await prisma.click.findFirst({
+    where: {
+      shortLinkId,
+      ipHash: ipHashed,
+      timestamp: { gte: dedupCutoff },
+    },
+    select: { id: true },
+  });
+
+  if (recentClick) return;
+
+  const { device, os, browser } = parseUserAgent(userAgent);
+  const geo = await lookupIP(ip);
+  if (!geo.country) {
+    console.warn(`[click] No geo data for IP (first 8 chars): ${ip.substring(0, 8)}..., code: ${code}`);
+  }
+
+  await prisma.click.create({
+    data: {
+      shortLinkId,
+      ipHash: ipHashed,
+      userAgent,
+      referrer: referrer || null,
+      device,
+      os,
+      browser,
+      country: geo.country,
+      city: geo.city,
+    },
+  });
 }

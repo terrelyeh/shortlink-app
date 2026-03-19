@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ClicksChart } from "@/components/analytics/ClicksChart";
 import { PieChartComponent } from "@/components/analytics/PieChartComponent";
-import { MousePointerClick, Users, TrendingUp, Loader2, Link2, ChevronDown, X, Target, Globe, Megaphone, Download, ChevronRight, Share2, Copy, Check, Lock, Calendar, Tag } from "lucide-react";
+import { ShareModal } from "@/components/analytics/ShareModal";
+import { MousePointerClick, Users, TrendingUp, Loader2, Link2, ChevronDown, X, Target, Globe, Megaphone, Download, Share2, Tag } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
 import { useToast } from "@/components/ui/Toast";
@@ -121,15 +122,7 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Share Report modal state
-  const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [shareLinkId, setShareLinkId] = useState("");
-  const [sharePassword, setSharePassword] = useState("");
-  const [shareExpiresAt, setShareExpiresAt] = useState("");
-  const [shareLoading, setShareLoading] = useState(false);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [shareCopied, setShareCopied] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   // Fetch available tags once
   useEffect(() => {
@@ -209,44 +202,6 @@ export default function AnalyticsPage() {
     setSelectedLinkId(""); // Reset link selection when campaign changes
   };
 
-  const openShareModal = () => {
-    setShareLinkId(selectedLinkId || (links[0]?.id ?? ""));
-    setSharePassword("");
-    setShareExpiresAt("");
-    setShareUrl(null);
-    setShareModalOpen(true);
-  };
-
-  const handleCreateShare = async () => {
-    if (!shareLinkId) return;
-    setShareLoading(true);
-    try {
-      const body: Record<string, unknown> = { shortLinkId: shareLinkId };
-      if (sharePassword) body.password = sharePassword;
-      if (shareExpiresAt) body.expiresAt = new Date(shareExpiresAt).toISOString();
-      const response = await fetch("/api/share", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!response.ok) throw new Error("Failed");
-      const result = await response.json();
-      setShareUrl(result.shareUrl);
-      success("Share link created!");
-    } catch {
-      toastError("Failed to create share link.");
-    } finally {
-      setShareLoading(false);
-    }
-  };
-
-  const copyShareUrl = async () => {
-    if (!shareUrl) return;
-    await navigator.clipboard.writeText(shareUrl);
-    setShareCopied(true);
-    setTimeout(() => setShareCopied(false), 2000);
-  };
-
   const selectedLink = links.find(l => l.id === selectedLinkId);
 
   if (error) {
@@ -259,131 +214,14 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Share Report Modal */}
-      {shareModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !shareLoading && setShareModalOpen(false)} />
-          <div className="relative bg-white rounded-2xl shadow-xl border border-slate-200 p-6 max-w-md w-full mx-4 z-10">
-            <button
-              onClick={() => setShareModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-sky-100 flex items-center justify-center">
-                <Share2 className="w-5 h-5 text-[#03A9F4]" />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-slate-900">Share Analytics Report</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Generate a public link to share this report</p>
-              </div>
-            </div>
-
-            {shareUrl ? (
-              /* Success state */
-              <div className="space-y-4">
-                <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
-                  <p className="text-xs font-medium text-emerald-700 mb-1">Share link created</p>
-                  <p className="text-xs text-slate-600 break-all font-mono">{shareUrl}</p>
-                </div>
-                <button
-                  onClick={copyShareUrl}
-                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-                    shareCopied
-                      ? "bg-emerald-600 text-white"
-                      : "bg-[#03A9F4] hover:bg-[#0288D1] text-white"
-                  }`}
-                >
-                  {shareCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  {shareCopied ? "Copied!" : "Copy Share Link"}
-                </button>
-                <button
-                  onClick={() => { setShareUrl(null); setShareModalOpen(false); }}
-                  className="w-full px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
-                >
-                  Done
-                </button>
-              </div>
-            ) : (
-              /* Form state */
-              <div className="space-y-4">
-                {/* Link selector */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Link to share</label>
-                  <div className="relative">
-                    <select
-                      value={shareLinkId}
-                      onChange={(e) => setShareLinkId(e.target.value)}
-                      className="w-full appearance-none pl-8 pr-7 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
-                    >
-                      <option value="">Select a link...</option>
-                      {links.map((link) => (
-                        <option key={link.id} value={link.id}>
-                          /{link.code}{link.title ? ` — ${link.title}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                    <Link2 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                  </div>
-                </div>
-
-                {/* Password (optional) */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                    Password <span className="text-slate-400 font-normal">(optional)</span>
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type="password"
-                      value={sharePassword}
-                      onChange={(e) => setSharePassword(e.target.value)}
-                      placeholder="Leave blank for public access"
-                      className="w-full pl-8 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
-                    />
-                  </div>
-                </div>
-
-                {/* Expiry (optional) */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                    Expires at <span className="text-slate-400 font-normal">(optional)</span>
-                  </label>
-                  <div className="relative">
-                    <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type="datetime-local"
-                      value={shareExpiresAt}
-                      onChange={(e) => setShareExpiresAt(e.target.value)}
-                      className="w-full pl-8 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-2 pt-1">
-                  <button
-                    onClick={() => setShareModalOpen(false)}
-                    className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCreateShare}
-                    disabled={!shareLinkId || shareLoading}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#03A9F4] hover:bg-[#0288D1] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {shareLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
-                    {shareLoading ? "Creating..." : "Create Share Link"}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Share Report Modal (extracted component) */}
+      <ShareModal
+        isOpen={shareOpen}
+        onClose={() => setShareOpen(false)}
+        linkId={selectedLinkId || undefined}
+        campaignFilter={selectedCampaign || undefined}
+        dateRange={range}
+      />
 
       {/* Header */}
       <PageHeader
@@ -392,7 +230,7 @@ export default function AnalyticsPage() {
         actions={
           <div className="flex items-center gap-2">
             <button
-              onClick={openShareModal}
+              onClick={() => setShareOpen(true)}
               className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
             >
               <Share2 className="w-4 h-4" />
@@ -417,11 +255,10 @@ export default function AnalyticsPage() {
             <button
               key={r.value}
               onClick={() => setRange(r.value)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                range === r.value
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${range === r.value
                   ? "bg-white text-slate-900 shadow-sm"
                   : "text-slate-600 hover:text-slate-900"
-              }`}
+                }`}
             >
               {t(r.labelKey)}
             </button>
@@ -596,11 +433,10 @@ export default function AnalyticsPage() {
                       <td className="py-2.5 pr-4 text-right">
                         <button
                           onClick={() => setSelectedLinkId(link.id)}
-                          className={`text-xs font-medium px-2.5 py-1 rounded-lg transition-colors ${
-                            selectedLinkId === link.id
+                          className={`text-xs font-medium px-2.5 py-1 rounded-lg transition-colors ${selectedLinkId === link.id
                               ? "bg-[#03A9F4] text-white"
                               : "text-[#03A9F4] hover:bg-sky-50"
-                          }`}
+                            }`}
                         >
                           {selectedLinkId === link.id ? t("viewing") : t("viewDetails")}
                         </button>
@@ -620,7 +456,7 @@ export default function AnalyticsPage() {
         </div>
       ) : data ? (
         <>
-          {/* Anchor Nav */}
+          {/* Anchor Nav — updated order */}
           <div className="flex items-center gap-1 pb-2 border-b border-slate-100">
             {[
               { id: "campaigns", label: t("sections.campaigns") },
@@ -774,7 +610,7 @@ export default function AnalyticsPage() {
                 </div>
               </div>
 
-              {/* Campaign × Source Table */}
+              {/* Campaign x Source Table */}
               {data.utm.campaignSource.length > 0 && (
                 <div className="bg-white rounded-xl border border-slate-100">
                   <div className="px-4 py-3 border-b border-slate-100">
@@ -817,7 +653,7 @@ export default function AnalyticsPage() {
                 </div>
               )}
 
-              {/* Campaign × Content Table */}
+              {/* Campaign x Content Table */}
               {data.utm.campaignContent.length > 0 && (
                 <div className="bg-white rounded-xl border border-slate-100">
                   <div className="px-4 py-3 border-b border-slate-100">

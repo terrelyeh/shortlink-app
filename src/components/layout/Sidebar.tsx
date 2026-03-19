@@ -113,11 +113,10 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                isActive
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${isActive
                   ? "bg-slate-700 text-white font-medium"
                   : "text-slate-300 hover:text-white hover:bg-slate-700/50"
-              }`}
+                }`}
               onClick={() => setMobileOpen(false)}
             >
               <span className={isActive ? "text-[#03A9F4]" : "text-slate-400"}>
@@ -156,11 +155,10 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
         </div>
         <Link
           href="/settings"
-          className={`flex items-center gap-2 w-full mt-2 px-3 py-2 text-sm rounded-lg transition-colors ${
-            pathname === "/settings"
+          className={`flex items-center gap-2 w-full mt-2 px-3 py-2 text-sm rounded-lg transition-colors ${pathname === "/settings"
               ? "text-white bg-slate-700"
               : "text-slate-400 hover:text-white hover:bg-slate-700/50"
-          }`}
+            }`}
           onClick={() => setMobileOpen(false)}
         >
           <Settings className="w-4 h-4" />
@@ -197,9 +195,8 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
 
       {/* Mobile sidebar */}
       <aside
-        className={`lg:hidden fixed inset-y-0 left-0 w-72 z-50 transform transition-transform duration-300 ease-out ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`lg:hidden fixed inset-y-0 left-0 w-72 z-50 transform transition-transform duration-300 ease-out ${mobileOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <button
           onClick={() => setMobileOpen(false)}

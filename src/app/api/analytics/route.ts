@@ -79,7 +79,6 @@ export async function GET(request: NextRequest) {
     if (linkId) {
       whereClicks.shortLinkId = linkId;
     } else {
-      // Get user's links
       const userLinks = await prisma.shortLink.findMany({
         where: whereLinks,
         select: { id: true },
@@ -87,17 +86,63 @@ export async function GET(request: NextRequest) {
       whereClicks.shortLinkId = { in: userLinks.map((l: { id: string }) => l.id) };
     }
 
-    // Get total clicks
-    const totalClicks = await prisma.click.count({ where: whereClicks });
+    // ============================================
+    // Parallel queries for better performance
+    // ============================================
 
-    // Calculate previous period for comparison
     const periodMs = now.getTime() - startDate.getTime();
     const prevStartDate = new Date(startDate.getTime() - periodMs);
     const prevWhereClicks: Record<string, unknown> = {
       ...whereClicks,
       timestamp: { gte: prevStartDate, lt: startDate },
     };
-    const prevTotalClicks = await prisma.click.count({ where: prevWhereClicks });
+
+    const [
+      totalClicks,
+      prevTotalClicks,
+      uniqueVisitors,
+      deviceStats,
+      browserStats,
+      osStats,
+      referrerStats,
+      countryStats,
+    ] = await Promise.all([
+      prisma.click.count({ where: whereClicks }),
+      prisma.click.count({ where: prevWhereClicks }),
+      prisma.click.groupBy({
+        by: ["ipHash"],
+        where: whereClicks,
+      }),
+      prisma.click.groupBy({
+        by: ["device"],
+        where: whereClicks,
+        _count: true,
+      }),
+      prisma.click.groupBy({
+        by: ["browser"],
+        where: whereClicks,
+        _count: true,
+      }),
+      prisma.click.groupBy({
+        by: ["os"],
+        where: whereClicks,
+        _count: true,
+      }),
+      prisma.click.groupBy({
+        by: ["referrer"],
+        where: { ...whereClicks, referrer: { not: null } },
+        _count: true,
+        orderBy: { _count: { referrer: "desc" } },
+        take: 10,
+      }),
+      prisma.click.groupBy({
+        by: ["country"],
+        where: { ...whereClicks, country: { not: null } },
+        _count: true,
+        orderBy: { _count: { country: "desc" } },
+        take: 10,
+      }),
+    ]);
 
     // Calculate percentage change
     let clicksChange = 0;
@@ -107,103 +152,58 @@ export async function GET(request: NextRequest) {
       clicksChange = 100;
     }
 
-    // Get unique visitors (by IP hash)
-    const uniqueVisitors = await prisma.click.groupBy({
-      by: ["ipHash"],
-      where: whereClicks,
-    });
+    // ============================================
+    // Clicks by day & hour — use raw SQL for proper date truncation
+    // instead of groupBy({ by: ["timestamp"] }) which returns every row
+    // ============================================
 
-    // Get clicks by day using Prisma's groupBy instead of raw SQL
-    const clicksByDayRaw = await prisma.click.groupBy({
-      by: ["timestamp"],
-      where: whereClicks,
-      _count: true,
-    });
+    const clicksByDayRaw = await prisma.$queryRaw<{ date: string; count: bigint }[]>`
+      SELECT DATE("timestamp") as date, COUNT(*)::bigint as count
+      FROM clicks
+      WHERE "short_link_id" IN (
+        SELECT unnest(${(whereClicks.shortLinkId as { in: string[] }).in || (linkId ? [linkId] : [])}::text[])
+      )
+      AND "timestamp" >= ${startDate}
+      AND "timestamp" <= ${endDate}
+      GROUP BY DATE("timestamp")
+      ORDER BY date ASC
+    `;
 
-    // Aggregate by date
-    const clicksByDayMap = new Map<string, number>();
-    clicksByDayRaw.forEach((c: { timestamp: Date; _count: number }) => {
-      const dateStr = c.timestamp.toISOString().split("T")[0];
-      clicksByDayMap.set(dateStr, (clicksByDayMap.get(dateStr) || 0) + c._count);
-    });
+    const clicksByDay = clicksByDayRaw.map((row) => ({
+      date: typeof row.date === 'string' ? row.date : new Date(row.date).toISOString().split("T")[0],
+      clicks: Number(row.count),
+    }));
 
-    const clicksByDay = Array.from(clicksByDayMap.entries())
-      .map(([date, count]) => ({ date, count }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    const clicksByHourRaw = await prisma.$queryRaw<{ hour: number; count: bigint }[]>`
+      SELECT EXTRACT(HOUR FROM "timestamp")::int as hour, COUNT(*)::bigint as count
+      FROM clicks
+      WHERE "short_link_id" IN (
+        SELECT unnest(${(whereClicks.shortLinkId as { in: string[] }).in || (linkId ? [linkId] : [])}::text[])
+      )
+      AND "timestamp" >= ${startDate}
+      AND "timestamp" <= ${endDate}
+      GROUP BY EXTRACT(HOUR FROM "timestamp")
+      ORDER BY hour ASC
+    `;
 
-    // Get device distribution
-    const deviceStats = await prisma.click.groupBy({
-      by: ["device"],
-      where: whereClicks,
-      _count: true,
-    });
-
-    // Get browser distribution
-    const browserStats = await prisma.click.groupBy({
-      by: ["browser"],
-      where: whereClicks,
-      _count: true,
-    });
-
-    // Get OS distribution
-    const osStats = await prisma.click.groupBy({
-      by: ["os"],
-      where: whereClicks,
-      _count: true,
-    });
-
-    // Get top referrers
-    const referrerStats = await prisma.click.groupBy({
-      by: ["referrer"],
-      where: {
-        ...whereClicks,
-        referrer: { not: null },
-      },
-      _count: true,
-      orderBy: { _count: { referrer: "desc" } },
-      take: 10,
-    });
-
-    // Get clicks by hour distribution (0-23)
-    const clicksByHourRaw = await prisma.click.groupBy({
-      by: ["timestamp"],
-      where: whereClicks,
-      _count: true,
-    });
-
-    // Aggregate by hour of day
+    // Fill all 24 hours
     const clicksByHourMap = new Map<number, number>();
-    for (let h = 0; h < 24; h++) {
-      clicksByHourMap.set(h, 0);
-    }
-    clicksByHourRaw.forEach((c: { timestamp: Date; _count: number }) => {
-      const hour = c.timestamp.getHours();
-      clicksByHourMap.set(hour, (clicksByHourMap.get(hour) || 0) + c._count);
+    for (let h = 0; h < 24; h++) clicksByHourMap.set(h, 0);
+    clicksByHourRaw.forEach((row) => {
+      clicksByHourMap.set(row.hour, Number(row.count));
     });
-
     const clicksByHour = Array.from(clicksByHourMap.entries())
       .sort((a, b) => a[0] - b[0])
       .map(([hour, clicks]) => ({ hour, clicks }));
 
-    // Get country distribution
-    const countryStats = await prisma.click.groupBy({
-      by: ["country"],
-      where: {
-        ...whereClicks,
-        country: { not: null },
-      },
-      _count: true,
-      orderBy: { _count: { country: "desc" } },
-      take: 10,
-    });
+    // ============================================
+    // Top performing links
+    // ============================================
 
-    // Get top performing links
     const topLinks = await prisma.shortLink.findMany({
       where: whereLinks,
       include: {
-        _count: {
-          select: { clicks: true },
-        },
+        _count: { select: { clicks: true } },
       },
       orderBy: {
         clicks: { _count: "desc" },
@@ -212,10 +212,9 @@ export async function GET(request: NextRequest) {
     });
 
     // ============================================
-    // UTM Analytics
+    // UTM Analytics — use _count instead of loading all click objects
     // ============================================
 
-    // Get all links with UTM parameters and their click counts
     const linksWithUTM = await prisma.shortLink.findMany({
       where: {
         ...whereLinks,
@@ -225,108 +224,68 @@ export async function GET(request: NextRequest) {
           { utmMedium: { not: null } },
         ],
       },
-      include: {
-        clicks: {
-          where: {
-            timestamp: { gte: startDate },
+      select: {
+        id: true,
+        utmCampaign: true,
+        utmSource: true,
+        utmMedium: true,
+        utmContent: true,
+        _count: {
+          select: {
+            clicks: {
+              where: { timestamp: { gte: startDate, lte: endDate } },
+            },
           },
-          select: { id: true },
         },
       },
     });
 
-    // Campaign breakdown: Campaign → Clicks
+    // Aggregate UTM data
     const campaignMap = new Map<string, number>();
-    // Source breakdown: Source → Clicks
     const sourceMap = new Map<string, number>();
-    // Medium breakdown: Medium → Clicks
     const mediumMap = new Map<string, number>();
-    // Campaign × Source: "campaign|source" → Clicks
     const campaignSourceMap = new Map<string, { campaign: string; source: string; clicks: number }>();
-    // Campaign × Content: "campaign|content" → Clicks
     const campaignContentMap = new Map<string, { campaign: string; content: string; clicks: number }>();
 
-    linksWithUTM.forEach((link: { utmCampaign: string | null; utmSource: string | null; utmMedium: string | null; utmContent: string | null; clicks: { id: string }[] }) => {
-      const clickCount = link.clicks.length;
+    linksWithUTM.forEach((link) => {
+      const clickCount = link._count.clicks;
 
-      // Campaign breakdown
       if (link.utmCampaign) {
-        campaignMap.set(
-          link.utmCampaign,
-          (campaignMap.get(link.utmCampaign) || 0) + clickCount
-        );
+        campaignMap.set(link.utmCampaign, (campaignMap.get(link.utmCampaign) || 0) + clickCount);
       }
-
-      // Source breakdown
       if (link.utmSource) {
-        sourceMap.set(
-          link.utmSource,
-          (sourceMap.get(link.utmSource) || 0) + clickCount
-        );
+        sourceMap.set(link.utmSource, (sourceMap.get(link.utmSource) || 0) + clickCount);
       }
-
-      // Medium breakdown
       if (link.utmMedium) {
-        mediumMap.set(
-          link.utmMedium,
-          (mediumMap.get(link.utmMedium) || 0) + clickCount
-        );
+        mediumMap.set(link.utmMedium, (mediumMap.get(link.utmMedium) || 0) + clickCount);
       }
 
-      // Campaign × Source
       if (link.utmCampaign && link.utmSource) {
         const key = `${link.utmCampaign}|${link.utmSource}`;
         const existing = campaignSourceMap.get(key);
         if (existing) {
           existing.clicks += clickCount;
         } else {
-          campaignSourceMap.set(key, {
-            campaign: link.utmCampaign,
-            source: link.utmSource,
-            clicks: clickCount,
-          });
+          campaignSourceMap.set(key, { campaign: link.utmCampaign, source: link.utmSource, clicks: clickCount });
         }
       }
 
-      // Campaign × Content
       if (link.utmCampaign && link.utmContent) {
         const key = `${link.utmCampaign}|${link.utmContent}`;
         const existing = campaignContentMap.get(key);
         if (existing) {
           existing.clicks += clickCount;
         } else {
-          campaignContentMap.set(key, {
-            campaign: link.utmCampaign,
-            content: link.utmContent,
-            clicks: clickCount,
-          });
+          campaignContentMap.set(key, { campaign: link.utmCampaign, content: link.utmContent, clicks: clickCount });
         }
       }
     });
 
-    // Convert maps to sorted arrays
-    const utmCampaigns = Array.from(campaignMap.entries())
-      .map(([name, clicks]) => ({ name, clicks }))
-      .sort((a, b) => b.clicks - a.clicks)
-      .slice(0, 10);
-
-    const utmSources = Array.from(sourceMap.entries())
-      .map(([name, clicks]) => ({ name, clicks }))
-      .sort((a, b) => b.clicks - a.clicks)
-      .slice(0, 10);
-
-    const utmMediums = Array.from(mediumMap.entries())
-      .map(([name, clicks]) => ({ name, clicks }))
-      .sort((a, b) => b.clicks - a.clicks)
-      .slice(0, 10);
-
-    const utmCampaignSource = Array.from(campaignSourceMap.values())
-      .sort((a, b) => b.clicks - a.clicks)
-      .slice(0, 15);
-
-    const utmCampaignContent = Array.from(campaignContentMap.values())
-      .sort((a, b) => b.clicks - a.clicks)
-      .slice(0, 15);
+    const sortAndSlice = (map: Map<string, number>, limit = 10) =>
+      Array.from(map.entries())
+        .map(([name, clicks]) => ({ name, clicks }))
+        .sort((a, b) => b.clicks - a.clicks)
+        .slice(0, limit);
 
     return NextResponse.json({
       summary: {
@@ -334,10 +293,8 @@ export async function GET(request: NextRequest) {
         uniqueVisitors: uniqueVisitors.length,
         clicksChange,
       },
-      clicksByDay: clicksByDay.map((d) => ({
-        date: d.date,
-        clicks: d.count,
-      })),
+      clicksByDay,
+      clicksByHour,
       devices: deviceStats.map((d: { device: string | null; _count: number }) => ({
         name: d.device || "Unknown",
         value: d._count,
@@ -365,13 +322,12 @@ export async function GET(request: NextRequest) {
         originalUrl: l.originalUrl,
         clicks: l._count.clicks,
       })),
-      // UTM Analytics
       utm: {
-        campaigns: utmCampaigns,
-        sources: utmSources,
-        mediums: utmMediums,
-        campaignSource: utmCampaignSource,
-        campaignContent: utmCampaignContent,
+        campaigns: sortAndSlice(campaignMap),
+        sources: sortAndSlice(sourceMap),
+        mediums: sortAndSlice(mediumMap),
+        campaignSource: Array.from(campaignSourceMap.values()).sort((a, b) => b.clicks - a.clicks).slice(0, 15),
+        campaignContent: Array.from(campaignContentMap.values()).sort((a, b) => b.clicks - a.clicks).slice(0, 15),
       },
     });
   } catch (error) {

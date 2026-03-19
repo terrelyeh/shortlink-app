@@ -12,71 +12,61 @@ export async function generateMetadata() {
   };
 }
 
-// Get real stats from database
+// Get real stats from database — optimized to avoid N+1 queries
 async function getDashboardStats(userId: string, userRole: string) {
   const isAdminOrManager = userRole === "ADMIN" || userRole === "MANAGER";
   const whereClause = isAdminOrManager ? { deletedAt: null } : { createdById: userId, deletedAt: null };
 
-  // Get total links and active links
-  const [totalLinks, activeLinks, pausedLinks] = await Promise.all([
-    prisma.shortLink.count({ where: whereClause }),
-    prisma.shortLink.count({ where: { ...whereClause, status: "ACTIVE" } }),
-    prisma.shortLink.count({ where: { ...whereClause, status: "PAUSED" } }),
-  ]);
-
-  // Get click stats for last 30 days
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
   const sixtyDaysAgo = new Date();
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-
-  // Get today's clicks
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  // Get link IDs for the user
-  const userLinks = await prisma.shortLink.findMany({
-    where: whereClause,
-    select: { id: true },
-  });
-  const linkIds = userLinks.map((l: { id: string }) => l.id);
+  // Use subquery-based click counts instead of fetching all link IDs then IN-querying
+  const clickWhere = isAdminOrManager
+    ? { shortLink: { deletedAt: null } }
+    : { shortLink: { deletedAt: null, createdById: userId } };
 
-  // Current period clicks (last 30 days), previous period, today, and unique visitors
-  const [currentPeriodClicks, previousPeriodClicks, todayClicks, uniqueVisitors] = await Promise.all([
-    linkIds.length > 0 ? prisma.click.count({
-      where: {
-        shortLinkId: { in: linkIds },
-        timestamp: { gte: thirtyDaysAgo },
-      },
-    }) : 0,
-    linkIds.length > 0 ? prisma.click.count({
-      where: {
-        shortLinkId: { in: linkIds },
-        timestamp: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
-      },
-    }) : 0,
-    linkIds.length > 0 ? prisma.click.count({
-      where: {
-        shortLinkId: { in: linkIds },
-        timestamp: { gte: todayStart },
-      },
-    }) : 0,
-    linkIds.length > 0 ? prisma.click.groupBy({
-      by: ['ipHash'],
-      where: {
-        shortLinkId: { in: linkIds },
-        timestamp: { gte: thirtyDaysAgo },
-      },
-    }).then((results: { ipHash: string | null }[]) => results.length) : 0,
+  // All independent queries in parallel
+  const [
+    totalLinks,
+    activeLinks,
+    pausedLinks,
+    currentPeriodClicks,
+    previousPeriodClicks,
+    todayClicks,
+    uniqueVisitors,
+    activeCampaignCount,
+  ] = await Promise.all([
+    prisma.shortLink.count({ where: whereClause }),
+    prisma.shortLink.count({ where: { ...whereClause, status: "ACTIVE" } }),
+    prisma.shortLink.count({ where: { ...whereClause, status: "PAUSED" } }),
+    prisma.click.count({
+      where: { ...clickWhere, timestamp: { gte: thirtyDaysAgo } },
+    }),
+    prisma.click.count({
+      where: { ...clickWhere, timestamp: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
+    }),
+    prisma.click.count({
+      where: { ...clickWhere, timestamp: { gte: todayStart } },
+    }),
+    prisma.click.groupBy({
+      by: ["ipHash"],
+      where: { ...clickWhere, timestamp: { gte: thirtyDaysAgo } },
+    }).then((results: { ipHash: string | null }[]) => results.length),
+    // Count distinct utmCampaign values on active links
+    prisma.shortLink.groupBy({
+      by: ["utmCampaign"],
+      where: { ...whereClause, status: "ACTIVE", utmCampaign: { not: null } },
+    }).then((results: { utmCampaign: string | null }[]) => results.length),
   ]);
 
-  // Calculate trend
   const clicksTrend = previousPeriodClicks > 0
     ? ((currentPeriodClicks - previousPeriodClicks) / previousPeriodClicks) * 100
     : 0;
 
-  // Calculate avg clicks per link
   const avgClicksPerLink = activeLinks > 0 ? Math.round(currentPeriodClicks / activeLinks) : 0;
 
   return {
@@ -88,6 +78,7 @@ async function getDashboardStats(userId: string, userRole: string) {
     pausedLinks,
     avgClicksPerLink,
     clicksTrend: Math.round(clicksTrend * 10) / 10,
+    activeCampaignCount,
   };
 }
 
@@ -362,7 +353,7 @@ export default async function DashboardPage() {
             <span className="text-xs font-medium text-slate-500">{t("totalClicks")}</span>
           </div>
           <p className="text-3xl font-semibold text-slate-900">{stats.totalClicks.toLocaleString()}</p>
-          <div className="flex items-center gap-2 mt-1.5">
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {stats.clicksTrend !== 0 && (
               <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${stats.clicksTrend >= 0 ? "text-emerald-600" : "text-red-500"}`}>
                 {stats.clicksTrend >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
@@ -370,7 +361,10 @@ export default async function DashboardPage() {
               </span>
             )}
             {stats.todayClicks > 0 && (
-              <span className="text-xs text-slate-400">{t("todayCount", { count: stats.todayClicks })}</span>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-sky-50 text-[#03A9F4] text-xs font-semibold rounded-full border border-sky-100">
+                <Zap className="w-3 h-3" />
+                +{stats.todayClicks} {t("todayLabel") || "today"}
+              </span>
             )}
           </div>
         </div>
@@ -467,14 +461,12 @@ export default async function DashboardPage() {
                 <Link
                   key={link.id}
                   href={`/links/${link.id}`}
-                  className={`flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group ${
-                    index > 0 ? "border-t border-slate-100" : ""
-                  }`}
+                  className={`flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group ${index > 0 ? "border-t border-slate-100" : ""
+                    }`}
                 >
                   {/* Rank badge */}
-                  <span className={`w-6 h-6 rounded-md text-xs font-semibold flex items-center justify-center shrink-0 ${
-                    index === 0 ? "bg-sky-50 text-[#03A9F4]" : index === 1 ? "bg-slate-100 text-slate-500" : "bg-slate-50 text-slate-400"
-                  }`}>
+                  <span className={`w-6 h-6 rounded-md text-xs font-semibold flex items-center justify-center shrink-0 ${index === 0 ? "bg-sky-50 text-[#03A9F4]" : index === 1 ? "bg-slate-100 text-slate-500" : "bg-slate-50 text-slate-400"
+                    }`}>
                     {index + 1}
                   </span>
 
@@ -530,9 +522,8 @@ export default async function DashboardPage() {
                 <Link
                   key={link.id}
                   href={`/links/${link.id}`}
-                  className={`flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group ${
-                    index > 0 ? "border-t border-slate-100" : ""
-                  }`}
+                  className={`flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group ${index > 0 ? "border-t border-slate-100" : ""
+                    }`}
                 >
                   {/* Status dot + info */}
                   <div className="flex-1 min-w-0">
@@ -598,9 +589,8 @@ export default async function DashboardPage() {
             {topCampaigns.map((campaign: { name: string; linkCount: number; clickCount: number; sources: string[]; mediums: string[] }, index: number) => (
               <div
                 key={campaign.name}
-                className={`flex items-center gap-4 px-4 py-3 hover:bg-slate-50/50 transition-colors ${
-                  index > 0 ? "border-t border-slate-50" : ""
-                }`}
+                className={`flex items-center gap-4 px-4 py-3 hover:bg-slate-50/50 transition-colors ${index > 0 ? "border-t border-slate-50" : ""
+                  }`}
               >
                 <div className="flex-1 min-w-0">
                   <span className="inline-flex items-center px-2 py-0.5 bg-violet-50 text-violet-700 border border-violet-100 rounded-md text-sm font-medium font-mono truncate max-w-full">
