@@ -31,16 +31,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async signIn({ user, account }) {
-      // Optional: Restrict to specific email domain
-      const allowedDomain = process.env.ALLOWED_EMAIL_DOMAIN;
-      if (allowedDomain && user.email) {
-        const emailDomain = user.email.split("@")[1];
-        if (emailDomain !== allowedDomain) {
-          return false;
-        }
-      }
-      return true;
+    async signIn({ user }) {
+      // Optional: Restrict to a specific email whitelist
+      // Set ALLOWED_EMAILS="a@x.com,b@y.com" — leave empty to allow any Google account.
+      const raw = process.env.ALLOWED_EMAILS;
+      if (!raw) return true;
+
+      const whitelist = raw
+        .split(",")
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean);
+
+      if (whitelist.length === 0) return true;
+      if (!user.email) return false;
+
+      return whitelist.includes(user.email.toLowerCase());
     },
     async session({ session, user }) {
       if (session.user) {

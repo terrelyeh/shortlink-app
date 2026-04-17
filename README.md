@@ -131,7 +131,7 @@ cp .env.example .env
 - `DATABASE_URL` - PostgreSQL 連線字串
 - `AUTH_SECRET` - 執行 `openssl rand -base64 32` 產生
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - 從 Google Cloud Console 取得
-- `ALLOWED_EMAIL_DOMAIN` - （選填）限制登入網域
+- `ALLOWED_EMAILS` - （選填）Email 白名單，逗號分隔，例 `a@x.com,b@y.com`
 
 4. 初始化資料庫：
 ```bash
@@ -187,7 +187,7 @@ Zeabur 提供簡單的一鍵部署，並內建 PostgreSQL 服務。
 | `NEXT_PUBLIC_APP_URL` | 你的 Zeabur 網域，例如 `https://your-app.zeabur.app` |
 | `NEXT_PUBLIC_SHORT_URL` | 短網址基底，例如 `https://your-app.zeabur.app/s` |
 | `IP_HASH_SALT` | 任意隨機字串，用於 IP 匿名化 |
-| `ALLOWED_EMAIL_DOMAIN` | （選填）限制可登入的 Email 網域 |
+| `ALLOWED_EMAILS` | （選填）Email 白名單，逗號分隔 |
 
 #### 步驟 5：設定網域
 
@@ -355,7 +355,7 @@ src/
 | `NEXT_PUBLIC_APP_URL` | 是 | 應用程式 URL |
 | `NEXT_PUBLIC_SHORT_URL` | 是 | 短網址基底 URL |
 | `IP_HASH_SALT` | 是 | IP 位址雜湊鹽值 |
-| `ALLOWED_EMAIL_DOMAIN` | 否 | 限制登入網域 |
+| `ALLOWED_EMAILS` | 否 | Email 白名單（逗號分隔） |
 
 ---
 
