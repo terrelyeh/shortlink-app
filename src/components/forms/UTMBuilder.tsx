@@ -8,7 +8,7 @@ import {
   isCustomSourceAllowed,
   normalizeSource,
 } from "@/lib/utils/utm";
-import { ChevronDown, FileText, Loader2, AlertCircle, Info } from "lucide-react";
+import { ChevronDown, FileText, Loader2, AlertCircle, Info, X } from "lucide-react";
 
 /** Hover tooltip with an info icon — explains the field's purpose inline. */
 function FieldHint({ text }: { text: string }) {
@@ -216,7 +216,18 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
               className="w-full px-3 py-2 pr-9 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] bg-white"
               autoComplete="off"
             />
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            {values.utmMedium ? (
+              <button
+                type="button"
+                onClick={() => handleChange("utmMedium", "")}
+                aria-label="Clear medium"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            )}
             <datalist id="utm-medium-options">
               {UTM_MEDIUMS.map((medium) => (
                 <option key={medium} value={medium} />
@@ -254,7 +265,18 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
                     : "border-slate-200 bg-white"
               }`}
             />
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            {values.utmSource && values.utmMedium ? (
+              <button
+                type="button"
+                onClick={() => handleChange("utmSource", "")}
+                aria-label="Clear source"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            )}
             <datalist id="utm-source-options">
               {availableSources.map((source) => (
                 <option key={source} value={source} />

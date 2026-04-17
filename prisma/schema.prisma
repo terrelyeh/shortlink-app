@@ -59,6 +59,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
   @@map("accounts")
 }
 
@@ -70,6 +71,7 @@ model Session {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("sessions")
 }
 
@@ -158,6 +160,7 @@ model WorkspaceInvitation {
   @@index([workspaceId])
   @@index([email])
   @@index([token])
+  @@index([invitedById])
   @@map("workspace_invitations")
 }
 
@@ -221,6 +224,8 @@ model ShortLink {
   @@index([createdAt])
   @@index([deletedAt])
   @@index([workspaceId, status])
+  @@index([campaignId])
+  @@index([groupId])
   @@map("short_links")
 }
 
@@ -288,6 +293,7 @@ model TagOnLink {
   tag       Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([shortLinkId, tagId])
+  @@index([tagId])
   @@map("tags_on_links")
 }
 
@@ -356,6 +362,7 @@ model TagOnCampaign {
   tag      CampaignTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([campaignId, tagId])
+  @@index([tagId])
   @@map("tags_on_campaigns")
 }
 
@@ -402,6 +409,7 @@ model ShareToken {
   shortLink ShortLink @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
 
   @@index([token])
+  @@index([shortLinkId])
   @@map("share_tokens")
 }
 
