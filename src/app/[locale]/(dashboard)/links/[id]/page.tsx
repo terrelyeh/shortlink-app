@@ -6,6 +6,7 @@ import { useRouter } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 import { UTMBuilder } from "@/components/forms/UTMBuilder";
 import { TagInput } from "@/components/tags/TagInput";
+import { useToast } from "@/components/ui/Toast";
 import {
   ArrowLeft,
   Link2,
@@ -63,13 +64,13 @@ export default function EditLinkPage() {
   const tErrors = useTranslations("errors");
   const tCampaigns = useTranslations("campaigns");
   const tUtm = useTranslations("utm");
+  const toast = useToast();
 
   const linkId = params.id as string;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   // Form state
   const [originalUrl, setOriginalUrl] = useState("");
@@ -217,7 +218,6 @@ export default function EditLinkPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSuccess(false);
 
     if (!originalUrl) {
       setError(tErrors("required"));
@@ -259,11 +259,12 @@ export default function EditLinkPage() {
         throw new Error(data.error || "Failed to update link");
       }
 
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      // Toast shows on the /links page after redirect (survives navigation
+      // because <ToastProvider> lives in the shared dashboard layout).
+      toast.success(t("updateSuccess"));
+      router.push("/links");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update link");
-    } finally {
       setSaving(false);
     }
   };
@@ -317,13 +318,6 @@ export default function EditLinkPage() {
               <span className="text-sm">{error}</span>
             </div>
           )}
-          {success && (
-            <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-700">
-              <CheckCircle className="w-5 h-5 shrink-0" />
-              <span className="text-sm">{t("updateSuccess")}</span>
-            </div>
-          )}
-
           {/* Original URL */}
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">

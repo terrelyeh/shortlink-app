@@ -7,6 +7,7 @@ import { UTMBuilder } from "./UTMBuilder";
 import { Link2, ChevronDown, ChevronUp, Loader2, Settings2, Target, AlertCircle, CheckCircle, Megaphone, Clock, Tag, Check, X as XIcon } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
 import { TagInput } from "@/components/tags/TagInput";
+import { useToast } from "@/components/ui/Toast";
 
 interface TagOption {
   id: string;
@@ -59,6 +60,7 @@ export function CreateLinkForm() {
   const tErrors = useTranslations("errors");
   const tCampaigns = useTranslations("campaigns");
   const tUtm = useTranslations("utm");
+  const toast = useToast();
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -256,6 +258,7 @@ export function CreateLinkForm() {
 
       // Use replace to prevent the form page from being in browser history
       // This ensures clean navigation back to links list
+      toast.success(t("createSuccess"));
       router.replace("/links");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create link");

@@ -119,6 +119,7 @@
     "cloneSuccess": "Link cloned successfully",
     "editLink": "Edit Link",
     "updateSuccess": "Link updated successfully",
+    "createSuccess": "Link created successfully",
     "titleLabel": "Title",
     "titlePlaceholder": "Optional title for this link",
     "sortNewest": "Newest",
