@@ -9,6 +9,7 @@ import { LinkTableRow } from "@/components/links/LinkTableRow";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import { Plus, Search, Loader2, Link2, Layers, ChevronLeft, ChevronRight, Tag, Trash2, Pause, Play, Archive, Download, ArrowUpDown, Check, ChevronDown } from "lucide-react";
 import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
 
@@ -476,10 +477,7 @@ export default function LinksPage() {
 
       {/* Links Table */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 animate-spin text-slate-400 mb-2" />
-          <p className="text-sm text-slate-500">{tCommon("loading")}</p>
-        </div>
+        <TableSkeleton rows={6} columns={5} />
       ) : links.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-100">
           <EmptyState
