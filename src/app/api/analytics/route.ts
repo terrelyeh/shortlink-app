@@ -97,6 +97,11 @@ export async function GET(request: NextRequest) {
       timestamp: { gte: prevStartDate, lt: startDate },
     };
 
+    // Stable shortLinkId list for raw SQL (Prisma can't parameterise $queryRaw `IN (...)` directly)
+    const shortLinkIds =
+      (whereClicks.shortLinkId as { in: string[] } | undefined)?.in ??
+      (linkId ? [linkId] : []);
+
     const [
       totalClicks,
       prevTotalClicks,
@@ -106,6 +111,10 @@ export async function GET(request: NextRequest) {
       osStats,
       referrerStats,
       countryStats,
+      clicksByDayRaw,
+      clicksByHourRaw,
+      topLinks,
+      linksWithUTM,
     ] = await Promise.all([
       prisma.click.count({ where: whereClicks }),
       prisma.click.count({ where: prevWhereClicks }),
@@ -142,6 +151,55 @@ export async function GET(request: NextRequest) {
         orderBy: { _count: { country: "desc" } },
         take: 10,
       }),
+      // Raw SQL — proper date truncation instead of groupBy per timestamp
+      prisma.$queryRaw<{ date: string; count: bigint }[]>`
+        SELECT DATE("timestamp") as date, COUNT(*)::bigint as count
+        FROM clicks
+        WHERE "short_link_id" IN (SELECT unnest(${shortLinkIds}::text[]))
+          AND "timestamp" >= ${startDate}
+          AND "timestamp" <= ${endDate}
+        GROUP BY DATE("timestamp")
+        ORDER BY date ASC
+      `,
+      prisma.$queryRaw<{ hour: number; count: bigint }[]>`
+        SELECT EXTRACT(HOUR FROM "timestamp")::int as hour, COUNT(*)::bigint as count
+        FROM clicks
+        WHERE "short_link_id" IN (SELECT unnest(${shortLinkIds}::text[]))
+          AND "timestamp" >= ${startDate}
+          AND "timestamp" <= ${endDate}
+        GROUP BY EXTRACT(HOUR FROM "timestamp")
+        ORDER BY hour ASC
+      `,
+      prisma.shortLink.findMany({
+        where: whereLinks,
+        include: { _count: { select: { clicks: true } } },
+        orderBy: { clicks: { _count: "desc" } },
+        take: 10,
+      }),
+      prisma.shortLink.findMany({
+        where: {
+          ...whereLinks,
+          OR: [
+            { utmCampaign: { not: null } },
+            { utmSource: { not: null } },
+            { utmMedium: { not: null } },
+          ],
+        },
+        select: {
+          id: true,
+          utmCampaign: true,
+          utmSource: true,
+          utmMedium: true,
+          utmContent: true,
+          _count: {
+            select: {
+              clicks: {
+                where: { timestamp: { gte: startDate, lte: endDate } },
+              },
+            },
+          },
+        },
+      }),
     ]);
 
     // Calculate percentage change
@@ -152,39 +210,10 @@ export async function GET(request: NextRequest) {
       clicksChange = 100;
     }
 
-    // ============================================
-    // Clicks by day & hour — use raw SQL for proper date truncation
-    // instead of groupBy({ by: ["timestamp"] }) which returns every row
-    // ============================================
-
-    const clicksByDayRaw = await prisma.$queryRaw<{ date: string; count: bigint }[]>`
-      SELECT DATE("timestamp") as date, COUNT(*)::bigint as count
-      FROM clicks
-      WHERE "short_link_id" IN (
-        SELECT unnest(${(whereClicks.shortLinkId as { in: string[] }).in || (linkId ? [linkId] : [])}::text[])
-      )
-      AND "timestamp" >= ${startDate}
-      AND "timestamp" <= ${endDate}
-      GROUP BY DATE("timestamp")
-      ORDER BY date ASC
-    `;
-
     const clicksByDay = clicksByDayRaw.map((row) => ({
-      date: typeof row.date === 'string' ? row.date : new Date(row.date).toISOString().split("T")[0],
+      date: typeof row.date === "string" ? row.date : new Date(row.date).toISOString().split("T")[0],
       clicks: Number(row.count),
     }));
-
-    const clicksByHourRaw = await prisma.$queryRaw<{ hour: number; count: bigint }[]>`
-      SELECT EXTRACT(HOUR FROM "timestamp")::int as hour, COUNT(*)::bigint as count
-      FROM clicks
-      WHERE "short_link_id" IN (
-        SELECT unnest(${(whereClicks.shortLinkId as { in: string[] }).in || (linkId ? [linkId] : [])}::text[])
-      )
-      AND "timestamp" >= ${startDate}
-      AND "timestamp" <= ${endDate}
-      GROUP BY EXTRACT(HOUR FROM "timestamp")
-      ORDER BY hour ASC
-    `;
 
     // Fill all 24 hours
     const clicksByHourMap = new Map<number, number>();
@@ -195,50 +224,6 @@ export async function GET(request: NextRequest) {
     const clicksByHour = Array.from(clicksByHourMap.entries())
       .sort((a, b) => a[0] - b[0])
       .map(([hour, clicks]) => ({ hour, clicks }));
-
-    // ============================================
-    // Top performing links
-    // ============================================
-
-    const topLinks = await prisma.shortLink.findMany({
-      where: whereLinks,
-      include: {
-        _count: { select: { clicks: true } },
-      },
-      orderBy: {
-        clicks: { _count: "desc" },
-      },
-      take: 10,
-    });
-
-    // ============================================
-    // UTM Analytics — use _count instead of loading all click objects
-    // ============================================
-
-    const linksWithUTM = await prisma.shortLink.findMany({
-      where: {
-        ...whereLinks,
-        OR: [
-          { utmCampaign: { not: null } },
-          { utmSource: { not: null } },
-          { utmMedium: { not: null } },
-        ],
-      },
-      select: {
-        id: true,
-        utmCampaign: true,
-        utmSource: true,
-        utmMedium: true,
-        utmContent: true,
-        _count: {
-          select: {
-            clicks: {
-              where: { timestamp: { gte: startDate, lte: endDate } },
-            },
-          },
-        },
-      },
-    });
 
     // Aggregate UTM data
     const campaignMap = new Map<string, number>();
@@ -287,7 +272,8 @@ export async function GET(request: NextRequest) {
         .sort((a, b) => b.clicks - a.clicks)
         .slice(0, limit);
 
-    return NextResponse.json({
+    return NextResponse.json(
+      {
       summary: {
         totalClicks,
         uniqueVisitors: uniqueVisitors.length,
@@ -329,7 +315,16 @@ export async function GET(request: NextRequest) {
         campaignSource: Array.from(campaignSourceMap.values()).sort((a, b) => b.clicks - a.clicks).slice(0, 15),
         campaignContent: Array.from(campaignContentMap.values()).sort((a, b) => b.clicks - a.clicks).slice(0, 15),
       },
-    });
+    },
+      {
+        headers: {
+          // Cache on Vercel edge for 30s, serve stale up to 60s while revalidating.
+          // Analytics data is not real-time — short cache is fine and dramatically
+          // speeds up repeat views / tab switching.
+          "Cache-Control": "private, s-maxage=30, stale-while-revalidate=60",
+        },
+      }
+    );
   } catch (error) {
     console.error("Failed to fetch analytics:", error);
     return NextResponse.json(
