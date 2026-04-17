@@ -4,6 +4,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { cached, cacheKey } from "@/lib/cache";
 
 export async function generateMetadata() {
   const t = await getTranslations("dashboard");
@@ -263,14 +264,21 @@ export default async function DashboardPage() {
   const userId = session.user.id;
   const userRole = session.user.role;
 
-  // Fetch real data
-  const [stats, topLinks, recentLinks, topCampaigns, alerts] = await Promise.all([
-    getDashboardStats(userId, userRole),
-    getTopLinks(userId, userRole),
-    getRecentLinks(userId, userRole),
-    getTopCampaigns(userId, userRole),
-    getAlerts(userId, userRole),
-  ]);
+  // Cached for 60s in Redis — dashboard data is not real-time and these
+  // are the heaviest aggregations in the app. Miss latency is also still
+  // fast because the five queries run in parallel.
+  const [stats, topLinks, recentLinks, topCampaigns, alerts] = await cached(
+    cacheKey("dashboard", userId, userRole),
+    60,
+    () =>
+      Promise.all([
+        getDashboardStats(userId, userRole),
+        getTopLinks(userId, userRole),
+        getRecentLinks(userId, userRole),
+        getTopCampaigns(userId, userRole),
+        getAlerts(userId, userRole),
+      ]),
+  );
 
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
 

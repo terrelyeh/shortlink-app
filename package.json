@@ -14,6 +14,7 @@
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
     "@prisma/client": "^6.0.0",
+    "@upstash/redis": "^1.37.0",
     "bcryptjs": "^3.0.3",
     "lucide-react": "^0.562.0",
     "nanoid": "^3.3.11",
