@@ -158,7 +158,7 @@ export const UTM_MEDIUM_SOURCE_MAP: Record<UTMMedium, readonly string[]> =
       medium,
       opts.map((o) => o.value),
     ]),
-  ) as Record<UTMMedium, readonly string[]>;
+  ) as unknown as Record<UTMMedium, readonly string[]>;
 
 /**
  * Inline copy shown below the Source field when a medium is selected.
