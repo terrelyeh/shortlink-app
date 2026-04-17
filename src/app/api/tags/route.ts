@@ -31,7 +31,15 @@ export async function GET(request: NextRequest) {
       orderBy: { name: "asc" },
     });
 
-    return NextResponse.json({ tags });
+    return NextResponse.json(
+      { tags },
+      {
+        headers: {
+          // Tags rarely change — cache in browser for 60s, serve stale up to 5min while revalidating
+          "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
+        },
+      }
+    );
   } catch (error) {
     console.error("Failed to fetch tags:", error);
     return NextResponse.json({ error: "Failed to fetch tags" }, { status: 500 });

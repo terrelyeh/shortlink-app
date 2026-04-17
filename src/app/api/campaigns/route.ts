@@ -77,14 +77,22 @@ export async function GET(request: NextRequest) {
       orderBy: { name: "asc" },
     });
 
-    return NextResponse.json({
-      campaigns: campaigns.map((c: { id: string; name: string; description: string | null; createdAt: Date; tags: { tag: { id: string; name: string } }[]; _count: { links: number } }) => ({
-        ...c,
-        tags: c.tags.map((t: { tag: { id: string; name: string } }) => t.tag),
-        linkCount: c._count.links,
-      })),
-      tags: allTags,
-    });
+    return NextResponse.json(
+      {
+        campaigns: campaigns.map((c: { id: string; name: string; description: string | null; createdAt: Date; tags: { tag: { id: string; name: string } }[]; _count: { links: number } }) => ({
+          ...c,
+          tags: c.tags.map((t: { tag: { id: string; name: string } }) => t.tag),
+          linkCount: c._count.links,
+        })),
+        tags: allTags,
+      },
+      {
+        headers: {
+          // Campaigns change occasionally — 30s browser cache with 1min revalidate window
+          "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+        },
+      }
+    );
   } catch (error) {
     console.error("Failed to fetch campaigns:", error);
     return NextResponse.json({ error: "Failed to fetch campaigns" }, { status: 500 });

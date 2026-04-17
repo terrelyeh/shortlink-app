@@ -123,15 +123,25 @@ export async function GET(request: NextRequest) {
       return { ...link, clicksLast7d: c7, trendPct };
     });
 
-    return NextResponse.json({
-      links: enrichedLinks,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+    return NextResponse.json(
+      {
+        links: enrichedLinks,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
       },
-    });
+      {
+        headers: {
+          // Short 10s browser cache — enough to dedupe repeat fetches from
+          // tab switches and back-button, not long enough to show stale
+          // data after creating/deleting.
+          "Cache-Control": "private, max-age=10, stale-while-revalidate=30",
+        },
+      }
+    );
   } catch (error) {
     console.error("Failed to fetch links:", error);
     return NextResponse.json({ error: "Failed to fetch links" }, { status: 500 });

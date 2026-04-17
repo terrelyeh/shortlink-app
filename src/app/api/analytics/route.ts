@@ -318,10 +318,11 @@ export async function GET(request: NextRequest) {
     },
       {
         headers: {
-          // Cache on Vercel edge for 30s, serve stale up to 60s while revalidating.
-          // Analytics data is not real-time — short cache is fine and dramatically
-          // speeds up repeat views / tab switching.
-          "Cache-Control": "private, s-maxage=30, stale-while-revalidate=60",
+          // Browser cache 30s, serve stale up to 60s while revalidating.
+          // Analytics data is not real-time — short cache dramatically speeds up
+          // repeat views / tab switching. Use max-age (browser) because response
+          // is per-user; s-maxage would be ignored with `private`.
+          "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
         },
       }
     );
