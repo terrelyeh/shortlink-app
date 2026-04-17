@@ -4,7 +4,10 @@ import { useEffect, useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import {
   UTM_MEDIUMS,
+  UTM_MEDIUM_LABELS,
   getSourcesForMedium,
+  getSourceOptionsForMedium,
+  getMediumContext,
   isCustomSourceAllowed,
   normalizeSource,
 } from "@/lib/utils/utm";
@@ -79,11 +82,16 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
     fetchTemplates();
   }, []);
 
-  // Get available sources based on selected medium
-  const availableSources = useMemo(() => {
+  // Get available sources (with labels) based on selected medium
+  const availableSourceOptions = useMemo(() => {
     if (!values.utmMedium) return [];
-    return getSourcesForMedium(values.utmMedium);
+    return getSourceOptionsForMedium(values.utmMedium);
   }, [values.utmMedium]);
+
+  const mediumContext = useMemo(
+    () => (values.utmMedium ? getMediumContext(values.utmMedium) : null),
+    [values.utmMedium],
+  );
 
   // Check if current source is valid for selected medium
   const sourceWarning = useMemo(() => {
@@ -230,7 +238,13 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
             )}
             <datalist id="utm-medium-options">
               {UTM_MEDIUMS.map((medium) => (
-                <option key={medium} value={medium} />
+                <option
+                  key={medium}
+                  value={medium}
+                  label={UTM_MEDIUM_LABELS[medium]}
+                >
+                  {UTM_MEDIUM_LABELS[medium]}
+                </option>
               ))}
             </datalist>
           </div>
@@ -278,8 +292,12 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             )}
             <datalist id="utm-source-options">
-              {availableSources.map((source) => (
-                <option key={source} value={source} />
+              {availableSourceOptions.map((opt) => (
+                // Both `label` and inner text — maximises cross-browser support.
+                // Chrome/Safari render the label; Firefox falls back to inner text.
+                <option key={opt.value} value={opt.value} label={opt.label}>
+                  {opt.label}
+                </option>
               ))}
             </datalist>
           </div>
@@ -295,6 +313,19 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
             </p>
           )}
         </div>
+
+        {/* Medium context hint — orients the user on what to pick for source */}
+        {mediumContext && (
+          <div className="md:col-span-2 -mt-1 flex gap-2 p-3 bg-sky-50/60 border border-sky-100 rounded-lg">
+            <Info className="w-4 h-4 text-sky-500 mt-0.5 shrink-0" />
+            <div className="space-y-0.5 text-xs">
+              <p className="font-medium text-sky-900">{mediumContext.title}</p>
+              <p className="text-sky-700/80 leading-relaxed">
+                {mediumContext.tip}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* UTM Campaign */}
         <div>
