@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShortLink App — 環境變數設定指南</title>
+  <style>
+    :root {
+      --sky: #03A9F4;
+      --sky-dark: #0288D1;
+      --slate-50: #f8fafc;
+      --slate-100: #f1f5f9;
+      --slate-200: #e2e8f0;
+      --slate-300: #cbd5e1;
+      --slate-400: #94a3b8;
+      --slate-500: #64748b;
+      --slate-600: #475569;
+      --slate-700: #334155;
+      --slate-800: #1e293b;
+      --slate-900: #0f172a;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --violet: #8b5cf6;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      color: var(--slate-800);
+      background: var(--slate-50);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 6rem;
+    }
+
+    /* Header */
+    .hero {
+      text-align: center;
+      padding: 3rem 0 2rem;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: linear-gradient(135deg, var(--sky), var(--sky-dark));
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.35rem 1rem;
+      border-radius: 2rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .hero h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--slate-900);
+      margin-top: 1rem;
+      line-height: 1.3;
+    }
+    .hero p {
+      color: var(--slate-500);
+      margin-top: 0.5rem;
+      font-size: 1rem;
+    }
+
+    /* Where to set */
+    .where-box {
+      background: white;
+      border: 1px solid var(--slate-200);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      margin: 2rem 0;
+    }
+    .where-box h2 {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--slate-900);
+      margin-bottom: 0.75rem;
+    }
+    .where-box ol {
+      padding-left: 1.25rem;
+      color: var(--slate-600);
+      font-size: 0.9rem;
+    }
+    .where-box li { margin-bottom: 0.25rem; }
+    .where-box code {
+      background: var(--slate-100);
+      padding: 0.15rem 0.4rem;
+      border-radius: 0.25rem;
+      font-size: 0.8rem;
+      color: var(--sky-dark);
+    }
+
+    /* Env var cards */
+    .env-card {
+      background: white;
+      border: 1px solid var(--slate-200);
+      border-radius: 1rem;
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+    }
+    .env-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--slate-100);
+      cursor: pointer;
+      user-select: none;
+    }
+    .env-header:hover { background: var(--slate-50); }
+    .env-num {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: white;
+      flex-shrink: 0;
+    }
+    .env-header h3 {
+      flex: 1;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--slate-900);
+    }
+    .env-header h3 code {
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      color: var(--sky-dark);
+    }
+    .env-required {
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 0.2rem 0.5rem;
+      border-radius: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .env-required.required { background: #fef2f2; color: var(--red); }
+    .env-required.optional { background: var(--slate-100); color: var(--slate-500); }
+    .env-toggle {
+      width: 1.5rem;
+      height: 1.5rem;
+      color: var(--slate-400);
+      transition: transform 0.2s;
+    }
+    .env-card.open .env-toggle { transform: rotate(180deg); }
+    .env-body {
+      display: none;
+      padding: 1.5rem;
+    }
+    .env-card.open .env-body { display: block; }
+
+    /* Sections inside card */
+    .section {
+      margin-bottom: 1.5rem;
+    }
+    .section:last-child { margin-bottom: 0; }
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 0.2rem 0.6rem;
+      border-radius: 0.25rem;
+      margin-bottom: 0.5rem;
+    }
+    .section-label.what { background: #eff6ff; color: #2563eb; }
+    .section-label.why { background: #fefce8; color: #ca8a04; }
+    .section-label.how { background: #ecfdf5; color: #059669; }
+    .section-label.warn { background: #fef2f2; color: #dc2626; }
+
+    .section p, .section li {
+      font-size: 0.9rem;
+      color: var(--slate-600);
+      line-height: 1.7;
+    }
+    .section ul, .section ol {
+      padding-left: 1.25rem;
+      margin-top: 0.5rem;
+    }
+    .section li { margin-bottom: 0.35rem; }
+
+    /* Code blocks */
+    pre {
+      background: var(--slate-800);
+      color: #e2e8f0;
+      border-radius: 0.75rem;
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      margin: 0.75rem 0;
+    }
+    pre .comment { color: #64748b; }
+    pre .string { color: #86efac; }
+    pre .cmd { color: #7dd3fc; }
+
+    code {
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      background: var(--slate-100);
+      padding: 0.15rem 0.4rem;
+      border-radius: 0.25rem;
+      font-size: 0.8rem;
+      color: var(--sky-dark);
+    }
+
+    /* Warning boxes */
+    .warn-box {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.875rem 1rem;
+      border-radius: 0.75rem;
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+      line-height: 1.5;
+    }
+    .warn-box.danger { background: #fef2f2; border-left: 3px solid var(--red); color: #991b1b; }
+    .warn-box.caution { background: #fffbeb; border-left: 3px solid var(--amber); color: #92400e; }
+    .warn-box.tip { background: #ecfdf5; border-left: 3px solid var(--emerald); color: #065f46; }
+    .warn-icon { flex-shrink: 0; font-size: 1rem; }
+
+    /* Steps */
+    .steps {
+      counter-reset: step;
+      list-style: none;
+      padding: 0;
+      margin-top: 0.75rem;
+    }
+    .steps li {
+      counter-increment: step;
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+      align-items: flex-start;
+    }
+    .steps li::before {
+      content: counter(step);
+      width: 1.5rem;
+      height: 1.5rem;
+      border-radius: 50%;
+      background: var(--slate-100);
+      color: var(--slate-600);
+      font-size: 0.75rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+
+    /* Table */
+    .env-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+    }
+    .env-table th {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      background: var(--slate-50);
+      color: var(--slate-500);
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--slate-200);
+    }
+    .env-table td {
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--slate-100);
+      color: var(--slate-700);
+    }
+    .env-table tr:last-child td { border-bottom: none; }
+
+    /* Checklist */
+    .checklist {
+      background: white;
+      border: 1px solid var(--slate-200);
+      border-radius: 1rem;
+      overflow: hidden;
+      margin-top: 2rem;
+    }
+    .checklist-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--slate-100);
+    }
+    .checklist-header h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--slate-900);
+    }
+    .checklist-header p {
+      font-size: 0.85rem;
+      color: var(--slate-500);
+      margin-top: 0.25rem;
+    }
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1.5rem;
+      border-bottom: 1px solid var(--slate-50);
+      font-size: 0.9rem;
+    }
+    .checklist-item:last-child { border-bottom: none; }
+    .checklist-item input[type="checkbox"] {
+      width: 1.15rem;
+      height: 1.15rem;
+      accent-color: var(--sky);
+      flex-shrink: 0;
+    }
+    .checklist-item label { flex: 1; color: var(--slate-700); cursor: pointer; }
+    .checklist-item .source {
+      font-size: 0.75rem;
+      color: var(--slate-400);
+      white-space: nowrap;
+    }
+
+    /* Verify section */
+    .verify {
+      background: white;
+      border: 1px solid var(--slate-200);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      margin-top: 2rem;
+    }
+    .verify h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--slate-900);
+      margin-bottom: 1rem;
+    }
+    .verify-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.6rem 0;
+    }
+    .verify-num {
+      width: 1.5rem;
+      height: 1.5rem;
+      border-radius: 50%;
+      background: var(--sky);
+      color: white;
+      font-size: 0.7rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+    .verify-step p {
+      font-size: 0.9rem;
+      color: var(--slate-700);
+    }
+    .verify-step .check-var {
+      font-size: 0.75rem;
+      color: var(--slate-400);
+      margin-top: 0.15rem;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      margin-top: 3rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--slate-200);
+      color: var(--slate-400);
+      font-size: 0.8rem;
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 1.5rem 1rem 4rem; }
+      .hero h1 { font-size: 1.5rem; }
+      .env-header { padding: 1rem; }
+      .env-body { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Hero -->
+    <div class="hero">
+      <span class="hero-badge">Deployment Guide</span>
+      <h1>ShortLink App<br>環境變數設定指南</h1>
+      <p>部署至 Vercel Hobby Plan 所需的完整環境變數說明</p>
+    </div>
+
+    <!-- Where to set -->
+    <div class="where-box">
+      <h2>在 Vercel 哪裡設定？</h2>
+      <ol>
+        <li>登入 <a href="https://vercel.com/dashboard" target="_blank">Vercel Dashboard</a></li>
+        <li>選擇你的 ShortLink 專案</li>
+        <li>左側選 <code>Settings</code></li>
+        <li>點擊 <code>Environment Variables</code></li>
+        <li>逐一新增以下變數，Environment 選擇 <strong>Production + Preview + Development</strong></li>
+      </ol>
+    </div>
+
+    <!-- ENV 1: DATABASE_URL -->
+    <div class="env-card open" id="env-1">
+      <div class="env-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="env-num" style="background: var(--sky);">1</div>
+        <h3><code>DATABASE_URL</code></h3>
+        <span class="env-required required">必填</span>
+        <svg class="env-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <div class="env-body">
+        <div class="section">
+          <div class="section-label what">是什麼</div>
+          <p>PostgreSQL 資料庫的連線 URI。Prisma ORM 透過這個連線字串存取所有資料：使用者帳號、短網址、點擊記錄、Campaign 等。</p>
+        </div>
+        <div class="section">
+          <div class="section-label why">為什麼需要</div>
+          <p>這是整個應用的核心資料來源。沒有 <code>DATABASE_URL</code>，應用無法啟動，所有頁面都會回傳 500 錯誤。</p>
+        </div>
+        <div class="section">
+          <div class="section-label how">如何設定（Supabase）</div>
+          <ol class="steps">
+            <li>登入 <a href="https://supabase.com/dashboard" target="_blank">Supabase Dashboard</a></li>
+            <li>選擇你的 Project（或建立新的，區域選 <strong>ap-southeast-1</strong> 離台灣最近）</li>
+            <li>左側選 <strong>Project Settings</strong> → <strong>Database</strong></li>
+            <li>往下找到 <strong>Connection string</strong> 區塊，選 <strong>URI</strong> tab</li>
+            <li>複製整段連線字串，把 <code>[YOUR-PASSWORD]</code> 替換成 database password</li>
+          </ol>
+          <pre><span class="comment"># 格式範例</span>
+<span class="string">postgresql://postgres.[project-ref]:[password]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres</span></pre>
+          <p style="margin-top: 0.75rem;">首次部署後，需要推送 Schema 到資料庫：</p>
+          <pre><span class="cmd">npx prisma db push</span></pre>
+        </div>
+        <div class="section">
+          <div class="section-label warn">注意事項</div>
+          <div class="warn-box caution">
+            <span class="warn-icon">&#9888;</span>
+            <span><strong>使用 Transaction mode (port 6543)</strong> — Vercel serverless 環境請用 pooler 連線，不要用 direct connection，否則會很快耗盡連線數。</span>
+          </div>
+          <div class="warn-box danger">
+            <span class="warn-icon">&#9888;</span>
+            <span><strong>密碼只顯示一次</strong> — database password 只在建立時顯示，忘記的話需要在 Supabase Dashboard 重設。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ENV 2: AUTH_SECRET -->
+    <div class="env-card" id="env-2">
+      <div class="env-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="env-num" style="background: var(--violet);">2</div>
+        <h3><code>AUTH_SECRET</code></h3>
+        <span class="env-required required">必填</span>
+        <svg class="env-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <div class="env-body">
+        <div class="section">
+          <div class="section-label what">是什麼</div>
+          <p>NextAuth.js 用來加密 session token、CSRF token 和 cookie 的密鑰。一組隨機的 Base64 字串。</p>
+        </div>
+        <div class="section">
+          <div class="section-label why">為什麼需要</div>
+          <p>沒有 <code>AUTH_SECRET</code>，NextAuth 無法管理使用者登入狀態。使用者無法登入，所有受保護的 Dashboard 頁面都無法存取。</p>
+        </div>
+        <div class="section">
+          <div class="section-label how">如何設定</div>
+          <p>在終端機執行：</p>
+          <pre><span class="cmd">openssl rand -base64 32</span>
+
+<span class="comment"># 輸出範例：</span>
+<span class="string">K7x2Qf3mNp8Lj1Rv5Yt9Wz4Xa6Bc0De2Fg7Hi3Jk=</span></pre>
+          <p>把輸出直接貼到 Vercel 的 Value 欄位。</p>
+        </div>
+        <div class="section">
+          <div class="section-label warn">注意事項</div>
+          <div class="warn-box caution">
+            <span class="warn-icon">&#9888;</span>
+            <span><strong>更改會登出所有人</strong> — 如果你更換 AUTH_SECRET，所有使用者的 session 都會失效，需要重新登入。</span>
+          </div>
+          <div class="warn-box danger">
+            <span class="warn-icon">&#9888;</span>
+            <span><strong>不要用簡單字串</strong> — 一定要用 <code>openssl rand</code> 產生的隨機值，不要手打 "my-secret" 之類的。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ENV 3: GOOGLE OAuth -->
+    <div class="env-card" id="env-3">
+      <div class="env-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="env-num" style="background: var(--red);">3</div>
+        <h3><code>GOOGLE_CLIENT_ID</code> + <code>SECRET</code></h3>
+        <span class="env-required required">必填</span>
+        <svg class="env-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <div class="env-body">
+        <div class="section">
+          <div class="section-label what">是什麼</div>
+          <p>Google OAuth 2.0 的憑證，讓使用者可以用 Google 帳號登入。<code>CLIENT_ID</code> 是公開的識別碼，<code>CLIENT_SECRET</code> 是伺服器端的密鑰。</p>
+        </div>
+        <div class="section">
+          <div class="section-label why">為什麼需要</div>
+          <p>ShortLink 目前只支援 Google OAuth 登入。沒有這兩個值，登入按鈕會失效，使用者無法進入系統。</p>
+        </div>
+        <div class="section">
+          <div class="section-label how">如何設定</div>
+          <p><strong>Step 1 — 設定 OAuth Consent Screen（首次才需要）</strong></p>
+          <ol class="steps">
+            <li>前往 <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a>，選擇或建立 Project</li>
+            <li>左側 <strong>APIs &amp; Services</strong> → <strong>OAuth consent screen</strong></li>
+            <li>User Type 選 <strong>External</strong>，填寫 App name 和 email</li>
+            <li>其他全部跳過，一路 Save and Continue 到完成</li>
+          </ol>
+          <p style="margin-top: 1rem;"><strong>Step 2 — 建立 OAuth Client ID</strong></p>
+          <ol class="steps">
+            <li>左側 <strong>Credentials</strong> → <strong>+ CREATE CREDENTIALS</strong> → <strong>OAuth client ID</strong></li>
+            <li>Application type 選 <strong>Web application</strong></li>
+            <li><strong>Authorized JavaScript origins</strong> 加入你的 domain</li>
+            <li><strong>Authorized redirect URIs</strong> 加入（兩個都要）：</li>
+          </ol>
+          <pre><span class="comment"># 本地開發</span>
+<span class="string">http://localhost:3000/api/auth/callback/google</span>
+
+<span class="comment"># Vercel Production</span>
+<span class="string">https://你的專案名.vercel.app/api/auth/callback/google</span></pre>
+          <ol class="steps" start="5">
+            <li>點 <strong>Create</strong>，複製彈窗中的 <strong>Client ID</strong> 和 <strong>Client Secret</strong></li>
+          </ol>
+        </div>
+        <div class="section">
+          <div class="section-label warn">注意事項</div>
+          <div class="warn-box danger">
+            <span class="warn-icon">&#9888;</span>
+            <span><strong>Redirect URI 必須完全匹配</strong> — 包含 protocol、domain、path，少一個字元都會導致 "redirect_uri_mismatch" 錯誤。自訂 domain 也要另外加。</span>
+          </div>
+          <div class="warn-box caution">
+            <span class="warn-icon">&#9888;</span>
+            <span><strong>Testing 狀態限制</strong> — OAuth consent screen 在 "Testing" 時，只有手動加入的測試帳號能登入。要讓所有人登入，需要點 <strong>PUBLISH APP</strong>。</span>
+          </div>
+          <div class="warn-box danger">
+            <span class="warn-icon">&#9888;</span>
+            <span><strong>CLIENT_SECRET 不可外洩</strong> — 只能放在 Vercel 環境變數或 <code>.env.local</code>，絕對不要 commit 到 Git。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ENV 4: NEXT_PUBLIC_APP_URL -->
+    <div class="env-card" id="env-4">
+      <div class="env-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="env-num" style="background: var(--emerald);">4</div>
+        <h3><code>NEXT_PUBLIC_APP_URL</code></h3>
+        <span class="env-required required">必填</span>
+        <svg class="env-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <div class="env-body">
+        <div class="section">
+          <div class="section-label what">是什麼</div>
+          <p>應用的公開 URL，用於 NextAuth callback、email 連結等。<code>NEXT_PUBLIC_</code> 前綴表示會暴露在前端 JS 中。</p>
+        </div>
+        <div class="section">
+          <div class="section-label why">為什麼需要</div>
+          <p>NextAuth 需要知道完整 URL 才能正確處理 OAuth redirect。設錯會導致登入後 redirect 到錯誤網址。</p>
+        </div>
+        <div class="section">
+          <div class="section-label how">如何設定</div>
+          <table class="env-table">
+            <tr><th>環境</th><th>值</th></tr>
+            <tr><td>本地開發</td><td><code>http://localhost:3000</code></td></tr>
+            <tr><td>Vercel（預設）</td><td><code>https://你的專案名.vercel.app</code></td></tr>
+            <tr><td>自訂 domain</td><td><code>https://sl.mycompany.com</code></td></tr>
+          </table>
+        </div>
+        <div class="section">
+          <div class="section-label warn">注意事項</div>
+          <div class="warn-box tip">
+            <span class="warn-icon">&#128161;</span>
+            <span>不要加結尾斜線 <code>/</code>。必須包含 <code>https://</code> protocol。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ENV 5: NEXT_PUBLIC_SHORT_URL -->
+    <div class="env-card" id="env-5">
+      <div class="env-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="env-num" style="background: var(--emerald);">5</div>
+        <h3><code>NEXT_PUBLIC_SHORT_URL</code></h3>
+        <span class="env-required required">必填</span>
+        <svg class="env-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <div class="env-body">
+        <div class="section">
+          <div class="section-label what">是什麼</div>
+          <p>短網址在 UI 上顯示的完整前綴，也用於 QR Code 生成和複製連結功能。</p>
+        </div>
+        <div class="section">
+          <div class="section-label why">為什麼需要</div>
+          <p>使用者在 Dashboard 看到的短網址如 <code>sl.mycompany.com/s/abc123</code>，其中 <code>sl.mycompany.com/s</code> 部分就來自這個變數。不設定的話 UI 會顯示預設佔位符。</p>
+        </div>
+        <div class="section">
+          <div class="section-label how">如何設定</div>
+          <table class="env-table">
+            <tr><th>環境</th><th>值</th></tr>
+            <tr><td>本地開發</td><td><code>http://localhost:3000/s</code></td></tr>
+            <tr><td>Vercel（預設）</td><td><code>https://你的專案名.vercel.app/s</code></td></tr>
+            <tr><td>自訂 domain</td><td><code>https://sl.mycompany.com/s</code></td></tr>
+          </table>
+        </div>
+        <div class="section">
+          <div class="section-label warn">注意事項</div>
+          <div class="warn-box tip">
+            <span class="warn-icon">&#128161;</span>
+            <span>結尾不加 <code>/</code>。必須包含 <code>/s</code> 路徑，因為所有短網址都在 <code>/s/[code]</code> 路徑下。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ENV 6: IP_HASH_SALT -->
+    <div class="env-card" id="env-6">
+      <div class="env-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="env-num" style="background: var(--slate-700);">6</div>
+        <h3><code>IP_HASH_SALT</code></h3>
+        <span class="env-required required">必填</span>
+        <svg class="env-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <div class="env-body">
+        <div class="section">
+          <div class="section-label what">是什麼</div>
+          <p>一組隨機的 hex 字串，用來對使用者 IP 做 SHA-256 雜湊。系統不儲存原始 IP，只儲存雜湊值，用於點擊去重和獨立訪客計算。</p>
+        </div>
+        <div class="section">
+          <div class="section-label why">為什麼需要</div>
+          <p><strong>隱私保護</strong> — GDPR 等隱私法規要求不能直接儲存 IP。加了 salt 的 SHA-256 雜湊可以：判斷同 IP 是否重複點擊（去重）、計算獨立訪客數，但無法反推原始 IP。</p>
+        </div>
+        <div class="section">
+          <div class="section-label how">如何設定</div>
+          <pre><span class="cmd">openssl rand -hex 32</span>
+
+<span class="comment"># 輸出範例：</span>
+<span class="string">a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2</span></pre>
+        </div>
+        <div class="section">
+          <div class="section-label warn">注意事項</div>
+          <div class="warn-box danger">
+            <span class="warn-icon">&#9888;</span>
+            <span><strong>Production 必填</strong> — 沒設定的話，點擊記錄功能會報錯。Redirect 本身仍正常，但不會有任何分析數據。</span>
+          </div>
+          <div class="warn-box danger">
+            <span class="warn-icon">&#9888;</span>
+            <span><strong>設定後不要更改</strong> — Salt 改了之後同一個 IP 會產生不同的 hash，導致去重失效、獨立訪客數突然暴增。</span>
+          </div>
+          <div class="warn-box danger">
+            <span class="warn-icon">&#9888;</span>
+            <span><strong>不可外洩</strong> — 如果 salt 洩漏，攻擊者可以用彩虹表反推 IP 地址。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ENV 7: ALLOWED_EMAIL_DOMAIN -->
+    <div class="env-card" id="env-7">
+      <div class="env-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="env-num" style="background: var(--amber);">7</div>
+        <h3><code>ALLOWED_EMAIL_DOMAIN</code></h3>
+        <span class="env-required optional">選填</span>
+        <svg class="env-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <div class="env-body">
+        <div class="section">
+          <div class="section-label what">是什麼</div>
+          <p>限制只有特定 email 網域的 Google 帳號才能登入。例如設成 <code>mycompany.com</code>，只有 <code>xxx@mycompany.com</code> 的帳號能登入。</p>
+        </div>
+        <div class="section">
+          <div class="section-label why">為什麼需要</div>
+          <p>如果你的 ShortLink 是公司內部工具，不想讓外部人員用個人 Gmail 登入，就需要這個限制。<strong>不設定 = 所有 Google 帳號都能登入。</strong></p>
+        </div>
+        <div class="section">
+          <div class="section-label how">如何設定</div>
+          <pre><span class="comment"># 只填 domain，不要加 @</span>
+<span class="string">mycompany.com</span></pre>
+        </div>
+        <div class="section">
+          <div class="section-label warn">注意事項</div>
+          <div class="warn-box caution">
+            <span class="warn-icon">&#9888;</span>
+            <span><strong>設錯 domain 會鎖死所有人</strong> — 確認拼寫正確。設錯需要到 Vercel Dashboard 修改後重新部署。</span>
+          </div>
+          <div class="warn-box tip">
+            <span class="warn-icon">&#128161;</span>
+            <span>目前只支援單一 domain。如果需要多 domain 支援，需修改程式碼 <code>src/lib/auth.ts</code>。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Checklist -->
+    <div class="checklist">
+      <div class="checklist-header">
+        <h2>Quick Checklist</h2>
+        <p>逐一勾選，確保所有必填變數都已設定</p>
+      </div>
+      <div class="checklist-item">
+        <input type="checkbox" id="c1"><label for="c1"><code>DATABASE_URL</code></label>
+        <span class="source">Supabase Dashboard</span>
+      </div>
+      <div class="checklist-item">
+        <input type="checkbox" id="c2"><label for="c2"><code>AUTH_SECRET</code></label>
+        <span class="source">openssl rand -base64 32</span>
+      </div>
+      <div class="checklist-item">
+        <input type="checkbox" id="c3"><label for="c3"><code>GOOGLE_CLIENT_ID</code></label>
+        <span class="source">Google Cloud Console</span>
+      </div>
+      <div class="checklist-item">
+        <input type="checkbox" id="c4"><label for="c4"><code>GOOGLE_CLIENT_SECRET</code></label>
+        <span class="source">Google Cloud Console</span>
+      </div>
+      <div class="checklist-item">
+        <input type="checkbox" id="c5"><label for="c5"><code>NEXT_PUBLIC_APP_URL</code></label>
+        <span class="source">你的 Vercel URL</span>
+      </div>
+      <div class="checklist-item">
+        <input type="checkbox" id="c6"><label for="c6"><code>NEXT_PUBLIC_SHORT_URL</code></label>
+        <span class="source">你的 Vercel URL + /s</span>
+      </div>
+      <div class="checklist-item">
+        <input type="checkbox" id="c7"><label for="c7"><code>IP_HASH_SALT</code></label>
+        <span class="source">openssl rand -hex 32</span>
+      </div>
+      <div class="checklist-item">
+        <input type="checkbox" id="c8"><label for="c8"><code>ALLOWED_EMAIL_DOMAIN</code> <span style="color: var(--slate-400);">(選填)</span></label>
+        <span class="source">自行決定</span>
+      </div>
+    </div>
+
+    <!-- Verify -->
+    <div class="verify">
+      <h2>部署後驗證</h2>
+      <p style="font-size: 0.85rem; color: var(--slate-500); margin-bottom: 1rem;">設定完所有環境變數並部署後，依序檢查：</p>
+      <div class="verify-step">
+        <div class="verify-num">1</div>
+        <div><p>首頁能載入</p><p class="check-var">驗證 DATABASE_URL</p></div>
+      </div>
+      <div class="verify-step">
+        <div class="verify-num">2</div>
+        <div><p>能用 Google 登入</p><p class="check-var">驗證 AUTH_SECRET + GOOGLE_CLIENT_* + NEXT_PUBLIC_APP_URL</p></div>
+      </div>
+      <div class="verify-step">
+        <div class="verify-num">3</div>
+        <div><p>Dashboard 顯示正常</p><p class="check-var">驗證資料庫連線正常</p></div>
+      </div>
+      <div class="verify-step">
+        <div class="verify-num">4</div>
+        <div><p>建立一條短網址並點擊</p><p class="check-var">驗證 IP_HASH_SALT</p></div>
+      </div>
+      <div class="verify-step">
+        <div class="verify-num">5</div>
+        <div><p>Analytics 有顯示點擊記錄</p><p class="check-var">驗證完整流程正常運作</p></div>
+      </div>
+      <div class="verify-step">
+        <div class="verify-num">6</div>
+        <div><p>UI 上短網址顯示正確的 domain</p><p class="check-var">驗證 NEXT_PUBLIC_SHORT_URL</p></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      ShortLink App &mdash; Environment Setup Guide<br>
+      Generated for Vercel Hobby Plan deployment
+    </div>
+  </div>
+</body>
+</html>
