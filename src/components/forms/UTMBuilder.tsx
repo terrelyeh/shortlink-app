@@ -316,18 +316,19 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
         {/* Campaign — the most important field on this form. Promoted to
             full-width and the first position so new users clock it first. */}
         <div className="md:col-span-2">
-          <div className="flex items-start gap-3 mb-2 p-3 bg-violet-50 border border-violet-100 rounded-lg">
-            <Megaphone className="w-4 h-4 text-violet-500 mt-0.5 shrink-0" />
-            <div className="text-xs leading-relaxed">
-              <p className="font-medium text-violet-900">
+          <details className="group mb-2 bg-violet-50 border border-violet-100 rounded-lg">
+            <summary className="flex items-center gap-2 p-3 cursor-pointer list-none">
+              <Megaphone className="w-4 h-4 text-violet-500 shrink-0" />
+              <span className="text-xs font-medium text-violet-900 flex-1">
                 Campaign 是這條 link 的管理依據
-              </p>
-              <p className="text-violet-700/80 mt-0.5">
-                這個值決定 link 之後歸到哪個活動 — 影響 Campaigns
-                列表、目標追蹤、和跨活動比較。留空的 link 只會出現在孤兒區。
-              </p>
-            </div>
-          </div>
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-violet-500 transition-transform group-open:rotate-180 shrink-0" />
+            </summary>
+            <p className="px-3 pb-3 pl-9 text-xs text-violet-700/80 leading-relaxed">
+              這個值決定 link 之後歸到哪個活動 — 影響 Campaigns
+              列表、目標追蹤、和跨活動比較。留空的 link 只會出現在孤兒區。
+            </p>
+          </details>
           <label className="flex items-center text-sm font-medium text-slate-700 mb-1">
             {t("campaign")}
             {campaignLocked && (
