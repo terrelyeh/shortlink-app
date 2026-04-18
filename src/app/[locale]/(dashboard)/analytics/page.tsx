@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import {
+  computeAnalytics,
+  type RawAnalyticsData,
+} from "@/lib/analytics/compute";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ClicksChart } from "@/components/analytics/ClicksChart";
@@ -119,11 +123,8 @@ export default function AnalyticsPage() {
   const [tags, setTags] = useState<TagOption[]>([]);
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(true);
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  // Two loading states — first-ever load (show skeleton) vs filter change
-  // (keep previous data visible with a subtle "updating" hint).
+  // `data` is now derived via useMemo below (see computeAnalytics call)
   const [loading, setLoading] = useState(true);
-  const [isRefetching, setIsRefetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
 
@@ -143,70 +144,72 @@ export default function AnalyticsPage() {
     fetchTags();
   }, []);
 
-  // Fetch links for the selector (filtered by campaign/tag when selected)
-  useEffect(() => {
-    async function fetchLinks() {
-      setLoadingLinks(true);
-      try {
-        const params = new URLSearchParams({ limit: "100" });
-        if (selectedCampaign) params.set("campaign", selectedCampaign);
-        const response = await fetch(`/api/links?${params}`);
-        if (response.ok) {
-          const data = await response.json();
-          setLinks(data.links || []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch links:", err);
-      } finally {
-        setLoadingLinks(false);
-      }
-    }
-    fetchLinks();
-  }, [selectedCampaign]);
+  // --- Raw analytics data (fetched once, aggregated in-browser) ---
+  const [raw, setRaw] = useState<RawAnalyticsData | null>(null);
 
-  // Fetch analytics data
+  // Fetch raw dataset once on mount. Filter changes no longer touch the network.
   useEffect(() => {
-    async function fetchAnalytics() {
-      // Stale-while-revalidate: if we already have data, keep it visible and
-      // use the light-weight `isRefetching` flag instead of the full `loading`
-      // that wipes the page to a skeleton.
-      setData((prev) => {
-        if (prev) setIsRefetching(true);
-        else setLoading(true);
-        return prev;
-      });
+    let cancelled = false;
+    async function fetchRaw() {
+      setLoading(true);
       setError(null);
-
       try {
-        const params = new URLSearchParams({ range });
-        if (selectedCampaign) {
-          params.set("campaign", selectedCampaign);
-        }
-        if (selectedLinkId) {
-          params.set("linkId", selectedLinkId);
-        }
-        if (selectedTagId) {
-          params.set("tagId", selectedTagId);
-        }
-        if (range === "custom" && customFrom) {
-          params.set("from", customFrom);
-          if (customTo) params.set("to", customTo);
-        }
-
-        const response = await fetch(`/api/analytics?${params}`);
+        const response = await fetch("/api/analytics/raw");
         if (!response.ok) throw new Error("Failed to fetch analytics");
-        const fresh = await response.json();
-        setData(fresh);
+        const fresh = (await response.json()) as RawAnalyticsData;
+        if (cancelled) return;
+        setRaw(fresh);
+        // Also seed the link selector dropdown
+        setLinks(
+          fresh.links.map((l) => ({
+            id: l.id,
+            code: l.code,
+            title: l.title,
+            originalUrl: l.originalUrl,
+          })),
+        );
+        setLoadingLinks(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load data");
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load data");
+        }
       } finally {
-        setLoading(false);
-        setIsRefetching(false);
+        if (!cancelled) setLoading(false);
       }
     }
+    fetchRaw();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-    fetchAnalytics();
-  }, [range, selectedCampaign, selectedLinkId, selectedTagId, customFrom, customTo]);
+  // Derive start/end dates from the `range` state
+  const { rangeStart, rangeEnd } = useMemo(() => {
+    const now = new Date();
+    if (range === "custom" && customFrom) {
+      return {
+        rangeStart: new Date(customFrom),
+        rangeEnd: customTo ? new Date(customTo) : now,
+      };
+    }
+    const days = range === "24h" ? 1 : range === "7d" ? 7 : range === "30d" ? 30 : range === "90d" ? 90 : 7;
+    const start = range === "24h"
+      ? new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      : new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    return { rangeStart: start, rangeEnd: now };
+  }, [range, customFrom, customTo]);
+
+  // Derive the aggregated dashboard — pure, instant, zero network.
+  const data = useMemo(() => {
+    if (!raw) return null;
+    return computeAnalytics(raw, {
+      rangeStart,
+      rangeEnd,
+      linkId: selectedLinkId || undefined,
+      campaign: selectedCampaign || undefined,
+      tagId: selectedTagId || undefined,
+    });
+  }, [raw, rangeStart, rangeEnd, selectedLinkId, selectedCampaign, selectedTagId]);
 
   const handleCampaignChange = (value: string) => {
     setSelectedCampaign(value);
@@ -467,15 +470,8 @@ export default function AnalyticsPage() {
           <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
         </div>
       ) : data ? (
-        <div
-          className={
-            // Soft fade while refetching a filter — keeps old data visible
-            // so the page doesn't "blink" to empty on every change.
-            isRefetching
-              ? "opacity-60 transition-opacity duration-150 pointer-events-none"
-              : "transition-opacity duration-150"
-          }
-        >
+        <div>
+
           {/* Anchor Nav — updated order */}
           <div className="flex items-center gap-1 pb-2 border-b border-slate-100">
             {[
@@ -907,11 +903,10 @@ export default function AnalyticsPage() {
         </div>
       ) : null}
 
-      {/* Subtle top-bar "updating" indicator during refetch */}
-      {isRefetching && (
-        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-3 py-1.5 bg-slate-900/85 text-white text-xs rounded-full shadow-lg backdrop-blur">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          <span>更新中…</span>
+      {/* Truncation warning when the raw dataset hit its cap */}
+      {raw?.meta.truncated && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-start gap-2 px-4 py-2 max-w-md bg-amber-50 border border-amber-200 rounded-lg shadow-lg text-xs text-amber-800">
+          <span>⚠️ 只顯示最近 10,000 筆點擊。更早的資料請縮小日期範圍或選特定連結。</span>
         </div>
       )}
     </div>
