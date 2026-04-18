@@ -53,7 +53,9 @@ export function CreateLinkForm() {
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showUTM, setShowUTM] = useState(false);
+  // Default expanded so new users immediately see the Campaign field —
+  // it's the single most important UTM for downstream management.
+  const [showUTM, setShowUTM] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<TagOption[]>([]);

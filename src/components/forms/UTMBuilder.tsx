@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import {
   UTM_MEDIUMS,
@@ -12,7 +12,17 @@ import {
   normalizeSource,
   type UTMMedium,
 } from "@/lib/utils/utm";
-import { ChevronDown, FileText, Loader2, AlertCircle, Info, X } from "lucide-react";
+import {
+  ChevronDown,
+  FileText,
+  Loader2,
+  AlertCircle,
+  Info,
+  X,
+  Plus,
+  Megaphone,
+  Sparkles,
+} from "lucide-react";
 
 /** Hover tooltip with an info icon — explains the field's purpose inline. */
 function FieldHint({ text }: { text: string }) {
@@ -303,6 +313,58 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Campaign — the most important field on this form. Promoted to
+            full-width and the first position so new users clock it first. */}
+        <div className="md:col-span-2">
+          <div className="flex items-start gap-3 mb-2 p-3 bg-violet-50 border border-violet-100 rounded-lg">
+            <Megaphone className="w-4 h-4 text-violet-500 mt-0.5 shrink-0" />
+            <div className="text-xs leading-relaxed">
+              <p className="font-medium text-violet-900">
+                Campaign 是這條 link 的管理依據
+              </p>
+              <p className="text-violet-700/80 mt-0.5">
+                這個值決定 link 之後歸到哪個活動 — 影響 Campaigns
+                列表、目標追蹤、和跨活動比較。留空的 link 只會出現在孤兒區。
+              </p>
+            </div>
+          </div>
+          <label className="flex items-center text-sm font-medium text-slate-700 mb-1">
+            {t("campaign")}
+            {campaignLocked && (
+              <span className="ml-1.5 text-[10px] text-violet-500 font-normal bg-violet-50 px-1.5 py-0.5 rounded">
+                from Campaign
+              </span>
+            )}
+            <FieldHint text={t("campaignTip")} />
+          </label>
+          <CampaignCombobox
+            value={values.utmCampaign}
+            onChange={(v) => handleChange("utmCampaign", v)}
+            existingCampaigns={existingCampaigns}
+            onCreated={(c) => setExistingCampaigns((prev) => [c, ...prev.filter((x) => x.name !== c.name)])}
+            readOnly={campaignLocked}
+            placeholder={t("campaignPlaceholder")}
+          />
+          {!campaignLocked && values.utmCampaign && (
+            <p className="mt-1 text-xs">
+              {existingCampaigns.some((c) => c.name === values.utmCampaign.trim()) ? (
+                <span className="inline-flex items-center gap-1 text-emerald-600">
+                  <Sparkles className="w-3 h-3" /> 歸到現有活動
+                </span>
+              ) : (
+                <span className="text-slate-500">
+                  新活動 — 儲存時自動建立
+                </span>
+              )}
+            </p>
+          )}
+          {!campaignLocked && !values.utmCampaign && (
+            <p className="mt-1 text-xs text-slate-400">
+              留空這條 link 不會出現在 Campaigns 列表
+            </p>
+          )}
+        </div>
+
         {/* UTM Medium — combobox via datalist (pick from list or type custom) */}
         <div>
           <label className="flex items-center text-sm font-medium text-slate-700 mb-1">
@@ -457,75 +519,6 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
           </div>
         )}
 
-        {/* UTM Campaign — combobox via datalist. Pick from existing Campaign
-            rows (99% case) or type a new one (auto-upserts on save). */}
-        <div>
-          <label className="flex items-center text-sm font-medium text-slate-700 mb-1">
-            {t("campaign")}
-            {campaignLocked && (
-              <span className="ml-1.5 text-[10px] text-violet-500 font-normal bg-violet-50 px-1.5 py-0.5 rounded">
-                from Campaign
-              </span>
-            )}
-            <FieldHint text={t("campaignTip")} />
-          </label>
-          <div className="relative">
-            <input
-              type="text"
-              list="utm-campaign-options"
-              value={values.utmCampaign}
-              onChange={(e) => handleChange("utmCampaign", e.target.value)}
-              placeholder={t("campaignPlaceholder")}
-              readOnly={campaignLocked}
-              autoComplete="off"
-              className={`w-full px-3 py-2 pr-9 border rounded-lg ${
-                campaignLocked
-                  ? "border-violet-200 bg-violet-50/50 text-violet-700 cursor-not-allowed"
-                  : "border-slate-200 bg-white focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
-              }`}
-            />
-            {!campaignLocked &&
-              (values.utmCampaign ? (
-                <button
-                  type="button"
-                  onClick={() => handleChange("utmCampaign", "")}
-                  aria-label="Clear campaign"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              ) : (
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-              ))}
-            <datalist id="utm-campaign-options">
-              {existingCampaigns.map((c) => (
-                <option
-                  key={c.name}
-                  value={c.name}
-                  label={c.displayName ? `${c.name} — ${c.displayName}` : c.name}
-                >
-                  {c.displayName ? `${c.name} — ${c.displayName}` : c.name}
-                </option>
-              ))}
-            </datalist>
-          </div>
-          {!campaignLocked && values.utmCampaign && (
-            <p className="mt-1 text-xs text-slate-500">
-              {existingCampaigns.some((c) => c.name === values.utmCampaign.trim()) ? (
-                <>
-                  <span className="inline-flex items-center gap-1 text-emerald-600">
-                    ✓ existing campaign
-                  </span>
-                </>
-              ) : (
-                <span className="text-slate-500">
-                  new campaign — will be created on save
-                </span>
-              )}
-            </p>
-          )}
-        </div>
-
         {/* UTM Content */}
         <div>
           <label className="flex items-center text-sm font-medium text-slate-700 mb-1">
@@ -567,6 +560,296 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
             {previewUrl}
           </p>
         </div>
+      )}
+    </div>
+  );
+}
+
+interface CampaignComboboxItem {
+  name: string;
+  displayName: string | null;
+  status: string | null;
+  defaultSource: string | null;
+  defaultMedium: string | null;
+}
+
+/**
+ * Custom combobox for the campaign field. Replaces a native <datalist>
+ * so the "create new campaign" action is a first-class option visible
+ * in the dropdown — not an invisible side-effect of typing + saving.
+ * Pattern mirrors Linear / Slack / Notion quick-pickers.
+ */
+function CampaignCombobox({
+  value,
+  onChange,
+  existingCampaigns,
+  onCreated,
+  readOnly,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  existingCampaigns: CampaignComboboxItem[];
+  onCreated: (c: CampaignComboboxItem) => void;
+  readOnly?: boolean;
+  placeholder?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [highlighted, setHighlighted] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const trimmed = value.trim();
+  const matchesExisting = existingCampaigns.some((c) => c.name === trimmed);
+  const filtered = useMemo(() => {
+    const q = trimmed.toLowerCase();
+    if (!q) return existingCampaigns;
+    return existingCampaigns.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.displayName && c.displayName.toLowerCase().includes(q)),
+    );
+  }, [existingCampaigns, trimmed]);
+
+  const showCreateOption = !!trimmed && !matchesExisting;
+  const totalItems = (showCreateOption ? 1 : 0) + filtered.length;
+
+  // Close on outside click
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [isOpen]);
+
+  // Reset highlight when dropdown contents change
+  useEffect(() => {
+    setHighlighted(0);
+  }, [trimmed, isOpen]);
+
+  const handleCreate = async () => {
+    if (!trimmed || creating) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      // The name regex on the API side is strict — lowercase letters,
+      // numbers, underscore, hyphen. If users type anything else we
+      // let the API reject and surface the message inline.
+      const res = await fetch("/api/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed, status: "ACTIVE" }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        // Zod validation errors come back as an array under `error`.
+        const msg =
+          typeof data.error === "string"
+            ? data.error
+            : Array.isArray(data.error)
+              ? data.error[0]?.message ?? "Invalid name"
+              : "Failed to create campaign";
+        throw new Error(msg);
+      }
+      const created = await res.json();
+      const newItem: CampaignComboboxItem = {
+        name: created.name,
+        displayName: created.displayName ?? null,
+        status: created.status ?? "ACTIVE",
+        defaultSource: created.defaultSource ?? null,
+        defaultMedium: created.defaultMedium ?? null,
+      };
+      onCreated(newItem);
+      onChange(newItem.name);
+      setIsOpen(false);
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const pickExisting = (name: string) => {
+    onChange(name);
+    setIsOpen(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (readOnly) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+        return;
+      }
+      setHighlighted((h) => Math.min(h + 1, Math.max(0, totalItems - 1)));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlighted((h) => Math.max(0, h - 1));
+    } else if (e.key === "Enter" && isOpen && totalItems > 0) {
+      e.preventDefault();
+      if (showCreateOption && highlighted === 0) {
+        handleCreate();
+      } else {
+        const idx = showCreateOption ? highlighted - 1 : highlighted;
+        const picked = filtered[idx];
+        if (picked) pickExisting(picked.name);
+      }
+    } else if (e.key === "Escape") {
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setIsOpen(true);
+          setCreateError(null);
+        }}
+        onFocus={() => setIsOpen(true)}
+        onKeyDown={handleKeyDown}
+        readOnly={readOnly}
+        placeholder={placeholder}
+        autoComplete="off"
+        className={`w-full px-3 py-2 pr-9 border rounded-lg ${
+          readOnly
+            ? "border-violet-200 bg-violet-50/50 text-violet-700 cursor-not-allowed"
+            : "border-slate-200 bg-white focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
+        }`}
+      />
+      {!readOnly &&
+        (value ? (
+          <button
+            type="button"
+            onClick={() => {
+              onChange("");
+              setIsOpen(false);
+              inputRef.current?.focus();
+            }}
+            aria-label="Clear campaign"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        ) : (
+          <ChevronDown
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
+            aria-hidden="true"
+          />
+        ))}
+
+      {isOpen && !readOnly && (
+        <div
+          ref={dropdownRef}
+          className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-72 overflow-y-auto py-1"
+        >
+          {showCreateOption && (
+            <button
+              type="button"
+              onClick={handleCreate}
+              disabled={creating}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                highlighted === 0
+                  ? "bg-violet-50 text-violet-700"
+                  : "text-violet-600 hover:bg-violet-50"
+              } disabled:opacity-60`}
+              onMouseEnter={() => setHighlighted(0)}
+            >
+              {creating ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+              ) : (
+                <Plus className="w-3.5 h-3.5 shrink-0" />
+              )}
+              <span>
+                建立新活動{" "}
+                <span className="font-mono font-medium">&apos;{trimmed}&apos;</span>
+              </span>
+            </button>
+          )}
+
+          {filtered.length > 0 && (
+            <>
+              {showCreateOption && <div className="my-1 border-t border-slate-100" />}
+              <div className="px-3 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                現有活動
+              </div>
+              {filtered.map((c, i) => {
+                const idx = showCreateOption ? i + 1 : i;
+                const isHighlighted = idx === highlighted;
+                return (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => pickExisting(c.name)}
+                    onMouseEnter={() => setHighlighted(idx)}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${
+                      isHighlighted ? "bg-slate-50" : ""
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                        c.status === "ACTIVE"
+                          ? "bg-emerald-400"
+                          : c.status === "DRAFT"
+                            ? "bg-slate-300"
+                            : "bg-amber-400"
+                      }`}
+                    />
+                    <span className="font-mono text-sm text-slate-700">{c.name}</span>
+                    {c.displayName && (
+                      <span className="text-xs text-slate-400 truncate">
+                        — {c.displayName}
+                      </span>
+                    )}
+                    {(c.defaultSource || c.defaultMedium) && (
+                      <span className="ml-auto flex items-center gap-1">
+                        {c.defaultSource && (
+                          <span className="px-1 py-0.5 bg-cyan-50 text-cyan-600 rounded text-[10px] font-mono">
+                            {c.defaultSource}
+                          </span>
+                        )}
+                        {c.defaultMedium && (
+                          <span className="px-1 py-0.5 bg-amber-50 text-amber-600 rounded text-[10px] font-mono">
+                            {c.defaultMedium}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </>
+          )}
+
+          {filtered.length === 0 && !showCreateOption && (
+            <div className="px-3 py-4 text-center text-sm text-slate-400">
+              尚無活動 — 打字就能建立第一個
+            </div>
+          )}
+        </div>
+      )}
+
+      {createError && (
+        <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+          <AlertCircle className="w-3 h-3 shrink-0" />
+          {createError}
+        </p>
       )}
     </div>
   );
