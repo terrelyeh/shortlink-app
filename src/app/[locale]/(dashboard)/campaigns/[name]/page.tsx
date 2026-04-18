@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Target,
   Pencil,
+  Settings2,
   X,
   LineChart as LineChartIcon,
   Users,
@@ -255,7 +256,6 @@ export default function CampaignDetailPage() {
   const totalConversions = links.reduce((sum, l) => sum + (l._count.conversions ?? 0), 0);
   const overallCvr = totalClicks > 0 ? (totalConversions / totalClicks) * 100 : 0;
   const activeLinks = links.filter((l) => l.status === "ACTIVE").length;
-  const maxClicks = links.length > 0 ? Math.max(...links.map((l) => l._count.clicks), 1) : 1;
   const totalCampaignClicks = totalClicks || 1;
 
   const copyLink = async (shortUrl: string, id: string) => {
@@ -689,20 +689,7 @@ export default function CampaignDetailPage() {
                           {link.status.charAt(0) + link.status.slice(1).toLowerCase()}
                         </span>
                       </td>
-                      <td className="num">
-                        <div className="bar-cell">
-                          <div className="bar-track">
-                            <div
-                              className="bar-fill"
-                              style={{
-                                width: `${(link._count.clicks / maxClicks) * 100}%`,
-                                background: "var(--data-violet)",
-                              }}
-                            />
-                          </div>
-                          <span className="num">{link._count.clicks.toLocaleString()}</span>
-                        </div>
-                      </td>
+                      <td className="num">{link._count.clicks.toLocaleString()}</td>
                       <td className="num">
                         {m && m.uniqueClicks > 0 ? (
                           m.uniqueClicks.toLocaleString()
@@ -771,10 +758,18 @@ export default function CampaignDetailPage() {
                           >
                             Analytics <span style={{ fontSize: 10 }}>→</span>
                           </Link>
+                          <Link
+                            href={`/links/${link.id}`}
+                            title="Edit link settings"
+                            style={{ color: "var(--ink-500)", display: "inline-flex" }}
+                          >
+                            <Settings2 size={13} />
+                          </Link>
                           <a
                             href={shortUrl}
                             target="_blank"
                             rel="noopener noreferrer"
+                            title="Open short URL"
                             style={{ color: "var(--ink-500)", display: "inline-flex" }}
                           >
                             <ExternalLink size={12} />
