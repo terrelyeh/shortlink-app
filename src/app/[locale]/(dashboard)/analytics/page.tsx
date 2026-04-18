@@ -120,7 +120,10 @@ export default function AnalyticsPage() {
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(true);
   const [data, setData] = useState<AnalyticsData | null>(null);
+  // Two loading states — first-ever load (show skeleton) vs filter change
+  // (keep previous data visible with a subtle "updating" hint).
   const [loading, setLoading] = useState(true);
+  const [isRefetching, setIsRefetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
 
@@ -164,7 +167,14 @@ export default function AnalyticsPage() {
   // Fetch analytics data
   useEffect(() => {
     async function fetchAnalytics() {
-      setLoading(true);
+      // Stale-while-revalidate: if we already have data, keep it visible and
+      // use the light-weight `isRefetching` flag instead of the full `loading`
+      // that wipes the page to a skeleton.
+      setData((prev) => {
+        if (prev) setIsRefetching(true);
+        else setLoading(true);
+        return prev;
+      });
       setError(null);
 
       try {
@@ -185,12 +195,13 @@ export default function AnalyticsPage() {
 
         const response = await fetch(`/api/analytics?${params}`);
         if (!response.ok) throw new Error("Failed to fetch analytics");
-        const data = await response.json();
-        setData(data);
+        const fresh = await response.json();
+        setData(fresh);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data");
       } finally {
         setLoading(false);
+        setIsRefetching(false);
       }
     }
 
@@ -450,12 +461,21 @@ export default function AnalyticsPage() {
         </div>
       )}
 
-      {loading ? (
+      {loading && !data ? (
+        // First-ever load: show skeleton spinner because there's nothing to show
         <div className="flex items-center justify-center py-16">
           <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
         </div>
       ) : data ? (
-        <>
+        <div
+          className={
+            // Soft fade while refetching a filter — keeps old data visible
+            // so the page doesn't "blink" to empty on every change.
+            isRefetching
+              ? "opacity-60 transition-opacity duration-150 pointer-events-none"
+              : "transition-opacity duration-150"
+          }
+        >
           {/* Anchor Nav — updated order */}
           <div className="flex items-center gap-1 pb-2 border-b border-slate-100">
             {[
@@ -884,8 +904,16 @@ export default function AnalyticsPage() {
               <PieChartComponent data={data.operatingSystems} title={t("operatingSystems")} />
             </div>
           </div>
-        </>
+        </div>
       ) : null}
+
+      {/* Subtle top-bar "updating" indicator during refetch */}
+      {isRefetching && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-3 py-1.5 bg-slate-900/85 text-white text-xs rounded-full shadow-lg backdrop-blur">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <span>更新中…</span>
+        </div>
+      )}
     </div>
   );
 }
