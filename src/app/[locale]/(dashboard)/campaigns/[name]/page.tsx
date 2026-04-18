@@ -19,6 +19,9 @@ import {
   LineChart as LineChartIcon,
   Users,
   Globe2,
+  TrendingUp,
+  TrendingDown,
+  Minus,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
@@ -125,6 +128,86 @@ export default function CampaignDetailPage() {
     return computeAnalytics(raw, { rangeStart, rangeEnd, campaign: campaignName });
   }, [raw, campaignName]);
 
+  // Per-link metrics from the raw click stream — single pass over all
+  // clicks keyed by shortLinkId, so we don't re-scan N times per link.
+  // Covers: unique visitors (ipHash distinct), last click, 7d trend
+  // (last 7d vs previous 7d), and a 7-day sparkline.
+  // `raw.clicks` is capped at 90 days / 10k rows by the API; values
+  // beyond that window are simply absent — we surface "—" in the UI.
+  const perLinkMetrics = useMemo(() => {
+    const empty = () => ({
+      uniques: new Set<string>(),
+      lastClickAt: null as Date | null,
+      last7d: 0,
+      prev7d: 0,
+      daily: new Array(7).fill(0) as number[],
+    });
+    const acc = new Map<string, ReturnType<typeof empty>>();
+    for (const l of links) acc.set(l.id, empty());
+    if (!raw) {
+      return new Map<
+        string,
+        {
+          uniqueClicks: number;
+          lastClickAt: Date | null;
+          trendPct: number | null;
+          trendState: "up" | "down" | "flat" | "new" | "dead" | "none";
+          sparkline: number[];
+        }
+      >();
+    }
+    const now = Date.now();
+    const DAY = 86400000;
+    for (const c of raw.clicks) {
+      const m = acc.get(c.shortLinkId);
+      if (!m) continue;
+      if (c.ipHash) m.uniques.add(c.ipHash);
+      const ts = new Date(c.timestamp);
+      if (!m.lastClickAt || ts > m.lastClickAt) m.lastClickAt = ts;
+      const ageMs = now - ts.getTime();
+      if (ageMs < 7 * DAY) {
+        m.last7d++;
+        const daysAgo = Math.floor(ageMs / DAY);
+        if (daysAgo >= 0 && daysAgo < 7) m.daily[6 - daysAgo]++;
+      } else if (ageMs < 14 * DAY) {
+        m.prev7d++;
+      }
+    }
+    const out = new Map<
+      string,
+      {
+        uniqueClicks: number;
+        lastClickAt: Date | null;
+        trendPct: number | null;
+        trendState: "up" | "down" | "flat" | "new" | "dead" | "none";
+        sparkline: number[];
+      }
+    >();
+    for (const [id, m] of acc) {
+      let trendPct: number | null = null;
+      let trendState: "up" | "down" | "flat" | "new" | "dead" | "none" = "none";
+      if (m.prev7d === 0 && m.last7d === 0) {
+        trendState = "none";
+      } else if (m.prev7d === 0 && m.last7d > 0) {
+        trendState = "new";
+      } else if (m.prev7d > 0 && m.last7d === 0) {
+        trendState = "dead";
+        trendPct = -100;
+      } else {
+        trendPct = ((m.last7d - m.prev7d) / m.prev7d) * 100;
+        trendState = trendPct > 2 ? "up" : trendPct < -2 ? "down" : "flat";
+      }
+      out.set(id, {
+        uniqueClicks: m.uniques.size,
+        lastClickAt: m.lastClickAt,
+        trendPct,
+        trendState,
+        sparkline: m.daily,
+      });
+    }
+    return out;
+  }, [raw, links]);
+
   const saveGoal = async () => {
     const parsed = parseInt(goalInput, 10);
     if (isNaN(parsed) || parsed < 1) return;
@@ -173,6 +256,7 @@ export default function CampaignDetailPage() {
   const overallCvr = totalClicks > 0 ? (totalConversions / totalClicks) * 100 : 0;
   const activeLinks = links.filter((l) => l.status === "ACTIVE").length;
   const maxClicks = links.length > 0 ? Math.max(...links.map((l) => l._count.clicks), 1) : 1;
+  const totalCampaignClicks = totalClicks || 1;
 
   const copyLink = async (shortUrl: string, id: string) => {
     await navigator.clipboard.writeText(shortUrl);
@@ -524,6 +608,16 @@ export default function CampaignDetailPage() {
                   <th className="num" style={{ width: 180 }}>
                     Clicks
                   </th>
+                  <th className="num" style={{ width: 80 }} title="Distinct visitors (by hashed IP)">
+                    Unique
+                  </th>
+                  <th className="num" style={{ width: 75 }} title="Share of this campaign's total clicks">
+                    Share
+                  </th>
+                  <th style={{ width: 120 }} title="Daily clicks over the last 7 days">
+                    7d trend
+                  </th>
+                  <th style={{ width: 110 }}>Last click</th>
                   <th className="num" style={{ width: 120 }}>
                     Conv.
                   </th>
@@ -535,6 +629,8 @@ export default function CampaignDetailPage() {
                   const shortUrl = `${shortBaseUrl}/${link.code}`;
                   const convs = link._count.conversions ?? 0;
                   const cvr = link._count.clicks > 0 ? (convs / link._count.clicks) * 100 : null;
+                  const m = perLinkMetrics.get(link.id);
+                  const sharePct = (link._count.clicks / totalCampaignClicks) * 100;
                   return (
                     <tr key={link.id}>
                       <td>
@@ -542,7 +638,7 @@ export default function CampaignDetailPage() {
                           <div
                             style={{
                               fontFamily: "var(--font-mono)",
-                              fontSize: 12.5,
+                              fontSize: 13.5,
                               fontWeight: 500,
                               color: "var(--ink-100)",
                               maxWidth: 220,
@@ -557,7 +653,7 @@ export default function CampaignDetailPage() {
                             <span
                               style={{
                                 fontFamily: "var(--font-mono)",
-                                fontSize: 11,
+                                fontSize: 12,
                                 color: "var(--brand-600)",
                               }}
                             >
@@ -608,6 +704,45 @@ export default function CampaignDetailPage() {
                         </div>
                       </td>
                       <td className="num">
+                        {m && m.uniqueClicks > 0 ? (
+                          m.uniqueClicks.toLocaleString()
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                      <td className="num">
+                        {link._count.clicks > 0 ? (
+                          <span style={{ color: "var(--ink-300)" }}>
+                            {sharePct.toFixed(1)}%
+                          </span>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                      <td>
+                        {m && (m.sparkline.some((v) => v > 0) || m.trendState !== "none") ? (
+                          <TrendCell
+                            sparkline={m.sparkline}
+                            trendPct={m.trendPct}
+                            trendState={m.trendState}
+                          />
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                      <td>
+                        {m && m.lastClickAt ? (
+                          <span
+                            style={{ fontSize: 13, color: "var(--ink-300)" }}
+                            title={m.lastClickAt.toLocaleString()}
+                          >
+                            {formatRelativeTime(m.lastClickAt)}
+                          </span>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                      <td className="num">
                         {convs > 0 ? (
                           <span style={{ color: "var(--ok-fg)" }}>
                             {convs.toLocaleString()}
@@ -627,7 +762,7 @@ export default function CampaignDetailPage() {
                             href={`/analytics?linkId=${link.id}`}
                             style={{
                               color: "var(--brand-600)",
-                              fontSize: 12,
+                              fontSize: 13,
                               fontWeight: 500,
                               display: "inline-flex",
                               alignItems: "center",
@@ -655,6 +790,97 @@ export default function CampaignDetailPage() {
         </div>
       )}
     </>
+  );
+}
+
+function formatRelativeTime(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  const s = Math.floor(diffMs / 1000);
+  if (s < 60) return "just now";
+  const min = Math.floor(s / 60);
+  if (min < 60) return `${min}m ago`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d ago`;
+  const mo = Math.floor(d / 30);
+  return `${mo}mo ago`;
+}
+
+function TrendCell({
+  sparkline,
+  trendPct,
+  trendState,
+}: {
+  sparkline: number[];
+  trendPct: number | null;
+  trendState: "up" | "down" | "flat" | "new" | "dead" | "none";
+}) {
+  const w = 60;
+  const h = 20;
+  const max = Math.max(1, ...sparkline);
+  const step = sparkline.length > 1 ? w / (sparkline.length - 1) : 0;
+  const points = sparkline
+    .map((v, i) => `${i * step},${h - (v / max) * h}`)
+    .join(" ");
+
+  const color =
+    trendState === "up" || trendState === "new"
+      ? "var(--data-emerald)"
+      : trendState === "down" || trendState === "dead"
+        ? "var(--err-fg)"
+        : "var(--ink-400)";
+
+  const Icon =
+    trendState === "up" || trendState === "new"
+      ? TrendingUp
+      : trendState === "down" || trendState === "dead"
+        ? TrendingDown
+        : Minus;
+
+  const label =
+    trendState === "new"
+      ? "NEW"
+      : trendState === "dead"
+        ? "—100%"
+        : trendPct === null
+          ? "—"
+          : `${trendPct > 0 ? "+" : ""}${trendPct.toFixed(0)}%`;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <svg
+        width={w}
+        height={h}
+        viewBox={`0 0 ${w} ${h}`}
+        style={{ display: "block", overflow: "visible" }}
+        aria-hidden="true"
+      >
+        <polyline
+          points={points}
+          fill="none"
+          stroke={color}
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span
+        title={trendPct !== null ? `${trendPct.toFixed(1)}% vs prev 7d` : "last 7d vs prev 7d"}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 2,
+          fontSize: 11,
+          fontWeight: 600,
+          color,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        <Icon size={10} />
+        {label}
+      </span>
+    </div>
   );
 }
 
