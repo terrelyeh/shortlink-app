@@ -613,8 +613,13 @@ function CampaignCombobox({
     );
   }, [existingCampaigns, trimmed]);
 
-  const showCreateOption = !!trimmed && !matchesExisting;
-  const totalItems = (showCreateOption ? 1 : 0) + filtered.length;
+  // The "create new" row is always visible in the dropdown UNLESS the
+  // input exactly matches an existing campaign (picking mode, not creating).
+  // When the input is empty it's rendered inert as a hint so users still
+  // see the capability exists without typing first.
+  const showCreateOption = !matchesExisting;
+  const createIsActionable = showCreateOption && !!trimmed;
+  const totalItems = (createIsActionable ? 1 : 0) + filtered.length;
 
   // Close on outside click
   useEffect(() => {
@@ -699,10 +704,10 @@ function CampaignCombobox({
       setHighlighted((h) => Math.max(0, h - 1));
     } else if (e.key === "Enter" && isOpen && totalItems > 0) {
       e.preventDefault();
-      if (showCreateOption && highlighted === 0) {
+      if (createIsActionable && highlighted === 0) {
         handleCreate();
       } else {
-        const idx = showCreateOption ? highlighted - 1 : highlighted;
+        const idx = createIsActionable ? highlighted - 1 : highlighted;
         const picked = filtered[idx];
         if (picked) pickExisting(picked.name);
       }
@@ -759,29 +764,38 @@ function CampaignCombobox({
           ref={dropdownRef}
           className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-72 overflow-y-auto py-1"
         >
-          {showCreateOption && (
-            <button
-              type="button"
-              onClick={handleCreate}
-              disabled={creating}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                highlighted === 0
-                  ? "bg-violet-50 text-violet-700"
-                  : "text-violet-600 hover:bg-violet-50"
-              } disabled:opacity-60`}
-              onMouseEnter={() => setHighlighted(0)}
-            >
-              {creating ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-              ) : (
+          {showCreateOption &&
+            (createIsActionable ? (
+              <button
+                type="button"
+                onClick={handleCreate}
+                disabled={creating}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                  highlighted === 0
+                    ? "bg-violet-50 text-violet-700"
+                    : "text-violet-600 hover:bg-violet-50"
+                } disabled:opacity-60`}
+                onMouseEnter={() => setHighlighted(0)}
+              >
+                {creating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                ) : (
+                  <Plus className="w-3.5 h-3.5 shrink-0" />
+                )}
+                <span>
+                  建立新活動{" "}
+                  <span className="font-mono font-medium">&apos;{trimmed}&apos;</span>
+                </span>
+              </button>
+            ) : (
+              <div
+                className="flex items-center gap-2 px-3 py-2 text-sm text-violet-400 cursor-default"
+                onClick={() => inputRef.current?.focus()}
+              >
                 <Plus className="w-3.5 h-3.5 shrink-0" />
-              )}
-              <span>
-                建立新活動{" "}
-                <span className="font-mono font-medium">&apos;{trimmed}&apos;</span>
-              </span>
-            </button>
-          )}
+                <span>輸入活動名稱以建立</span>
+              </div>
+            ))}
 
           {filtered.length > 0 && (
             <>
@@ -790,7 +804,7 @@ function CampaignCombobox({
                 現有活動
               </div>
               {filtered.map((c, i) => {
-                const idx = showCreateOption ? i + 1 : i;
+                const idx = createIsActionable ? i + 1 : i;
                 const isHighlighted = idx === highlighted;
                 return (
                   <button
@@ -839,7 +853,7 @@ function CampaignCombobox({
 
           {filtered.length === 0 && !showCreateOption && (
             <div className="px-3 py-4 text-center text-sm text-slate-400">
-              尚無活動 — 打字就能建立第一個
+              尚無活動
             </div>
           )}
         </div>
