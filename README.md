@@ -69,13 +69,21 @@
 
 | 類別 | 技術 |
 |------|------|
-| **框架** | Next.js 16 (App Router) |
-| **資料庫** | PostgreSQL + Prisma ORM |
-| **認證** | NextAuth.js v5 (Google OAuth) |
+| **框架** | Next.js 16 (App Router) + React 19 |
+| **資料庫** | PostgreSQL + Prisma 6 ORM |
+| **快取**（選配）| Upstash Redis（REST API）|
+| **認證** | NextAuth.js v5 (Google OAuth) + Email 白名單 |
 | **樣式** | Tailwind CSS 4 |
 | **圖表** | Recharts |
-| **國際化** | next-intl |
+| **國際化** | next-intl（英文 / 繁體中文）|
 | **驗證** | Zod |
+
+### 效能架構
+
+- **Server Components + Client-side filter** — 列表頁（連結 / 活動 / 分析）由 Server Component 預先載入資料，Client Component 以 `useMemo` 做過濾、排序、聚合，切 filter 零延遲
+- **兩層快取** — 瀏覽器 `Cache-Control` + Upstash Redis（60s TTL）
+- **載入骨架** — 每個路由有 `loading.tsx`，導航當下立即顯示 skeleton
+- **Analytics raw 端點** — `/api/analytics/raw` 回傳 90 天原始點擊（上限 10,000 筆），前端用 `lib/analytics/compute.ts` 聚合
 
 ---
 
@@ -150,87 +158,59 @@ npm run dev
 
 ## 部署指南
 
-### Zeabur 部署（推薦）
+推薦組合：**Vercel + Supabase + Upstash**（全部可免費方案起步）。
 
-Zeabur 提供簡單的一鍵部署，並內建 PostgreSQL 服務。
+### 步驟 1：Supabase（資料庫）
 
-#### 步驟 1：建立專案
+1. 到 [Supabase Console](https://supabase.com/dashboard) 建立新 project
+2. Region 建議選 **Tokyo (ap-northeast-1)** — 跟 Vercel 東京 edge 同區
+3. 專案建好後到 **Settings → Database → Connect**，選 **ORMs → Prisma** 取得兩條連線字串：
+   - `DATABASE_URL`（pooler，port 6543）→ 給 app 用
+   - `DIRECT_URL`（直連，port 5432）→ 給 migration 用
+4. 密碼含 `?`、`@` 等特殊字元要 URL encode（`?` → `%3F`）
 
-1. 登入 [Zeabur Dashboard](https://dash.zeabur.com)
-2. 點擊 **Create Project**
-3. 選擇區域（建議選擇靠近目標使用者的區域）
+### 步驟 2：Vercel（部署 + 自動 CI/CD）
 
-#### 步驟 2：新增 PostgreSQL 服務
-
-1. 在專案中點擊 **Add Service**
-2. 選擇 **Marketplace** → **PostgreSQL**
-3. 等待資料庫啟動完成
-4. 點擊 PostgreSQL 服務 → **Connection** 標籤
-5. 複製 **Prisma URL**（格式為 `postgresql://...`）
-
-#### 步驟 3：部署應用程式
-
-1. 點擊 **Add Service** → **Git**
-2. 連接你的 GitHub 帳號並選擇此 Repository
-3. Zeabur 會自動偵測 Next.js 專案
-
-#### 步驟 4：設定環境變數
-
-在應用服務的 **Variables** 標籤中新增：
-
-| 變數名稱 | 說明 |
-|----------|------|
-| `DATABASE_URL` | 貼上步驟 2 複製的 Prisma URL |
-| `AUTH_SECRET` | 執行 `openssl rand -base64 32` 產生的隨機字串 |
-| `GOOGLE_CLIENT_ID` | Google OAuth Client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
-| `NEXT_PUBLIC_APP_URL` | 你的 Zeabur 網域，例如 `https://your-app.zeabur.app` |
-| `NEXT_PUBLIC_SHORT_URL` | 短網址基底，例如 `https://your-app.zeabur.app/s` |
-| `IP_HASH_SALT` | 任意隨機字串，用於 IP 匿名化 |
-| `ALLOWED_EMAILS` | （選填）Email 白名單，逗號分隔 |
-
-#### 步驟 5：設定網域
-
-1. 在應用服務中點擊 **Networking** 標籤
-2. 新增自訂網域或使用 Zeabur 提供的 `.zeabur.app` 子網域
-3. **重要**：更新 Google OAuth 設定中的「已授權重新導向 URI」為：
+1. `npx vercel link` 或到 Vercel Dashboard **Import Git Repository**
+2. 自動偵測為 Next.js，預設 build command 就是 `prisma generate && next build`
+3. 設定環境變數（見下方 [環境變數說明](#環境變數說明)）：
+   ```bash
+   # 用 CLI 批次設
+   vercel env add DATABASE_URL production
+   vercel env add DIRECT_URL production
+   vercel env add AUTH_SECRET production
+   # ... 其他
    ```
-   https://your-domain.com/api/auth/callback/google
+4. `vercel --prod --yes` 部署
+5. 到 Google Cloud Console 把 Vercel domain 加到 OAuth **Authorized redirect URIs**：
+   ```
+   https://{your-project}.vercel.app/api/auth/callback/google
    ```
 
-#### 步驟 6：初始化資料庫
+### 步驟 3：Upstash Redis（選配快取，5 分鐘完成）
 
-部署完成後，Zeabur 會自動執行 `npm run build`，其中會觸發 `prisma generate`。
+Analytics / Dashboard 查詢貴，加上 Redis 後重複瀏覽幾乎瞬間。**不設也能跑**（code 有 graceful fallback）。
 
-如需手動推送 Schema，可在 Zeabur 的 **Console** 標籤執行：
+1. 到 [Upstash Console](https://console.upstash.com/) 建立 Redis database
+2. Region 選 **Tokyo**；**Eviction 打開**（policy: `allkeys-lru`）
+3. 到 database 頁面找 **REST API** 區塊，複製：
+   - `UPSTASH_REDIS_REST_URL`
+   - `UPSTASH_REDIS_REST_TOKEN`
+4. 加到 Vercel env vars，redeploy
+
+### 步驟 4：Schema 推送
+
+本機跑一次把 Prisma schema 推到 Supabase：
+
 ```bash
 npx prisma db push
 ```
 
----
+後續每次 schema 變動重跑一次即可。
 
 ### 其他部署平台
 
-本應用相容任何支援 Next.js 的平台：
-
-#### Vercel
-```bash
-npm i -g vercel
-vercel
-```
-在 Vercel Dashboard 設定環境變數，並加入 PostgreSQL 整合（如 Neon、Supabase）。
-
-#### Railway
-1. 連接 GitHub Repository
-2. 新增 PostgreSQL 服務
-3. 設定環境變數
-4. Railway 會自動部署
-
-#### Docker
-```bash
-docker build -t shortlink-app .
-docker run -p 3000:3000 --env-file .env shortlink-app
-```
+本應用相容任何支援 Next.js 的平台。無 Redis 時 `lib/cache.ts` 會 silent no-op，不會報錯，只是沒快取加速。
 
 ---
 
@@ -348,7 +328,8 @@ src/
 
 | 變數 | 必填 | 說明 |
 |------|------|------|
-| `DATABASE_URL` | 是 | PostgreSQL 連線字串 |
+| `DATABASE_URL` | 是 | Supabase pooler 連線字串（給 app 用） |
+| `DIRECT_URL` | 是 | Supabase 直連字串（給 `prisma db push` 用） |
 | `AUTH_SECRET` | 是 | NextAuth.js 加密金鑰 |
 | `GOOGLE_CLIENT_ID` | 是 | Google OAuth Client ID |
 | `GOOGLE_CLIENT_SECRET` | 是 | Google OAuth Client Secret |
@@ -356,6 +337,8 @@ src/
 | `NEXT_PUBLIC_SHORT_URL` | 是 | 短網址基底 URL |
 | `IP_HASH_SALT` | 是 | IP 位址雜湊鹽值 |
 | `ALLOWED_EMAILS` | 否 | Email 白名單（逗號分隔） |
+| `UPSTASH_REDIS_REST_URL` | 否 | Upstash Redis REST URL（沒設則停用快取）|
+| `UPSTASH_REDIS_REST_TOKEN` | 否 | Upstash Redis REST Token |
 
 ---
 
