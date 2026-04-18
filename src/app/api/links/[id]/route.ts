@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { bumpLinksCache } from "@/lib/cache-scopes";
+import {
+  getWorkspaceUtmGovernance,
+  validateUtmAgainstGovernance,
+} from "@/lib/utm-governance";
 import { z } from "zod";
 
 const updateLinkSchema = z.object({
@@ -86,6 +90,22 @@ export async function PATCH(
       existingLink.createdById !== session.user.id
     ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    // Governance check on UTM changes — only validate if the field is being
+    // updated (undefined means "not touched", keeps current value).
+    if (validated.utmSource !== undefined || validated.utmMedium !== undefined) {
+      const governance = await getWorkspaceUtmGovernance(existingLink.workspaceId);
+      const govErrors = validateUtmAgainstGovernance(governance, {
+        source: validated.utmSource !== undefined ? validated.utmSource : existingLink.utmSource,
+        medium: validated.utmMedium !== undefined ? validated.utmMedium : existingLink.utmMedium,
+      });
+      if (govErrors.length > 0) {
+        return NextResponse.json(
+          { error: "UTM governance violation", details: govErrors },
+          { status: 400 },
+        );
+      }
     }
 
     // Build update data

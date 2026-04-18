@@ -10,6 +10,7 @@ import {
   getMediumContext,
   isCustomSourceAllowed,
   normalizeSource,
+  type UTMMedium,
 } from "@/lib/utils/utm";
 import { ChevronDown, FileText, Loader2, AlertCircle, Info, X } from "lucide-react";
 
@@ -63,6 +64,10 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
 
+  // Workspace-level UTM governance (whitelist). Empty arrays = no restriction.
+  const [approvedSources, setApprovedSources] = useState<string[]>([]);
+  const [approvedMediums, setApprovedMediums] = useState<string[]>([]);
+
   // Fetch templates on mount
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -81,6 +86,40 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
     };
     fetchTemplates();
   }, []);
+
+  // Fetch workspace UTM governance rules once on mount. If the workspace
+  // hasn't configured them (or user isn't in a workspace), both arrays stay
+  // empty and no warnings show.
+  useEffect(() => {
+    fetch("/api/workspace/utm-settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        setApprovedSources(data.approvedSources || []);
+        setApprovedMediums(data.approvedMediums || []);
+      })
+      .catch(() => {
+        /* silent — governance is optional */
+      });
+  }, []);
+
+  const sourceGovernanceWarning = useMemo(() => {
+    if (approvedSources.length === 0 || !values.utmSource) return null;
+    const s = values.utmSource.trim().toLowerCase();
+    if (!approvedSources.includes(s)) {
+      return `"${values.utmSource}" 不在這個 workspace 的核准清單（${approvedSources.join(", ")}）— 儲存時會被擋下。`;
+    }
+    return null;
+  }, [approvedSources, values.utmSource]);
+
+  const mediumGovernanceWarning = useMemo(() => {
+    if (approvedMediums.length === 0 || !values.utmMedium) return null;
+    const m = values.utmMedium.trim().toLowerCase();
+    if (!approvedMediums.includes(m)) {
+      return `"${values.utmMedium}" 不在這個 workspace 的核准清單（${approvedMediums.join(", ")}）— 儲存時會被擋下。`;
+    }
+    return null;
+  }, [approvedMediums, values.utmMedium]);
 
   // Get available sources (with labels) based on selected medium
   const availableSourceOptions = useMemo(() => {
@@ -237,17 +276,36 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             )}
             <datalist id="utm-medium-options">
-              {UTM_MEDIUMS.map((medium) => (
-                <option
-                  key={medium}
-                  value={medium}
-                  label={UTM_MEDIUM_LABELS[medium]}
-                >
-                  {UTM_MEDIUM_LABELS[medium]}
-                </option>
-              ))}
+              {/* When workspace governance is set, surface approved mediums
+                  first — they're the ones that will actually save. Anything
+                  not on the list will trip the warning below. */}
+              {approvedMediums.length > 0
+                ? approvedMediums.map((m) => (
+                    <option
+                      key={m}
+                      value={m}
+                      label={UTM_MEDIUM_LABELS[m as UTMMedium] ?? m}
+                    >
+                      {UTM_MEDIUM_LABELS[m as UTMMedium] ?? m}
+                    </option>
+                  ))
+                : UTM_MEDIUMS.map((medium) => (
+                    <option
+                      key={medium}
+                      value={medium}
+                      label={UTM_MEDIUM_LABELS[medium]}
+                    >
+                      {UTM_MEDIUM_LABELS[medium]}
+                    </option>
+                  ))}
             </datalist>
           </div>
+          {mediumGovernanceWarning && (
+            <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" />
+              {mediumGovernanceWarning}
+            </p>
+          )}
         </div>
 
         {/* UTM Source — combobox via datalist (filtered by medium) */}
@@ -292,21 +350,34 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             )}
             <datalist id="utm-source-options">
-              {availableSourceOptions.map((opt) => (
-                // Both `label` and inner text — maximises cross-browser support.
-                // Chrome/Safari render the label; Firefox falls back to inner text.
-                <option key={opt.value} value={opt.value} label={opt.label}>
-                  {opt.label}
-                </option>
-              ))}
+              {/* Approved workspace sources take priority when governance is
+                  enabled. Fall back to medium-specific options otherwise. */}
+              {approvedSources.length > 0
+                ? approvedSources.map((s) => (
+                    <option key={s} value={s} label={s}>
+                      {s}
+                    </option>
+                  ))
+                : availableSourceOptions.map((opt) => (
+                    // Both `label` and inner text — maximises cross-browser support.
+                    // Chrome/Safari render the label; Firefox falls back to inner text.
+                    <option key={opt.value} value={opt.value} label={opt.label}>
+                      {opt.label}
+                    </option>
+                  ))}
             </datalist>
           </div>
-          {sourceWarning && (
+          {sourceGovernanceWarning ? (
+            <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" />
+              {sourceGovernanceWarning}
+            </p>
+          ) : sourceWarning ? (
             <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
               <AlertCircle className="w-3 h-3" />
               {sourceWarning}
             </p>
-          )}
+          ) : null}
           {isCustomSourceAllowed(values.utmMedium) && (
             <p className="mt-1 text-xs text-slate-500">
               {t("customSourceAllowed")}

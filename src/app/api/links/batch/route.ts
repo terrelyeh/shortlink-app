@@ -3,6 +3,11 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createShortCode } from "@/lib/utils/shortcode";
 import { bumpLinksCache } from "@/lib/cache-scopes";
+import { resolveWorkspaceScope } from "@/lib/workspace";
+import {
+  getWorkspaceUtmGovernance,
+  validateUtmAgainstGovernance,
+} from "@/lib/utm-governance";
 import { z } from "zod";
 
 const batchCreateSchema = z.object({
@@ -24,6 +29,23 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const validated = batchCreateSchema.parse(body);
+
+    // Resolve workspace scope (fallback to user scope for legacy batch mode).
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    // Governance check once upfront — all rows share the same source/medium.
+    const governance = await getWorkspaceUtmGovernance(scope.workspaceId);
+    const govErrors = validateUtmAgainstGovernance(governance, {
+      source: validated.utmSource,
+      medium: validated.utmMedium,
+    });
+    if (govErrors.length > 0) {
+      return NextResponse.json(
+        { error: "UTM governance violation", details: govErrors },
+        { status: 400 },
+      );
+    }
 
     const createdLinks = [];
     const errors = [];

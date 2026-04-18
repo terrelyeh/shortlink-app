@@ -203,6 +203,14 @@ model ShortLink {
   // path. Incremented atomically inside recordClick().
   clickCount Int @default(0) @map("click_count")
 
+  // Open Graph metadata fetched from originalUrl after creation (best effort,
+  // via after() background job). Used to show a thumbnail + richer label in
+  // the Links list. All nullable because the fetch can fail.
+  ogImage       String? @map("og_image") @db.Text
+  ogTitle       String? @map("og_title")
+  ogDescription String? @map("og_description") @db.Text
+  ogFetchedAt   DateTime? @map("og_fetched_at")
+
   // Metadata (optional for migration, will be required after data migration)
   workspaceId String?  @map("workspace_id")
   createdById String?  @map("created_by_id") // User who created the link

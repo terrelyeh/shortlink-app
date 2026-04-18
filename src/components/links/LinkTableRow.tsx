@@ -37,6 +37,8 @@ interface LinkTableRowProps {
     utmCampaign?: string | null;
     clicksLast7d?: number;
     trendPct?: number | null;
+    ogImage?: string | null;
+    ogTitle?: string | null;
     _count: { clicks: number };
     tags?: LinkTag[];
   };
@@ -152,15 +154,38 @@ export function LinkTableRow({
           </button>
         </td>
 
-        {/* Title + Original URL */}
+        {/* Title + Original URL + OG thumbnail */}
         <td className="py-2 pr-3 min-w-[160px] max-w-[220px]">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900 truncate">
-              {link.title || `/${link.code}`}
-            </p>
-            <p className="text-[11px] text-slate-400 truncate" title={link.originalUrl}>
-              {link.originalUrl.replace(/^https?:\/\/(www\.)?/, "").substring(0, 50)}
-            </p>
+          <div className="flex items-start gap-2 min-w-0">
+            {/* OG image thumbnail — falls back to a letter avatar when
+                the scrape failed / hasn't run yet. Plain <img> (not
+                next/image) avoids needing every destination domain in
+                next.config's remotePatterns list. */}
+            {link.ogImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={link.ogImage}
+                alt=""
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+                className="w-10 h-10 rounded-md object-cover bg-slate-100 border border-slate-200 shrink-0"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-md bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-200 shrink-0 flex items-center justify-center text-xs font-semibold text-slate-400">
+                {(link.title || link.code).charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-900 truncate" title={link.ogTitle ?? undefined}>
+                {link.title || `/${link.code}`}
+              </p>
+              <p className="text-[11px] text-slate-400 truncate" title={link.originalUrl}>
+                {link.originalUrl.replace(/^https?:\/\/(www\.)?/, "").substring(0, 50)}
+              </p>
+            </div>
           </div>
         </td>
 

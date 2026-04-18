@@ -1,11 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createShortCode, isValidCustomCode, isReservedCode } from "@/lib/utils/shortcode";
 import { resolveWorkspaceScope } from "@/lib/workspace";
 import { cacheGetVersion, cacheKey, cached } from "@/lib/cache";
 import { bumpLinksCache, linksCacheNamespace } from "@/lib/cache-scopes";
+import {
+  getWorkspaceUtmGovernance,
+  validateUtmAgainstGovernance,
+} from "@/lib/utm-governance";
+import { fetchOpenGraph } from "@/lib/og-scraper";
 import { z } from "zod";
+
+/**
+ * Fire-and-forget-but-guaranteed OG metadata fetch. Uses Next's `after()`
+ * API so the link-create response ships before the scrape starts; the
+ * scrape itself happens on the same Lambda invocation so it *will*
+ * complete (unlike a naked fire-and-forget which Vercel would kill).
+ */
+async function populateOgMetadata(linkId: string, url: string, workspaceId: string | null, userId: string) {
+  try {
+    const og = await fetchOpenGraph(url);
+    if (!og) return;
+    await prisma.shortLink.update({
+      where: { id: linkId },
+      data: {
+        ogImage: og.image,
+        ogTitle: og.title,
+        ogDescription: og.description,
+        ogFetchedAt: new Date(),
+      },
+    });
+    await bumpLinksCache(workspaceId, userId);
+  } catch (err) {
+    console.warn("[og] populate failed for", linkId, err);
+  }
+}
 
 // Validation schema
 const createLinkSchema = z.object({
@@ -177,6 +208,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = createLinkSchema.parse(body);
 
+    // Resolve workspace scope up-front — we need it for governance checks
+    // and the final create. Fails fast on cross-workspace attempts.
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
     // Generate or validate code
     let code = validated.customCode;
 
@@ -243,6 +279,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Governance: enforce workspace-level UTM whitelist if configured.
+    // Runs *after* Campaign auto-fill so campaign defaults are also checked.
+    const governance = await getWorkspaceUtmGovernance(scope.workspaceId);
+    const govErrors = validateUtmAgainstGovernance(governance, {
+      source: utmSource,
+      medium: utmMedium,
+    });
+    if (govErrors.length > 0) {
+      return NextResponse.json(
+        { error: "UTM governance violation", details: govErrors },
+        { status: 400 },
+      );
+    }
+
     // Build final URL with UTM parameters
     let finalUrl = validated.originalUrl;
     if (utmSource || utmMedium || utmCampaign) {
@@ -256,8 +306,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the short link with tags
-    const scope = await resolveWorkspaceScope(request, session);
-    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const workspaceId = scope.workspaceId;
     const shortLink = await prisma.shortLink.create({
       data: {
@@ -300,6 +348,11 @@ export async function POST(request: NextRequest) {
     });
 
     await bumpLinksCache(workspaceId, session.user.id);
+
+    // Kick off OG metadata fetch after the response — best-effort, does not
+    // block link creation. Uses the *destination* URL (without UTM params)
+    // so thumbnails aren't keyed by tracking variants.
+    after(() => populateOgMetadata(shortLink.id, validated.originalUrl, workspaceId, session.user.id));
 
     return NextResponse.json(shortLink, { status: 201 });
   } catch (error) {

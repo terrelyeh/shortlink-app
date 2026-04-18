@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkWorkspaceAccess, getWorkspaceId } from "@/lib/workspace";
+import { cacheDel, cacheKey } from "@/lib/cache";
 import { z } from "zod";
 
 const utmSettingsSchema = z.object({
@@ -81,6 +82,10 @@ export async function PATCH(request: NextRequest) {
       where: { id: workspaceId },
       data: { utmSettings: normalized },
     });
+
+    // Invalidate the governance cache so enforcement picks up the change
+    // on the very next link create/update instead of waiting 60s.
+    await cacheDel(cacheKey("utm-gov", workspaceId));
 
     return NextResponse.json({ success: true, ...normalized });
   } catch (error) {

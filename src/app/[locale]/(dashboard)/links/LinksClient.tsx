@@ -9,7 +9,7 @@ import { LinkTableRow } from "@/components/links/LinkTableRow";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
-import { Plus, Search, Loader2, Link2, Layers, Tag, Trash2, Pause, Play, Archive, Download, ArrowUpDown, Check, ChevronDown } from "lucide-react";
+import { Plus, Search, Loader2, Link2, Layers, Tag, Trash2, Pause, Play, Archive, Download, ArrowUpDown, Check, ChevronDown, FileSpreadsheet } from "lucide-react";
 import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
 
 interface LinkTag {
@@ -33,6 +33,8 @@ interface ShortLink {
   utmCampaign?: string | null;
   clicksLast7d?: number;
   trendPct?: number | null;
+  ogImage?: string | null;
+  ogTitle?: string | null;
   _count: { clicks: number };
   tags?: LinkTag[];
 }
@@ -365,6 +367,13 @@ export default function LinksClient({
           >
             <Plus className="w-4 h-4" />
             {t("createNew")}
+          </Link>
+          <Link
+            href="/links/import"
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Import CSV
           </Link>
           <Link
             href="/links/batch"
