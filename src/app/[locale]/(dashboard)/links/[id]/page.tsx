@@ -44,8 +44,10 @@ interface LinkData {
   title: string | null;
   status: string;
   redirectType: string;
+  startsAt: string | null;
   expiresAt: string | null;
   maxClicks: number | null;
+  allowedCountries: string[];
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
@@ -78,8 +80,11 @@ export default function EditLinkPage() {
   const [code, setCode] = useState("");
   const [status, setStatus] = useState("ACTIVE");
   const [redirectType, setRedirectType] = useState("TEMPORARY");
+  const [startsAt, setStartsAt] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [maxClicks, setMaxClicks] = useState("");
+  const [allowedCountries, setAllowedCountries] = useState<string[]>([]);
+  const [newCountry, setNewCountry] = useState("");
   const [utmSource, setUtmSource] = useState("");
   const [utmMedium, setUtmMedium] = useState("");
   const [utmCampaign, setUtmCampaign] = useState("");
@@ -132,15 +137,26 @@ export default function EditLinkPage() {
         setUtmTerm(data.utmTerm || "");
         setSelectedTags(data.tags.map((t) => t.tag));
 
+        if (data.startsAt) {
+          setStartsAt(new Date(data.startsAt).toISOString().slice(0, 16));
+        }
         if (data.expiresAt) {
           const d = new Date(data.expiresAt);
           setExpiresAt(d.toISOString().slice(0, 16));
         }
         if (data.maxClicks) setMaxClicks(String(data.maxClicks));
+        if (data.allowedCountries?.length) setAllowedCountries(data.allowedCountries);
 
         // Auto-expand sections if they have values
         if (data.utmSource || data.utmMedium || data.utmContent || data.utmTerm) setShowUTM(true);
-        if (data.expiresAt || data.maxClicks || data.redirectType === "PERMANENT") setShowAdvanced(true);
+        if (
+          data.startsAt ||
+          data.expiresAt ||
+          data.maxClicks ||
+          data.allowedCountries?.length ||
+          data.redirectType === "PERMANENT"
+        )
+          setShowAdvanced(true);
       } catch {
         setError("Failed to load link");
       } finally {
@@ -238,8 +254,10 @@ export default function EditLinkPage() {
         title: title || null,
         status,
         redirectType,
+        startsAt: startsAt ? new Date(startsAt).toISOString() : null,
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
         maxClicks: maxClicks ? parseInt(maxClicks) : null,
+        allowedCountries,
         utmSource: utmSource || null,
         utmMedium: utmMedium || null,
         utmCampaign: utmCampaign || null,
@@ -574,6 +592,22 @@ export default function EditLinkPage() {
                   </div>
                 </div>
 
+                {/* Scheduled start */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Scheduled start
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={startsAt}
+                    onChange={(e) => setStartsAt(e.target.value)}
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] transition-all"
+                  />
+                  <p className="mt-2 text-xs text-slate-500">
+                    Link is inactive until this time. Leave blank to activate immediately.
+                  </p>
+                </div>
+
                 {/* Expiration */}
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -601,6 +635,76 @@ export default function EditLinkPage() {
                     placeholder={t("noLimit")}
                     className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] transition-all placeholder:text-slate-400"
                   />
+                </div>
+
+                {/* Allowed countries */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Geo restriction
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {allowedCountries.map((c) => (
+                      <span
+                        key={c}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-violet-50 text-violet-700 border border-violet-200 rounded-full text-sm font-medium"
+                      >
+                        {c}
+                        <button
+                          type="button"
+                          onClick={() => setAllowedCountries(allowedCountries.filter((x) => x !== c))}
+                          className="text-violet-400 hover:text-violet-700"
+                          aria-label={`Remove ${c}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    {allowedCountries.length === 0 && (
+                      <span className="text-xs text-slate-400 italic">
+                        No restriction — link works worldwide
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      maxLength={2}
+                      value={newCountry}
+                      onChange={(e) => setNewCountry(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => {
+                        if (
+                          e.key === "Enter" &&
+                          /^[A-Z]{2}$/.test(newCountry) &&
+                          !allowedCountries.includes(newCountry)
+                        ) {
+                          e.preventDefault();
+                          setAllowedCountries([...allowedCountries, newCountry]);
+                          setNewCountry("");
+                        }
+                      }}
+                      placeholder="ISO code (e.g. TW)"
+                      className="flex-1 max-w-xs px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-300 focus:border-violet-400 uppercase tracking-wider text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          /^[A-Z]{2}$/.test(newCountry) &&
+                          !allowedCountries.includes(newCountry)
+                        ) {
+                          setAllowedCountries([...allowedCountries, newCountry]);
+                          setNewCountry("");
+                        }
+                      }}
+                      disabled={!/^[A-Z]{2}$/.test(newCountry)}
+                      className="px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:opacity-40 transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Use ISO 3166-1 alpha-2 codes (TW, US, JP, GB…). Non-matching visitors see a &quot;not available in your region&quot; page.
+                  </p>
                 </div>
               </div>
             )}

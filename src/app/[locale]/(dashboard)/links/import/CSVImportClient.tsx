@@ -25,7 +25,9 @@ const TEMPLATE_COLUMNS = [
   "utm_term",
   "tags",
   "max_clicks",
+  "starts_at",
   "expires_at",
+  "allowed_countries",
   "redirect_type",
 ] as const;
 
@@ -40,7 +42,9 @@ const TEMPLATE_SAMPLE: Record<string, string> = {
   utm_term: "",
   tags: "spring,ads",
   max_clicks: "",
+  starts_at: "",
   expires_at: "",
+  allowed_countries: "TW,JP",
   redirect_type: "TEMPORARY",
 };
 

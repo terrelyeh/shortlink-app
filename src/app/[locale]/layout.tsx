@@ -1,26 +1,14 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
-import "../globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: "Short Link Manager",
-  description: "Internal Marketing URL Shortener",
-};
-
+/**
+ * Locale layout — wraps localised pages with NextIntlClientProvider so
+ * client components can call useTranslations(). The <html>/<body> shell
+ * lives in the root layout (src/app/layout.tsx) because Next.js only
+ * allows one per render tree.
+ */
 export default async function LocaleLayout({
   children,
   params,
@@ -30,7 +18,6 @@ export default async function LocaleLayout({
 }) {
   const { locale } = await params;
 
-  // Validate locale
   if (!routing.locales.includes(locale as typeof routing.locales[number])) {
     notFound();
   }
@@ -38,14 +25,6 @@ export default async function LocaleLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale}>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <NextIntlClientProvider messages={messages}>
-          {children}
-        </NextIntlClientProvider>
-      </body>
-    </html>
+    <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
   );
 }

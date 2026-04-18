@@ -13,8 +13,13 @@ const updateLinkSchema = z.object({
   title: z.string().optional().nullable(),
   status: z.enum(["ACTIVE", "PAUSED", "ARCHIVED"]).optional(),
   redirectType: z.enum(["PERMANENT", "TEMPORARY"]).optional(),
+  startsAt: z.string().datetime().optional().nullable(),
   expiresAt: z.string().datetime().optional().nullable(),
   maxClicks: z.number().int().positive().optional().nullable(),
+  allowedCountries: z
+    .array(z.string().regex(/^[A-Z]{2}$/, "Use ISO 3166-1 alpha-2 codes"))
+    .max(50)
+    .optional(),
   utmSource: z.string().optional().nullable(),
   utmMedium: z.string().optional().nullable(),
   utmCampaign: z.string().optional().nullable(),
@@ -115,6 +120,12 @@ export async function PATCH(
     if (validated.title !== undefined) updateData.title = validated.title;
     if (validated.status) updateData.status = validated.status;
     if (validated.redirectType) updateData.redirectType = validated.redirectType;
+    if (validated.startsAt !== undefined) {
+      updateData.startsAt = validated.startsAt ? new Date(validated.startsAt) : null;
+    }
+    if (validated.allowedCountries !== undefined) {
+      updateData.allowedCountries = validated.allowedCountries;
+    }
     if (validated.expiresAt !== undefined) {
       updateData.expiresAt = validated.expiresAt ? new Date(validated.expiresAt) : null;
     }

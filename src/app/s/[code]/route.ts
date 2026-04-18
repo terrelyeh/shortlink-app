@@ -110,6 +110,11 @@ export async function GET(
       return NextResponse.redirect(new URL("/link-inactive", request.url));
     }
 
+    // Scheduled activation — link hasn't gone live yet
+    if (shortLink.startsAt && new Date() < shortLink.startsAt) {
+      return NextResponse.redirect(new URL("/link-not-yet-active", request.url));
+    }
+
     // Check expiration
     if (shortLink.expiresAt && new Date() > shortLink.expiresAt) {
       return NextResponse.redirect(new URL("/link-expired", request.url));
@@ -122,14 +127,24 @@ export async function GET(
       return NextResponse.redirect(new URL("/link-limit-reached", request.url));
     }
 
-    // Redirect immediately
-    const redirectStatus = shortLink.redirectType === "PERMANENT" ? 301 : 302;
-    const response = NextResponse.redirect(shortLink.originalUrl, redirectStatus);
-
     // Extract data before after() — headers are not available inside after()
     const userAgent = headersList.get("user-agent");
     const referrer = headersList.get("referer") || headersList.get("referrer");
     const geo = getGeoFromHeaders(headersList);
+
+    // Geo restriction — only IPs from allowedCountries pass through.
+    // Empty array / null means no restriction. Uses the same geo data we'd
+    // record anyway so no extra lookup cost. Unknown country (no geo headers)
+    // is treated as not-allowed when a whitelist is configured.
+    if (shortLink.allowedCountries.length > 0) {
+      if (!geo.country || !shortLink.allowedCountries.includes(geo.country)) {
+        return NextResponse.redirect(new URL("/link-geo-blocked", request.url));
+      }
+    }
+
+    // Redirect immediately
+    const redirectStatus = shortLink.redirectType === "PERMANENT" ? 301 : 302;
+    const response = NextResponse.redirect(shortLink.originalUrl, redirectStatus);
 
     // Record click AFTER the response is sent using Next.js after() API
     // This is guaranteed to complete on Vercel (unlike fire-and-forget)

@@ -65,7 +65,10 @@ const rowSchema = z.object({
     .refine((v) => v === null || (Number.isInteger(v) && v > 0), {
       message: "max_clicks must be a positive integer",
     }),
+  starts_at: z.string().optional().nullable(),
   expires_at: z.string().optional().nullable(),
+  // Comma-separated ISO country codes (e.g. "TW,US,JP"). Empty → no geo rule.
+  allowed_countries: z.string().optional().nullable(),
   redirect_type: z
     .string()
     .optional()
@@ -235,6 +238,17 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
+      // Parse starts_at if present
+      let startsAt: Date | null = null;
+      if (r.starts_at) {
+        const d = new Date(r.starts_at);
+        if (isNaN(d.getTime())) {
+          results.push({ row: rowNumber, ok: false, error: "Invalid starts_at datetime" });
+          continue;
+        }
+        startsAt = d;
+      }
+
       // Parse expires_at if present
       let expiresAt: Date | null = null;
       if (r.expires_at) {
@@ -244,6 +258,28 @@ export async function POST(request: NextRequest) {
           continue;
         }
         expiresAt = d;
+      }
+
+      // Parse allowed_countries (comma-separated ISO alpha-2 codes).
+      // Any malformed entry fails the whole row — we don't silently drop
+      // restrictions because that would make the link wider than the user
+      // intended (safer to surface the error).
+      const allowedCountries: string[] = [];
+      if (r.allowed_countries) {
+        const parts = r.allowed_countries
+          .split(",")
+          .map((s) => s.trim().toUpperCase())
+          .filter(Boolean);
+        const bad = parts.find((p) => !/^[A-Z]{2}$/.test(p));
+        if (bad) {
+          results.push({
+            row: rowNumber,
+            ok: false,
+            error: `allowed_countries: "${bad}" is not a valid ISO code`,
+          });
+          continue;
+        }
+        allowedCountries.push(...parts);
       }
 
       // Resolve tags for this row
@@ -262,8 +298,10 @@ export async function POST(request: NextRequest) {
             originalUrl: finalUrl,
             title: r.title || null,
             redirectType: (r.redirect_type as "PERMANENT" | "TEMPORARY" | null) ?? "TEMPORARY",
+            startsAt,
             expiresAt,
             maxClicks: r.max_clicks ?? null,
+            allowedCountries,
             utmSource: r.utm_source ?? null,
             utmMedium: r.utm_medium ?? null,
             utmCampaign: r.utm_campaign ?? null,

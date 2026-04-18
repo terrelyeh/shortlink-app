@@ -30,6 +30,8 @@ interface ShortLink {
   title: string | null;
   status: string;
   createdAt: string;
+  startsAt?: string | null;
+  allowedCountries?: string[];
   utmCampaign?: string | null;
   clicksLast7d?: number;
   trendPct?: number | null;

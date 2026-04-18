@@ -44,8 +44,13 @@ const createLinkSchema = z.object({
   customCode: z.string().optional(),
   title: z.string().optional(),
   redirectType: z.enum(["PERMANENT", "TEMPORARY"]).default("TEMPORARY"),
+  startsAt: z.string().datetime().optional().nullable(),
   expiresAt: z.string().datetime().optional().nullable(),
   maxClicks: z.number().int().positive().optional().nullable(),
+  allowedCountries: z
+    .array(z.string().regex(/^[A-Z]{2}$/, "Use ISO 3166-1 alpha-2 codes (e.g. TW, US)"))
+    .max(50)
+    .optional(),
   campaignId: z.string().optional(),
   utmSource: z.string().optional(),
   utmMedium: z.string().optional(),
@@ -313,8 +318,10 @@ export async function POST(request: NextRequest) {
         originalUrl: finalUrl,
         title: validated.title,
         redirectType: validated.redirectType,
+        startsAt: validated.startsAt ? new Date(validated.startsAt) : null,
         expiresAt: validated.expiresAt ? new Date(validated.expiresAt) : null,
         maxClicks: validated.maxClicks,
+        allowedCountries: validated.allowedCountries ?? [],
         utmSource,
         utmMedium,
         utmCampaign,

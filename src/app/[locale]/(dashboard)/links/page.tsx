@@ -109,6 +109,8 @@ export default async function LinksPage({
     return {
       ...link,
       createdAt: link.createdAt.toISOString(),
+      // Date fields → strings so the Client boundary can take them.
+      startsAt: link.startsAt ? link.startsAt.toISOString() : null,
       clicksLast7d: c7,
       trendPct,
     };

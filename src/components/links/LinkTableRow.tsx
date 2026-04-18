@@ -17,6 +17,8 @@ import {
   TrendingUp,
   TrendingDown,
   Download,
+  CalendarClock,
+  Globe2,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge, StatusDot } from "@/components/ui/Badge";
@@ -34,6 +36,8 @@ interface LinkTableRowProps {
     title?: string | null;
     status: string;
     createdAt: string;
+    startsAt?: string | null;
+    allowedCountries?: string[];
     utmCampaign?: string | null;
     clicksLast7d?: number;
     trendPct?: number | null;
@@ -185,6 +189,32 @@ export function LinkTableRow({
               <p className="text-[11px] text-slate-400 truncate" title={link.originalUrl}>
                 {link.originalUrl.replace(/^https?:\/\/(www\.)?/, "").substring(0, 50)}
               </p>
+              {/* Schedule / geo indicators — these affect whether the link
+                  actually redirects, so worth surfacing at a glance. */}
+              {(link.startsAt || (link.allowedCountries && link.allowedCountries.length > 0)) && (
+                <div className="flex items-center gap-2 mt-1">
+                  {link.startsAt && new Date(link.startsAt) > new Date() && (
+                    <span
+                      className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-100"
+                      title={`Starts ${new Date(link.startsAt).toLocaleString()}`}
+                    >
+                      <CalendarClock className="w-2.5 h-2.5" />
+                      Scheduled
+                    </span>
+                  )}
+                  {link.allowedCountries && link.allowedCountries.length > 0 && (
+                    <span
+                      className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-100"
+                      title={`Restricted to: ${link.allowedCountries.join(", ")}`}
+                    >
+                      <Globe2 className="w-2.5 h-2.5" />
+                      {link.allowedCountries.length === 1
+                        ? link.allowedCountries[0]
+                        : `${link.allowedCountries.length} regions`}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </td>
