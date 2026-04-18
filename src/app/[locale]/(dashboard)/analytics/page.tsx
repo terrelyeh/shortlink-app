@@ -58,7 +58,9 @@ export default function AnalyticsPage() {
   const [selectedCampaign, setSelectedCampaign] = useState<string>(
     searchParams.get("campaign") || "",
   );
-  const [selectedLinkId, setSelectedLinkId] = useState<string>("");
+  const [selectedLinkId, setSelectedLinkId] = useState<string>(
+    searchParams.get("linkId") || "",
+  );
   const [selectedTagId, setSelectedTagId] = useState<string>("");
   const [tags, setTags] = useState<TagOption[]>([]);
   const [links, setLinks] = useState<ShortLink[]>([]);
