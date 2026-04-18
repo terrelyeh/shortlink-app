@@ -4,7 +4,6 @@ import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/routing";
 import { signOut } from "next-auth/react";
 import {
-  LayoutDashboard,
   Link2,
   FileText,
   BarChart3,
@@ -38,11 +37,17 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Order reflects actual workflow frequency:
+  //   Campaigns is the daily operational hub (moved to top),
+  //   Links is the resource layer, Analytics is the weekly/monthly
+  //   strategic view, Templates and admin items trail.
+  // The legacy /dashboard stop was removed — it duplicated data users
+  // already see on Campaigns + Analytics.
   const navItems: NavItem[] = [
     {
-      href: "/dashboard",
-      labelKey: "dashboard",
-      icon: <LayoutDashboard className="w-5 h-5" />,
+      href: "/campaigns",
+      labelKey: "campaigns",
+      icon: <Megaphone className="w-5 h-5" />,
     },
     {
       href: "/links",
@@ -53,11 +58,6 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       href: "/analytics",
       labelKey: "analytics",
       icon: <BarChart3 className="w-5 h-5" />,
-    },
-    {
-      href: "/campaigns",
-      labelKey: "campaigns",
-      icon: <Megaphone className="w-5 h-5" />,
     },
     {
       href: "/templates",

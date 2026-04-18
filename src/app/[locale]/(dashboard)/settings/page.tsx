@@ -188,7 +188,7 @@ export default function SettingsPage() {
       await refreshWorkspaces();
       setShowDeleteWorkspaceConfirm(false);
       setDeleteWorkspaceConfirmName("");
-      router.push("/dashboard");
+      router.push("/campaigns");
     } catch (err) {
       setDeleteWorkspaceError(err instanceof Error ? err.message : "Failed to delete workspace");
       setIsDeletingWorkspace(false);

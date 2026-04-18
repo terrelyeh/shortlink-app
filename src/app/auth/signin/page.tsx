@@ -7,7 +7,7 @@ export default async function SignInPage() {
   const session = await auth();
 
   if (session) {
-    redirect("/dashboard");
+    redirect("/campaigns");
   }
 
   return (
@@ -76,7 +76,7 @@ export default async function SignInPage() {
             <form
               action={async () => {
                 "use server";
-                await signIn("google", { redirectTo: "/dashboard" });
+                await signIn("google", { redirectTo: "/campaigns" });
               }}
             >
               <button
