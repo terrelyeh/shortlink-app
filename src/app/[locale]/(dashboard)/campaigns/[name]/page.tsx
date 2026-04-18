@@ -38,6 +38,7 @@ interface CampaignLink {
   title: string | null;
   status: string;
   createdAt: string;
+  utmCampaign: string | null;
   utmSource: string | null;
   utmMedium: string | null;
   utmContent: string | null;
@@ -670,7 +671,11 @@ export default function CampaignDetailPage() {
                       </td>
                       <td>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                          <span className="pill pill-campaign">{campaignName}</span>
+                          {link.utmCampaign ? (
+                            <span className="pill pill-campaign">{link.utmCampaign}</span>
+                          ) : (
+                            <span className="muted">—</span>
+                          )}
                           {link.utmSource && <span className="pill pill-source">{link.utmSource}</span>}
                           {link.utmMedium && <span className="pill pill-medium">{link.utmMedium}</span>}
                           {link.utmContent && <span className="pill pill-content">{link.utmContent}</span>}
