@@ -10,27 +10,40 @@
 |------|------|
 | **短網址管理** | 建立、編輯、刪除短連結，支援自訂代碼或自動生成 7 位 Base62 代碼 |
 | **UTM 參數建構器** | 內建 UTM 參數編輯器，預設常用來源（Facebook、Instagram、Google Ads 等） |
+| **UTM 白名單 Governance** | Workspace 層級設定核准的 source / medium；違反時伺服器拒絕 + UI 即時警告 |
 | **UTM 模板系統** | 儲存常用 UTM 組合為模板，快速套用 |
-| **批次建立** | 一次建立多個短網址變體（如多位 KOL 的追蹤連結） |
-| **QR Code 產生** | 自動為每個短網址產生 QR Code |
+| **批次建立（固定 URL + 多 content）** | 一次建立多個短網址變體（如多位 KOL 的追蹤連結） |
+| **CSV 匯入批次建立** | 每 row 獨立 URL / UTM / tags / 排程 / 地區限制，上限 500 row |
+| **OG 縮圖自動抓取** | 建連結後背景抓目標頁的 `og:image` / `og:title` 作為預覽縮圖 |
+| **QR Code 產生** | 自動為每個短網址產生 QR Code，支援 PNG 下載與複製到剪貼簿 |
 | **連結分組與標籤** | 使用群組和標籤整理連結，支援多標籤篩選 |
 | **連結複製** | 一鍵複製既有連結設定，快速建立變體 |
+| **A/B 多目的地** | 單一短網址可設定 2–4 個目的 URL + 權重，後端加權隨機分流，`Click.variantId` 記錄每次走哪條 |
+| **排程啟用** | 設定 `startsAt`，到時間才開始轉址（前顯示 "Not yet active" 頁） |
+| **地區限制** | `allowedCountries` ISO 代碼列表，非名單訪客顯示 "Geo blocked" 頁 |
 
 ### 行銷活動管理
 
 | 功能 | 說明 |
 |------|------|
-| **Campaign 管理** | 建立行銷活動（Campaign），設定預設 UTM Source / Medium |
+| **Campaign 管理** | 建立行銷活動（Campaign），設定預設 UTM Source / Medium、顯示名稱、描述 |
+| **Campaign 自動綁定** | 建連結時填 `utm_campaign` 自動建 Campaign row；填同名就綁同一個 — 使用者不用額外「建 Campaign」 |
 | **活動狀態生命週期** | Draft → Active → Completed → Archived 四階段管理 |
+| **KPI 目標追蹤** | 每個 Campaign 可設 `goalClicks` 目標，Detail 頁顯示進度條 + 達標慶祝 |
+| **活動排行榜** | Campaigns 列表顯示每個活動的 clicks / conversions / CVR / goal%，可排序 |
+| **多 Campaign 比較** | 列表勾選 2-4 個 → 上方顯示 daily clicks overlay 折線；進 `/campaigns/compare` 看 side-by-side 深度比較（winner cards + 每活動 top source/medium/link） |
+| **Campaign Detail 三 tabs** | Overview（KPI + 30d 趨勢）/ Traffic（來源/裝置/地區拆解）/ Links（活動內連結含 CVR） |
 | **活動標籤** | 為活動加上標籤分類，方便搜尋篩選 |
-| **跨頁面 Campaign 篩選** | 在連結、分析、儀表板頁面皆可依 Campaign 篩選 |
-| **儀表板活動摘要** | 首頁直接顯示 Top Campaigns 排行（依點擊數） |
+| **跨頁面 Campaign 篩選** | 在連結、分析頁面皆可依 Campaign 篩選 |
+| **Orphan Links 提醒** | Campaigns 頁自動列出有流量但沒綁 Campaign 的連結，一鍵跳去補綁 |
 
 ### 數據分析
 
 | 功能 | 說明 |
 |------|------|
-| **點擊追蹤** | 即時記錄每次點擊，含重複點擊去重與 Bot 偵測 |
+| **點擊追蹤** | 即時記錄每次點擊，含重複點擊去重（2 秒窗口）與 Bot 偵測 |
+| **轉換追蹤 (Conversion Tracking)** | Landing page 放一段 snippet（`/track.js`）或後端 webhook 呼叫 `/api/track`，透過 session token 歸因回來源連結；支援 event name / value / currency / externalId（idempotency） |
+| **CVR 顯示** | 連結列表 / Campaign 列表 / Compare 頁都自動算 CVR；超過 0 才顯示，避免雜訊 |
 | **趨勢圖表** | 視覺化呈現點擊數據（支援 24h / 7d / 30d / 90d / 自訂範圍） |
 | **來源分析** | 追蹤流量來源（Referrer） |
 | **裝置分析** | Mobile / Tablet / Desktop 分佈 |
@@ -59,9 +72,10 @@
 - **國際化 (i18n)** - 支援英文與繁體中文
 - **響應式設計** - 適配桌面與行動裝置
 - **軟刪除** - 已刪除連結保留於資料庫，可供稽核
-- **連結過期** - 設定到期時間或最大點擊次數
-- **Rate Limiting** - 重導向端點與分享報告端點均設有速率限制
+- **連結生命週期** - 排程啟用（`startsAt`）/ 到期（`expiresAt`）/ 最大點擊次數（`maxClicks`）
+- **Rate Limiting** - 重導向端點（per-IP 60/min）與分享報告端點均設有速率限制
 - **IP 匿名化** - 使用 Hash Salt 對 IP 位址進行匿名化處理
+- **Workspace IDOR 防護** - `resolveWorkspaceScope()` 驗 membership，避免越權讀取他人 workspace
 
 ---
 
@@ -219,42 +233,60 @@ npx prisma db push
 ```
 src/
 ├── app/
+│   ├── layout.tsx             # Root layout（<html>/<body>，給非 locale 頁用）
 │   ├── [locale]/              # 國際化路由
-│   │   ├── (dashboard)/       # 受保護的儀表板路由
-│   │   │   ├── dashboard/     # 總覽儀表板
-│   │   │   ├── links/         # 連結管理（含新增、批次建立）
-│   │   │   ├── campaigns/     # 行銷活動管理
+│   │   ├── layout.tsx         # NextIntlClientProvider（無 html/body）
+│   │   ├── (dashboard)/       # Route group（登入後的保護區）
+│   │   │   ├── campaigns/     # 行銷活動管理（登入首頁）
+│   │   │   │   ├── [name]/    # Campaign Detail（Overview / Traffic / Links tabs）
+│   │   │   │   └── compare/   # 多活動 side-by-side 比較
+│   │   │   ├── links/         # 連結管理
+│   │   │   │   ├── new/       # 單筆建立
+│   │   │   │   ├── batch/     # 固定 URL + 多 content 批次
+│   │   │   │   ├── import/    # CSV 匯入批次建立
+│   │   │   │   └── [id]/      # 編輯單一連結
+│   │   │   ├── analytics/     # 全站維度分析
 │   │   │   ├── templates/     # UTM 模板
-│   │   │   ├── analytics/     # 數據分析
-│   │   │   ├── workspaces/    # 工作區管理（含成員、設定）
+│   │   │   ├── workspaces/    # 工作區管理
 │   │   │   ├── users/         # 使用者管理（Admin）
 │   │   │   ├── audit-log/     # 審計日誌
-│   │   │   └── settings/      # 個人設定
-│   │   └── auth/              # 認證頁面
-│   ├── api/                   # API 路由
-│   ├── s/[code]/              # 短網址重導向處理
-│   └── share/[token]/         # 公開分享報告頁面
+│   │   │   └── settings/      # 個人設定 + UTM Governance tab
+│   │   └── page.tsx           # 根頁 → 登入時 redirect 到 /campaigns
+│   ├── auth/                  # NextAuth 認證頁
+│   ├── api/                   # API 路由（含 /api/track 轉換追蹤）
+│   ├── s/[code]/              # 短網址轉址 + A/B variant + session attribution
+│   ├── track.js/              # 公開 JS snippet（landing page 引用）
+│   ├── share/[token]/         # 公開分享報告頁面
+│   └── link-*/                # 狀態頁（expired / inactive / limit-reached /
+│                              # not-yet-active / geo-blocked）
 ├── components/
-│   ├── layout/                # 版面元件（Sidebar、語言切換）
-│   ├── forms/                 # 表單元件（建立連結、批次建立、UTM 建構器）
-│   ├── links/                 # 連結相關元件（LinkCard、QR Code）
-│   ├── analytics/             # 分析圖表元件（折線圖、圓餅圖）
-│   ├── campaigns/             # Campaign 元件（CampaignFilter）
-│   ├── tags/                  # 標籤元件（TagInput）
-│   ├── workspace/             # 工作區元件（WorkspaceSwitcher）
-│   ├── ui/                    # 通用 UI 元件（Toast）
-│   └── providers/             # Context Providers
-├── hooks/
-│   └── useDebounce.ts         # 防抖 Hook
+│   ├── layout/                # Sidebar、語言切換
+│   ├── forms/                 # 表單（建立連結、批次、CSV 匯入、UTM 建構器）
+│   ├── links/                 # LinkCard / LinkTableRow（含 OG 縮圖）/ QR Code
+│   ├── analytics/             # 折線圖 / 圓餅圖 / MultiCampaignChart
+│   ├── campaigns/             # CampaignFilter
+│   └── ...（tags / workspace / ui / providers）
 ├── lib/
 │   ├── auth.ts                # NextAuth.js 設定
 │   ├── prisma.ts              # Prisma 客戶端
-│   ├── workspace.ts           # 工作區查詢工具
-│   ├── rate-limit.ts          # 速率限制
+│   ├── workspace.ts           # resolveWorkspaceScope() — 驗 membership
+│   ├── ratelimit.ts           # 速率限制（重導向 + /api/track）
+│   ├── cache.ts + cache-scopes.ts  # Redis wrapper + versioned invalidation
 │   ├── geoip.ts               # IP 地理位置查詢
-│   └── utils/                 # 工具函式（短碼生成、UTM 處理）
+│   ├── og-scraper.ts          # 目標頁 og:image / og:title 抓取
+│   ├── utm-governance.ts      # 工作區白名單驗證
+│   ├── variants.ts            # A/B 權重 pick + session URL helper
+│   ├── campaign-autolink.ts   # 自動 upsert Campaign from utm_campaign
+│   ├── analytics/compute.ts   # Client-side 聚合（全 JS）
+│   └── utils/                 # shortcode 生成、UTM 常數處理
 ├── i18n/                      # 國際化設定
-└── messages/                  # 翻譯檔案（en.json、zh-TW.json）
+├── messages/                  # 翻譯檔案（en.json、zh-TW.json）
+└── middleware.ts              # next-intl routing（排除 /s/、/link-*、/share/ 等）
+
+scripts/
+└── backfill-campaign-autolink.mjs  # 一次性 orphan link → Campaign 綁定
+
+screenshots/                   # UI 設計評估用截圖（gitignored 建議）
 ```
 
 ---
@@ -265,10 +297,11 @@ src/
 
 | 端點 | 方法 | 說明 |
 |------|------|------|
-| `/api/links` | GET, POST | 列出 / 建立連結（支援 campaign、tag、status 篩選） |
-| `/api/links/batch` | POST | 批次建立連結 |
-| `/api/links/batch-actions` | POST | 批次操作（刪除、暫停、啟用、封存） |
-| `/api/links/[id]` | GET, PATCH, DELETE | 單一連結操作 |
+| `/api/links` | GET, POST | 列出 / 建立連結（Redis cached + versioned invalidation） |
+| `/api/links/batch` | POST | 固定 URL + 多 content 批次建立 |
+| `/api/links/batch-csv` | POST | CSV 檔案批次匯入（每 row 獨立 UTM / 排程 / 地區） |
+| `/api/links/batch-actions` | POST | 批次操作（刪除、暫停、啟用、封存、加標籤） |
+| `/api/links/[id]` | GET, PATCH, DELETE | 單一連結操作（PATCH 支援 A/B variants / 排程 / 地區） |
 | `/api/links/[id]/clone` | POST | 複製連結 |
 | `/api/links/[id]/preview` | GET | 預覽目標網址資訊 |
 
@@ -285,8 +318,17 @@ src/
 | 端點 | 方法 | 說明 |
 |------|------|------|
 | `/api/analytics` | GET | 取得分析數據（支援 campaign、link、日期範圍篩選） |
+| `/api/analytics/raw` | GET | 回傳 90d 原始點擊，給前端 `computeAnalytics()` 聚合 |
+| `/api/analytics/campaigns-summary` | GET | Campaign leaderboard + orphan links + 每活動時序資料 |
 | `/api/export/links` | GET | 匯出連結清單 CSV |
 | `/api/export/analytics` | GET | 匯出點擊原始數據 CSV |
+
+### 轉換追蹤
+
+| 端點 | 方法 | 說明 |
+|------|------|------|
+| `/api/track` | POST, OPTIONS | 接收 landing page 回傳的 conversion 事件（公開 CORS，rate-limited） |
+| `/track.js` | GET | 公開 JS snippet，提供 `window.Shortlink.convert({ event, value, currency, externalId })` |
 
 ### 模板與標籤
 
