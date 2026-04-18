@@ -1,4 +1,4 @@
-import { ArrowLeft, FileSpreadsheet } from "lucide-react";
+import { ChevronLeft, FileSpreadsheet } from "lucide-react";
 import Link from "next/link";
 import CSVImportClient from "./CSVImportClient";
 
@@ -8,32 +8,36 @@ export function generateMetadata() {
 
 export default function CSVImportPage() {
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="mb-6">
-        <Link
-          href="/links"
-          className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Links
-        </Link>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-5 bg-slate-100 border-b border-slate-200">
-          <h1 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
-            <FileSpreadsheet className="w-5 h-5 text-[#03A9F4]" />
-            Import Links from CSV
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">
-            Upload a CSV with one row per link — each can have its own URL,
-            UTM set, tags, expiry and custom code. Great for rolling out
-            20+ channel variants in one go.
-          </p>
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      <Link href="/links" className="back-link">
+        <ChevronLeft size={13} /> Back to Links
+      </Link>
+      <div className="card" style={{ padding: 24 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16 }}>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              background: "var(--brand-50)",
+              color: "var(--brand-600)",
+              display: "grid",
+              placeItems: "center",
+            }}
+          >
+            <FileSpreadsheet size={18} />
+          </div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ink-100)" }}>
+              Import links from CSV
+            </div>
+          </div>
         </div>
-        <div className="p-6">
-          <CSVImportClient />
-        </div>
+        <p style={{ fontSize: 13, color: "var(--ink-400)", margin: "0 0 16px" }}>
+          Upload a CSV with one row per link — each can have its own URL, UTM set, tags,
+          expiry and custom code. Great for rolling out 20+ channel variants in one go.
+        </p>
+        <CSVImportClient />
       </div>
     </div>
   );

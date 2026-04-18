@@ -4,13 +4,28 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/routing";
-// (useDebounce removed — client-side filter is instant, no debouncing needed)
 import { LinkTableRow } from "@/components/links/LinkTableRow";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
-import { Plus, Search, Loader2, Link2, Layers, Tag, Trash2, Pause, Play, Archive, Download, ArrowUpDown, Check, ChevronDown, FileSpreadsheet } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Loader2,
+  Link2,
+  Layers,
+  Tag as TagIcon,
+  Trash2,
+  Pause,
+  Play,
+  Archive,
+  Download,
+  ArrowUpDown,
+  ChevronDown,
+  FileSpreadsheet,
+} from "lucide-react";
 import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 interface LinkTag {
   tag: { id: string; name: string; color?: string | null };
@@ -61,10 +76,7 @@ export default function LinksClient({
   const { success, error: toastError } = useToast();
   const searchParams = useSearchParams();
 
-  // `allLinks` is the raw list loaded from the server. Filters/sorts/search
-  // derive from this via useMemo — zero-latency on every keystroke.
   const [allLinks, setAllLinks] = useState<ShortLink[]>(initialLinks);
-  // Used only after mutations (delete, clone, batch actions) to pull fresh data.
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -74,18 +86,16 @@ export default function LinksClient({
   const [batchLoading, setBatchLoading] = useState(false);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState("desc");
-  const [campaignFilter, setCampaignFilter] = useState(searchParams.get("campaign") || initialCampaign);
+  const [campaignFilter, setCampaignFilter] = useState(
+    searchParams.get("campaign") || initialCampaign,
+  );
 
-  // Delete confirmation state
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
 
-  // Batch tag state
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [batchTagLoading, setBatchTagLoading] = useState(false);
 
-  // Tags are seeded from the server; refresh in the background so the filter
-  // stays current if someone added a tag from another tab.
   useEffect(() => {
     async function refreshTags() {
       try {
@@ -98,17 +108,12 @@ export default function LinksClient({
         console.error("Failed to fetch tags:", err);
       }
     }
-    // Small delay so it doesn't compete with the initial paint.
-    const t = setTimeout(refreshTags, 500);
-    return () => clearTimeout(t);
+    const tt = setTimeout(refreshTags, 500);
+    return () => clearTimeout(tt);
   }, []);
 
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
 
-  /**
-   * Pull a fresh copy of all links from the server. Used only after
-   * mutations (clone, batch actions) — NOT wired to filter changes.
-   */
   const refreshLinks = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -124,54 +129,35 @@ export default function LinksClient({
     }
   }, [loadedCap]);
 
-  // Derived list: filter → sort in-memory. Instant on every keystroke.
   const links = useMemo(() => {
     const q = search.trim().toLowerCase();
     let out = allLinks;
-
     if (q) {
-      out = out.filter((l) => {
-        return (
+      out = out.filter(
+        (l) =>
           l.code.toLowerCase().includes(q) ||
           l.originalUrl.toLowerCase().includes(q) ||
-          (l.title?.toLowerCase() ?? "").includes(q)
-        );
-      });
+          (l.title?.toLowerCase() ?? "").includes(q),
+      );
     }
     if (statusFilter) out = out.filter((l) => l.status === statusFilter);
     if (campaignFilter) {
-      if (campaignFilter === "__none__") {
-        out = out.filter((l) => !l.utmCampaign);
-      } else {
-        out = out.filter((l) => l.utmCampaign === campaignFilter);
-      }
+      if (campaignFilter === "__none__") out = out.filter((l) => !l.utmCampaign);
+      else out = out.filter((l) => l.utmCampaign === campaignFilter);
     }
     if (tagFilter) {
-      out = out.filter((l) =>
-        (l.tags || []).some((t) => t.tag.id === tagFilter),
-      );
+      out = out.filter((l) => (l.tags || []).some((tg) => tg.tag.id === tagFilter));
     }
-
     const dir = sortOrder === "asc" ? 1 : -1;
     out = [...out].sort((a, b) => {
-      if (sortBy === "clicks") {
-        return (a._count.clicks - b._count.clicks) * dir;
-      }
-      // createdAt (default)
-      return (
-        (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir
-      );
+      if (sortBy === "clicks") return (a._count.clicks - b._count.clicks) * dir;
+      return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir;
     });
-
     return out;
   }, [allLinks, search, statusFilter, campaignFilter, tagFilter, sortBy, sortOrder]);
 
-  // Called from row — opens confirm modal
-  const confirmDelete = (id: string) => {
-    setDeleteConfirmId(id);
-  };
+  const confirmDelete = (id: string) => setDeleteConfirmId(id);
 
-  // Executes actual single delete after modal confirm
   const executeDelete = async () => {
     if (!deleteConfirmId) return;
     const id = deleteConfirmId;
@@ -181,9 +167,7 @@ export default function LinksClient({
       if (response.ok) {
         setAllLinks((prev) => prev.filter((link) => link.id !== id));
         success("Link deleted.");
-      } else {
-        toastError("Failed to delete link.");
-      }
+      } else toastError("Failed to delete link.");
     } catch {
       toastError("Failed to delete link.");
     }
@@ -197,13 +181,15 @@ export default function LinksClient({
         body: JSON.stringify({ status }),
       });
       if (response.ok) {
-        setAllLinks((prev) =>
-          prev.map((link) => (link.id === id ? { ...link, status } : link))
+        setAllLinks((prev) => prev.map((link) => (link.id === id ? { ...link, status } : link)));
+        success(
+          status === "ACTIVE"
+            ? "Link activated."
+            : status === "PAUSED"
+              ? "Link paused."
+              : "Link archived.",
         );
-        success(status === "ACTIVE" ? "Link activated." : status === "PAUSED" ? "Link paused." : "Link archived.");
-      } else {
-        toastError("Failed to update status.");
-      }
+      } else toastError("Failed to update status.");
     } catch {
       toastError("Failed to update status.");
     }
@@ -215,9 +201,7 @@ export default function LinksClient({
       if (response.ok) {
         refreshLinks();
         success("Link cloned successfully.");
-      } else {
-        toastError("Failed to clone link.");
-      }
+      } else toastError("Failed to clone link.");
     } catch {
       toastError("Failed to clone link.");
     }
@@ -233,11 +217,8 @@ export default function LinksClient({
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === links.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(links.map((l) => l.id)));
-    }
+    if (selectedIds.size === links.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(links.map((l) => l.id)));
   };
 
   const handleBatchTag = async (tagId: string) => {
@@ -253,9 +234,7 @@ export default function LinksClient({
       if (response.ok) {
         refreshLinks();
         success(`Tag added to ${selectedIds.size} link${selectedIds.size > 1 ? "s" : ""}.`);
-      } else {
-        toastError("Failed to add tag.");
-      }
+      } else toastError("Failed to add tag.");
     } catch {
       toastError("Failed to add tag.");
     } finally {
@@ -277,9 +256,7 @@ export default function LinksClient({
         setSelectedIds(new Set());
         refreshLinks();
         success(`${count} link${count > 1 ? "s" : ""} deleted.`);
-      } else {
-        toastError("Batch delete failed.");
-      }
+      } else toastError("Batch delete failed.");
     } catch {
       toastError("Batch delete failed.");
     } finally {
@@ -302,9 +279,7 @@ export default function LinksClient({
         refreshLinks();
         const label = action === "activate" ? "activated" : action === "pause" ? "paused" : "archived";
         success(`${count} link${count > 1 ? "s" : ""} ${label}.`);
-      } else {
-        toastError("Batch action failed.");
-      }
+      } else toastError("Batch action failed.");
     } catch {
       toastError("Batch action failed.");
     } finally {
@@ -313,8 +288,7 @@ export default function LinksClient({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Delete confirmation modals — rendered outside pagination so they always work */}
+    <>
       <ConfirmDialog
         open={!!deleteConfirmId}
         title="Delete this link?"
@@ -336,89 +310,79 @@ export default function LinksClient({
         variant="danger"
       />
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">{t("title")}</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+      <PageHeader
+        title="Link Management"
+        description={
+          <>
             {links.length} of {totalLinks} {totalLinks === 1 ? "link" : "links"}
             {totalLinks > loadedCap && (
-              <span className="ml-1 text-amber-600">
-                (showing first {loadedCap} — create fewer links or contact admin)
+              <span style={{ color: "var(--data-amber)", marginLeft: 4 }}>
+                (showing first {loadedCap})
               </span>
             )}
             {campaignFilter && campaignFilter !== "__none__" && (
-              <span className="text-slate-400"> in <span className="font-mono">{campaignFilter}</span></span>
+              <span className="muted">
+                {" "}
+                in{" "}
+                <span style={{ fontFamily: "var(--font-mono)" }}>{campaignFilter}</span>
+              </span>
             )}
             {campaignFilter === "__none__" && (
-              <span className="text-slate-400"> without campaign</span>
+              <span className="muted"> without campaign</span>
             )}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <a
-            href={`/api/export/links${statusFilter ? `?status=${statusFilter}` : ""}`}
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            {tCommon("export")}
-          </a>
-          <Link
-            href="/links/new"
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            {t("createNew")}
-          </Link>
-          <Link
-            href="/links/import"
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Import CSV
-          </Link>
-          <Link
-            href="/links/batch"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors"
-          >
-            <Layers className="w-4 h-4" />
-            Batch Create
-          </Link>
-        </div>
-      </div>
+          </>
+        }
+        actions={
+          <>
+            <a
+              href={`/api/export/links${statusFilter ? `?status=${statusFilter}` : ""}`}
+              className="btn btn-secondary"
+            >
+              <Download size={12} /> {tCommon("export")}
+            </a>
+            <Link href="/links/new" className="btn btn-secondary">
+              <Plus size={12} /> {t("createNew")}
+            </Link>
+            <Link href="/links/import" className="btn btn-secondary">
+              <FileSpreadsheet size={12} /> Import CSV
+            </Link>
+            <Link href="/links/batch" className="btn btn-primary">
+              <Layers size={12} /> Batch create
+            </Link>
+          </>
+        }
+      />
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      {/* Toolbar */}
+      <div className="toolbar">
+        <div className="search" style={{ minWidth: 240, flex: 1 }}>
+          <Search size={14} />
           <input
-            type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={tCommon("search")}
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] text-sm"
           />
         </div>
-        <CampaignFilter
-          value={campaignFilter}
-          onChange={setCampaignFilter}
-          showNoCampaign
-        />
-        <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
+        <CampaignFilter value={campaignFilter} onChange={setCampaignFilter} showNoCampaign />
+        <div className="chip-row">
           {["", "ACTIVE", "PAUSED", "ARCHIVED"].map((status) => (
             <button
-              key={status}
+              key={status || "all"}
+              className={`chip ${statusFilter === status ? "active" : ""}`}
               onClick={() => setStatusFilter(status)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${statusFilter === status
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-                }`}
             >
-              {status === "" ? tCommon("all") : status === "ACTIVE" ? t("active") : status === "PAUSED" ? t("paused") : t("archived")}
+              {status === ""
+                ? tCommon("all")
+                : status === "ACTIVE"
+                  ? t("active")
+                  : status === "PAUSED"
+                    ? t("paused")
+                    : t("archived")}
             </button>
           ))}
         </div>
-        <div className="relative">
+        <div style={{ flex: 1 }} />
+        <div style={{ position: "relative" }}>
           <select
             value={`${sortBy}:${sortOrder}`}
             onChange={(e) => {
@@ -426,66 +390,153 @@ export default function LinksClient({
               setSortBy(by);
               setSortOrder(order);
             }}
-            className="appearance-none pl-8 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] cursor-pointer"
+            className="input"
+            style={{
+              height: 32,
+              paddingLeft: 32,
+              paddingRight: 28,
+              appearance: "none",
+              cursor: "pointer",
+              fontSize: 12.5,
+            }}
           >
             <option value="createdAt:desc">{t("sortNewest")}</option>
             <option value="createdAt:asc">{t("sortOldest")}</option>
             <option value="clicks:desc">{t("sortMostClicks")}</option>
             <option value="clicks:asc">{t("sortFewestClicks")}</option>
           </select>
-          <ArrowUpDown className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          <ArrowUpDown
+            size={13}
+            style={{
+              position: "absolute",
+              left: 10,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "var(--ink-500)",
+              pointerEvents: "none",
+            }}
+          />
         </div>
         {allTags.length > 0 && (
-          <div className="relative">
+          <div style={{ position: "relative" }}>
             <select
               value={tagFilter}
               onChange={(e) => setTagFilter(e.target.value)}
-              className="appearance-none pl-8 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] cursor-pointer"
+              className="input"
+              style={{
+                height: 32,
+                paddingLeft: 32,
+                paddingRight: 28,
+                appearance: "none",
+                cursor: "pointer",
+                fontSize: 12.5,
+              }}
             >
-              <option value="">{t("tags")}: {tCommon("all")}</option>
+              <option value="">
+                {t("tags")}: {tCommon("all")}
+              </option>
               {allTags.map((tag) => (
                 <option key={tag.id} value={tag.id}>
                   {tag.name} ({tag._count.links})
                 </option>
               ))}
             </select>
-            <Tag className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <TagIcon
+              size={13}
+              style={{
+                position: "absolute",
+                left: 10,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "var(--ink-500)",
+                pointerEvents: "none",
+              }}
+            />
           </div>
         )}
       </div>
 
-      {/* Batch Actions Toolbar */}
+      {/* Batch toolbar */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-          <span className="text-sm font-medium text-slate-700">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: 10,
+            background: "var(--bg-subtle)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--r-lg)",
+            marginBottom: 14,
+          }}
+        >
+          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink-200)" }}>
             {selectedIds.size} selected
           </span>
-          <div className="flex gap-1 ml-auto flex-wrap">
-            {/* Add Tag dropdown */}
+          <div className="row" style={{ marginLeft: "auto", gap: 4, flexWrap: "wrap" }}>
             {allTags.length > 0 && (
-              <div className="relative">
+              <div style={{ position: "relative" }}>
                 <button
+                  className="btn"
                   onClick={() => setShowTagDropdown(!showTagDropdown)}
                   disabled={batchLoading || batchTagLoading}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors disabled:opacity-50"
+                  style={{
+                    height: 28,
+                    fontSize: 11.5,
+                    background: "var(--brand-50)",
+                    color: "var(--brand-700)",
+                  }}
                 >
-                  <Tag className="w-3.5 h-3.5" />
-                  Add Tag
-                  <ChevronDown className="w-3 h-3" />
+                  <TagIcon size={12} /> Add Tag <ChevronDown size={11} />
                 </button>
                 {showTagDropdown && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowTagDropdown(false)} />
-                    <div className="absolute top-full mt-1 left-0 z-50 bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[140px]">
+                    <div
+                      style={{ position: "fixed", inset: 0, zIndex: 40 }}
+                      onClick={() => setShowTagDropdown(false)}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        marginTop: 4,
+                        background: "#fff",
+                        border: "1px solid var(--border)",
+                        borderRadius: 8,
+                        boxShadow: "var(--shadow-pop)",
+                        minWidth: 160,
+                        zIndex: 50,
+                        padding: 4,
+                      }}
+                    >
                       {allTags.map((tag) => (
                         <button
                           key={tag.id}
                           onClick={() => handleBatchTag(tag.id)}
-                          className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            width: "100%",
+                            padding: "6px 10px",
+                            fontSize: 12,
+                            color: "var(--ink-300)",
+                            background: "transparent",
+                            border: 0,
+                            borderRadius: 5,
+                            cursor: "pointer",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-subtle)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                         >
                           <span
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: tag.color || "#94a3b8" }}
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: "50%",
+                              background: tag.color || "#94a3b8",
+                            }}
                           />
                           {tag.name}
                         </button>
@@ -496,45 +547,47 @@ export default function LinksClient({
               </div>
             )}
             <button
+              className="btn"
               onClick={() => handleBatchAction("activate")}
               disabled={batchLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+              style={{ height: 28, fontSize: 11.5, background: "var(--ok-bg)", color: "var(--ok-fg)" }}
             >
-              <Play className="w-3.5 h-3.5" />
-              {t("active")}
+              <Play size={12} /> {t("active")}
             </button>
             <button
+              className="btn"
               onClick={() => handleBatchAction("pause")}
               disabled={batchLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50"
+              style={{ height: 28, fontSize: 11.5, background: "var(--warn-bg)", color: "var(--warn-fg)" }}
             >
-              <Pause className="w-3.5 h-3.5" />
-              {t("paused")}
+              <Pause size={12} /> {t("paused")}
             </button>
             <button
+              className="btn"
               onClick={() => handleBatchAction("archive")}
               disabled={batchLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50"
+              style={{ height: 28, fontSize: 11.5, background: "var(--neutral-bg)", color: "var(--neutral-fg)" }}
             >
-              <Archive className="w-3.5 h-3.5" />
-              {t("archived")}
+              <Archive size={12} /> {t("archived")}
             </button>
             <button
+              className="btn"
               onClick={() => setBatchDeleteConfirm(true)}
               disabled={batchLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+              style={{ height: 28, fontSize: 11.5, background: "var(--err-bg)", color: "var(--err-fg)" }}
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              {tCommon("delete")}
+              <Trash2 size={12} /> {tCommon("delete")}
             </button>
           </div>
-          {(batchLoading || batchTagLoading) && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
+          {(batchLoading || batchTagLoading) && (
+            <Loader2 size={14} className="animate-spin" style={{ color: "var(--ink-500)" }} />
+          )}
         </div>
       )}
 
-      {/* Links Table */}
+      {/* Table */}
       {links.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-100">
+        <div className="card">
           <EmptyState
             icon={<Link2 className="w-10 h-10" />}
             title={t("noLinks")}
@@ -543,73 +596,69 @@ export default function LinksClient({
           />
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-100">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="pl-4 pr-2 py-2.5 w-10">
-                    <button
-                      onClick={toggleSelectAll}
-                      className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${selectedIds.size === links.length && links.length > 0
-                          ? "bg-[#03A9F4] border-[#03A9F4] text-white"
-                          : "border-slate-300 hover:border-slate-400"
-                        }`}
-                    >
-                      {selectedIds.size === links.length && links.length > 0 && (
-                        <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </button>
-                  </th>
-                  <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    {t("title")}
-                  </th>
-                  <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    Campaign
-                  </th>
-                  <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    {t("shortUrl")}
-                  </th>
-                  <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    {t("tags")}
-                  </th>
-                  <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    {t("status")}
-                  </th>
-                  <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    {t("clicks")} <span className="text-[10px] normal-case font-normal text-slate-300">7d ↑↓</span>
-                  </th>
-                  <th className="py-2.5 pr-3 w-10" />
-                </tr>
-              </thead>
-              <tbody>
-                {links.map((link) => (
-                  <LinkTableRow
-                    key={link.id}
-                    link={link}
-                    shortBaseUrl={shortBaseUrl}
-                    selected={selectedIds.has(link.id)}
-                    onSelect={toggleSelect}
-                    onDelete={confirmDelete}
-                    onStatusChange={handleStatusChange}
-                    onClone={handleClone}
+        <div className="tbl-wrap">
+          <table className="data">
+            <thead>
+              <tr>
+                <th style={{ width: 40 }}>
+                  <button
+                    onClick={toggleSelectAll}
+                    className={`cbx ${selectedIds.size === links.length && links.length > 0 ? "checked" : ""}`}
+                    aria-label="Select all"
                   />
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </th>
+                <th>{t("title")}</th>
+                <th style={{ width: 160 }}>Campaign</th>
+                <th style={{ width: 140 }}>{t("shortUrl")}</th>
+                <th style={{ width: 120 }}>{t("tags")}</th>
+                <th style={{ width: 100 }}>{t("status")}</th>
+                <th className="num" style={{ width: 110 }}>
+                  {t("clicks")}
+                </th>
+                <th style={{ width: 36 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {links.map((link) => (
+                <LinkTableRow
+                  key={link.id}
+                  link={link}
+                  shortBaseUrl={shortBaseUrl}
+                  selected={selectedIds.has(link.id)}
+                  onSelect={toggleSelect}
+                  onDelete={confirmDelete}
+                  onStatusChange={handleStatusChange}
+                  onClone={handleClone}
+                />
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* Subtle refresh indicator shown after mutations */}
       {refreshing && (
-        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-3 py-1.5 bg-slate-900/85 text-white text-xs rounded-full shadow-lg backdrop-blur">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        <div
+          style={{
+            position: "fixed",
+            top: 12,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 40,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 12px",
+            background: "rgba(11,18,32,0.85)",
+            color: "#fff",
+            fontSize: 11.5,
+            borderRadius: 999,
+            boxShadow: "var(--shadow-pop)",
+          }}
+        >
+          <Loader2 size={13} className="animate-spin" />
           <span>更新中…</span>
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useRouter } from "@/i18n/routing";
 import {
-  ArrowLeft,
   Link2,
   MousePointerClick,
   Megaphone,
@@ -26,6 +25,7 @@ import { useToast } from "@/components/ui/Toast";
 import { ClicksChart } from "@/components/analytics/ClicksChart";
 import { PieChartComponent } from "@/components/analytics/PieChartComponent";
 import { computeAnalytics, type RawAnalyticsData } from "@/lib/analytics/compute";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 interface CampaignLink {
   id: string;
@@ -44,17 +44,7 @@ type TabId = "overview" | "traffic" | "links";
 
 /**
  * Campaign Detail page — the marketer's daily "mission control" for one
- * campaign. Three tabs:
- *   - Overview: KPI progress + summary stats + 30-day traffic trend
- *   - Traffic:  per-campaign breakdown of sources / mediums / devices /
- *               geography (mirrors Analytics page but pre-filtered)
- *   - Links:    every link under this campaign, sorted by clicks, with
- *               quick actions (copy / open / analytics)
- *
- * Design intent (see session notes): Route A in the Route A vs B
- * discussion — users live on this page for a given campaign, and the
- * global Analytics page is reserved for cross-campaign comparison.
- * That's why the per-campaign Traffic breakdown lives here, not there.
+ * campaign. Three tabs: Overview, Traffic, Links.
  */
 export default function CampaignDetailPage() {
   const params = useParams();
@@ -68,15 +58,11 @@ export default function CampaignDetailPage() {
   const [copiedAll, setCopiedAll] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
 
-  // KPI state
   const [goalClicks, setGoalClicks] = useState<number | null>(null);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
   const [goalSaving, setGoalSaving] = useState(false);
 
-  // Raw analytics — used for Overview time-series + the entire Traffic tab.
-  // Fetched once on mount because the endpoint is Redis-cached and both
-  // tabs need it; paying once up front means switching tabs is instant.
   const [raw, setRaw] = useState<RawAnalyticsData | null>(null);
   const [rawLoading, setRawLoading] = useState(true);
 
@@ -131,8 +117,6 @@ export default function CampaignDetailPage() {
     fetchRaw();
   }, [fetchLinks, fetchGoal, fetchRaw]);
 
-  // Compute breakdowns pre-filtered to this campaign. 30-day window
-  // because the raw endpoint already caps at 90 and we want "recent" data.
   const computed = useMemo(() => {
     if (!raw) return null;
     const rangeEnd = new Date();
@@ -205,168 +189,154 @@ export default function CampaignDetailPage() {
     setTimeout(() => setCopiedAll(false), 2000);
   };
 
-  const statusDot: Record<string, string> = {
-    ACTIVE: "bg-emerald-500",
-    PAUSED: "bg-amber-500",
-    ARCHIVED: "bg-slate-400",
+  const statusBadgeClass: Record<string, string> = {
+    ACTIVE: "active",
+    PAUSED: "paused",
+    ARCHIVED: "archived",
   };
 
-  const tabs: { id: TabId; label: string; icon: typeof LineChartIcon }[] = [
-    { id: "overview", label: "Overview", icon: BarChart3 },
-    { id: "traffic", label: "Traffic", icon: Users },
-    { id: "links", label: "Links", icon: Link2 },
-  ];
-
   return (
-    <div className="space-y-6">
-      {/* Back nav */}
-      <button
-        onClick={() => router.push("/campaigns")}
-        className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 transition-colors group"
-      >
-        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-        <span className="text-sm font-medium">Back to Campaigns</span>
-      </button>
+    <>
+      <PageHeader
+        back="Back to Campaigns"
+        onBack={() => router.push("/campaigns")}
+        title={
+          <div className="campaign-hero" style={{ marginBottom: 0 }}>
+            <div className="campaign-icon">
+              <Megaphone size={20} />
+            </div>
+            <div>
+              <div className="campaign-kind">UTM Campaign</div>
+              <h1>{campaignName}</h1>
+            </div>
+          </div>
+        }
+        actions={
+          <>
+            <button
+              className="btn btn-secondary"
+              onClick={copyAllLinks}
+              disabled={links.length === 0}
+            >
+              {copiedAll ? <Check size={13} /> : <Copy size={13} />}
+              {copiedAll ? "Copied!" : "Copy all links"}
+            </button>
+            <Link
+              href={`/links/new?utmCampaign=${encodeURIComponent(campaignName)}`}
+              className="btn btn-primary"
+            >
+              <Plus size={13} /> Add link
+            </Link>
+          </>
+        }
+      />
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center shrink-0">
-            <Megaphone className="w-5 h-5 text-violet-600" />
+      {/* KPI Row */}
+      <div className="kpi-row">
+        <div className="kpi">
+          <div className="kpi-label">
+            <Link2 size={12} /> Links
           </div>
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900 font-mono">{campaignName}</h1>
-            <p className="text-sm text-slate-400 mt-0.5">UTM Campaign</p>
+          <div className="kpi-value">{links.length}</div>
+          <div className="kpi-sub pos">● {activeLinks} active</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">
+            <MousePointerClick size={12} /> Total clicks
+          </div>
+          <div className="kpi-value">{totalClicks.toLocaleString()}</div>
+          <div className="kpi-sub">all-time</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">
+            <Target size={12} /> Conversions
+          </div>
+          <div className="kpi-value">{totalConversions.toLocaleString()}</div>
+          <div className="kpi-sub">
+            {totalClicks > 0 ? (
+              <>
+                {overallCvr.toFixed(1)}% <span className="muted">CVR</span>
+              </>
+            ) : (
+              "no data yet"
+            )}
           </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={copyAllLinks}
-            disabled={links.length === 0}
-            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-              copiedAll
-                ? "bg-emerald-600 text-white"
-                : "bg-[#03A9F4] hover:bg-[#0288D1] text-white"
-            } disabled:opacity-40 disabled:cursor-not-allowed`}
-          >
-            {copiedAll ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            {copiedAll ? "Copied!" : "Copy All Links"}
-          </button>
-          <Link
-            href={`/links/new?utmCampaign=${encodeURIComponent(campaignName)}`}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add Link
-          </Link>
-        </div>
-      </div>
-
-      {/* Summary stats — always visible across tabs so the headline numbers
-          are never more than a glance away. */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-slate-100 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Link2 className="w-4 h-4 text-slate-400" />
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Links</span>
+        <div className="kpi">
+          <div className="kpi-label">
+            <BarChart3 size={12} /> Avg clicks
           </div>
-          <p className="text-2xl font-semibold text-slate-900">{links.length}</p>
-          <p className="text-xs text-emerald-600 mt-1">{activeLinks} active</p>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-100 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <MousePointerClick className="w-4 h-4 text-slate-400" />
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Clicks</span>
-          </div>
-          <p className="text-2xl font-semibold text-slate-900">{totalClicks.toLocaleString()}</p>
-          <p className="text-xs text-slate-400 mt-1">all-time</p>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-100 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Target className="w-4 h-4 text-emerald-500" />
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Conversions</span>
-          </div>
-          <p className="text-2xl font-semibold text-slate-900">{totalConversions.toLocaleString()}</p>
-          <p className="text-xs text-slate-400 mt-1">
-            {totalClicks > 0 ? `${overallCvr.toFixed(1)}% CVR` : "no data yet"}
-          </p>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-100 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <BarChart3 className="w-4 h-4 text-slate-400" />
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Avg Clicks</span>
-          </div>
-          <p className="text-2xl font-semibold text-slate-900">
+          <div className="kpi-value">
             {links.length > 0 ? Math.round(totalClicks / links.length).toLocaleString() : "0"}
-          </p>
-          <p className="text-xs text-slate-400 mt-1">per link</p>
+          </div>
+          <div className="kpi-sub">per link</div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-slate-200">
-        <nav className="flex gap-1">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                  isActive
-                    ? "border-[#03A9F4] text-[#03A9F4]"
-                    : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-200"
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
+      <div className="tabs">
+        <button
+          className={activeTab === "overview" ? "active" : ""}
+          onClick={() => setActiveTab("overview")}
+        >
+          <LineChartIcon size={13} /> Overview
+        </button>
+        <button
+          className={activeTab === "traffic" ? "active" : ""}
+          onClick={() => setActiveTab("traffic")}
+        >
+          <Users size={13} /> Traffic
+        </button>
+        <button
+          className={activeTab === "links" ? "active" : ""}
+          onClick={() => setActiveTab("links")}
+        >
+          <Link2 size={13} /> Links
+        </button>
       </div>
 
-      {/* ===== Overview Tab ===== */}
+      {/* Overview tab */}
       {activeTab === "overview" && (
-        <div className="space-y-6">
-          {/* KPI Goal Tracking */}
-          <div className="bg-white rounded-xl border border-slate-100 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-violet-500" />
-                <span className="text-sm font-semibold text-slate-900">Click Goal</span>
+        <>
+          {/* Goal card */}
+          <div className="goal-card">
+            <div className="goal-head">
+              <div className="section-title">
+                <Target size={14} style={{ color: "var(--data-violet)" }} />
+                Click Goal
                 {goalClicks && (
-                  <span className="text-xs text-slate-400 tabular-nums">
+                  <span className="muted" style={{ fontFamily: "var(--font-mono)", fontWeight: 400, fontSize: 11.5 }}>
                     {totalClicks.toLocaleString()} / {goalClicks.toLocaleString()}
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1">
+              <div className="row" style={{ gap: 4 }}>
                 {goalClicks && !editingGoal && (
                   <button
+                    className="btn btn-ghost"
+                    style={{ padding: "4px 6px" }}
                     onClick={clearGoal}
-                    className="p-1 text-slate-300 hover:text-slate-500 hover:bg-slate-100 rounded transition-colors"
                     title="Remove goal"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X size={13} />
                   </button>
                 )}
                 <button
+                  className="btn btn-ghost"
+                  style={{ padding: "4px 6px" }}
                   onClick={() => {
                     setEditingGoal(!editingGoal);
                     setGoalInput(goalClicks ? String(goalClicks) : "");
                   }}
-                  className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors"
                   title="Edit goal"
                 >
-                  <Pencil className="w-3.5 h-3.5" />
+                  <Pencil size={13} />
                 </button>
               </div>
             </div>
 
             {editingGoal ? (
-              <div className="flex items-center gap-2">
+              <div className="row" style={{ gap: 8 }}>
                 <input
                   type="number"
                   min={1}
@@ -377,141 +347,133 @@ export default function CampaignDetailPage() {
                     if (e.key === "Escape") setEditingGoal(false);
                   }}
                   placeholder="e.g. 10000"
-                  className="flex-1 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-300 focus:border-violet-400"
+                  className="input"
+                  style={{ flex: 1, height: 32 }}
                   autoFocus
                 />
                 <button
+                  className="btn btn-primary"
                   onClick={saveGoal}
                   disabled={!goalInput || goalSaving}
-                  className="px-3 py-1.5 text-sm font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors disabled:opacity-50"
                 >
-                  {goalSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save"}
+                  {goalSaving ? <Loader2 size={13} className="animate-spin" /> : "Save"}
                 </button>
-                <button
-                  onClick={() => setEditingGoal(false)}
-                  className="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-                >
+                <button className="btn btn-secondary" onClick={() => setEditingGoal(false)}>
                   Cancel
                 </button>
               </div>
             ) : goalClicks ? (
-              <div className="space-y-1.5">
-                {(() => {
-                  const pct = Math.min((totalClicks / goalClicks) * 100, 100);
-                  const reached = totalClicks >= goalClicks;
-                  return (
-                    <>
-                      <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${
-                            reached ? "bg-emerald-500" : "bg-violet-500"
-                          }`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span
-                          className={`text-xs font-medium ${
-                            reached ? "text-emerald-600" : "text-violet-600"
-                          }`}
-                        >
-                          {reached ? "🎉 Goal reached!" : `${pct.toFixed(1)}% of goal`}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                          {(goalClicks - totalClicks).toLocaleString()} clicks remaining
-                        </span>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
+              (() => {
+                const pct = Math.min((totalClicks / goalClicks) * 100, 100);
+                const reached = totalClicks >= goalClicks;
+                return (
+                  <>
+                    <div className="goal-progress">
+                      <div style={{ width: `${pct}%` }} />
+                    </div>
+                    <div className="row-between" style={{ marginTop: 4 }}>
+                      <span
+                        style={{
+                          fontSize: 11.5,
+                          fontWeight: 500,
+                          color: reached ? "var(--ok-fg)" : "var(--data-violet)",
+                        }}
+                      >
+                        {reached ? "🎉 Goal reached!" : `${pct.toFixed(1)}% of goal`}
+                      </span>
+                      <span className="muted" style={{ fontSize: 11.5 }}>
+                        {(goalClicks - totalClicks).toLocaleString()} clicks remaining
+                      </span>
+                    </div>
+                  </>
+                );
+              })()
             ) : (
-              <button
-                onClick={() => setEditingGoal(true)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-slate-400 border border-dashed border-slate-200 rounded-lg hover:border-violet-300 hover:text-violet-500 transition-colors"
-              >
-                <Target className="w-4 h-4" />
-                Set a click goal to track progress
-              </button>
+              <p className="placeholder" style={{ margin: 0 }}>
+                Set a click goal to track progress toward your target
+              </p>
             )}
           </div>
 
-          {/* 30-day click trend */}
-          <div className="bg-white rounded-xl border border-slate-100 p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <LineChartIcon className="w-4 h-4 text-slate-400" />
-              <span className="text-sm font-semibold text-slate-900">Clicks — last 30 days</span>
+          {/* Trend chart */}
+          <div className="card card-padded">
+            <div className="section-title" style={{ marginBottom: 10 }}>
+              <LineChartIcon size={14} style={{ color: "var(--ink-400)" }} />
+              Clicks
+              <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
+                last 30 days
+              </span>
             </div>
             {rawLoading ? (
-              <div className="h-[300px] flex items-center justify-center">
-                <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+              <div style={{ height: 300, display: "grid", placeItems: "center" }}>
+                <Loader2 size={20} className="animate-spin" style={{ color: "var(--ink-500)" }} />
               </div>
             ) : computed && computed.clicksByDay.length > 0 ? (
               <ClicksChart data={computed.clicksByDay} />
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-sm text-slate-400">
+              <div style={{ height: 300, display: "grid", placeItems: "center", fontSize: 13, color: "var(--ink-500)" }}>
                 No clicks recorded in the last 30 days
               </div>
             )}
           </div>
-        </div>
+        </>
       )}
 
-      {/* ===== Traffic Tab ===== */}
+      {/* Traffic tab */}
       {activeTab === "traffic" && (
-        <div className="space-y-6">
+        <div className="stack" style={{ gap: 14 }}>
           {rawLoading ? (
-            <div className="bg-white rounded-xl border border-slate-100 p-12 flex items-center justify-center">
-              <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+            <div className="card" style={{ padding: 48, display: "grid", placeItems: "center" }}>
+              <Loader2 size={20} className="animate-spin" style={{ color: "var(--ink-500)" }} />
             </div>
           ) : !computed || computed.summary.totalClicks === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-100 p-12 text-center">
-              <p className="text-sm text-slate-400">
-                No traffic data for this campaign in the last 30 days.
-              </p>
+            <div
+              className="card"
+              style={{ padding: 48, textAlign: "center", fontSize: 13, color: "var(--ink-500)" }}
+            >
+              No traffic data for this campaign in the last 30 days.
             </div>
           ) : (
             <>
-              {/* UTM source / medium breakdown */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid-2">
                 <TopList
                   title="Top sources"
+                  subtitle="where the traffic is coming from"
                   rows={computed.utm.sources}
                   total={computed.summary.totalClicks}
-                  colorClass="bg-cyan-50 text-cyan-700 border-cyan-100"
+                  pillClass="pill-source"
                 />
                 <TopList
                   title="Top mediums"
+                  subtitle="paid, organic, email, etc."
                   rows={computed.utm.mediums}
                   total={computed.summary.totalClicks}
-                  colorClass="bg-violet-50 text-violet-700 border-violet-100"
+                  pillClass="pill-medium"
                 />
               </div>
 
-              {/* Device / browser / OS pies */}
-              <div className="bg-white rounded-xl border border-slate-100 p-4">
-                <h3 className="text-sm font-semibold text-slate-900 mb-4">Audience</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="card card-padded">
+                <div className="section-title" style={{ marginBottom: 14 }}>Audience breakdown</div>
+                <div className="grid-3">
                   <PieChartComponent data={computed.devices} title="Device" />
                   <PieChartComponent data={computed.browsers} title="Browser" />
                   <PieChartComponent data={computed.operatingSystems} title="OS" />
                 </div>
               </div>
 
-              {/* Geography + referrers */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid-2">
                 <TopList
                   title="Top countries"
                   rows={computed.countries.map((c) => ({ name: c.name, clicks: c.value }))}
                   total={computed.summary.totalClicks}
-                  colorClass="bg-emerald-50 text-emerald-700 border-emerald-100"
-                  icon={<Globe2 className="w-4 h-4 text-slate-400" />}
+                  pillClass="pill-country"
+                  icon={<Globe2 size={14} style={{ color: "var(--ink-400)" }} />}
                 />
                 <TopList
                   title="Top referrers"
                   rows={computed.referrers.map((r) => ({ name: r.name, clicks: r.value }))}
                   total={computed.summary.totalClicks}
-                  colorClass="bg-amber-50 text-amber-700 border-amber-100"
+                  pillClass="pill-content"
                 />
               </div>
             </>
@@ -519,225 +481,232 @@ export default function CampaignDetailPage() {
         </div>
       )}
 
-      {/* ===== Links Tab ===== */}
+      {/* Links tab */}
       {activeTab === "links" && (
-        <div className="bg-white rounded-xl border border-slate-100">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">Links in this campaign</h2>
-            <span className="text-xs text-slate-400">{links.length} links · sorted by clicks</span>
+        <div className="tbl-wrap">
+          <div className="tbl-head">
+            <div className="tbl-head-title">
+              Links in this campaign
+              <span className="muted">· {links.length} links · sorted by clicks</span>
+            </div>
+            <Link
+              href={`/links/new?utmCampaign=${encodeURIComponent(campaignName)}`}
+              className="btn btn-secondary"
+              style={{ height: 28, fontSize: 11.5 }}
+            >
+              <Plus size={12} /> Add link
+            </Link>
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+            <div style={{ padding: 48, textAlign: "center" }}>
+              <Loader2 size={20} className="animate-spin" style={{ color: "var(--ink-500)" }} />
             </div>
           ) : links.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-sm text-slate-400 mb-3">No links found for this campaign</p>
+            <div style={{ padding: 48, textAlign: "center" }}>
+              <p style={{ fontSize: 13, color: "var(--ink-500)", marginBottom: 12 }}>
+                No links found for this campaign
+              </p>
               <Link
                 href={`/links/new?utmCampaign=${encodeURIComponent(campaignName)}`}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors"
+                className="btn btn-primary"
               >
-                <Plus className="w-4 h-4" />
-                Create first link
+                <Plus size={13} /> Create first link
               </Link>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="pl-4 py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Link
-                    </th>
-                    <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Source / Medium / Content
-                    </th>
-                    <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Clicks
-                    </th>
-                    <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Conversions
-                    </th>
-                    <th className="py-2.5 pr-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {links.map((link) => {
-                    const shortUrl = `${shortBaseUrl}/${link.code}`;
-                    const clickPct = Math.max((link._count.clicks / maxClicks) * 100, 4);
-                    const convs = link._count.conversions ?? 0;
-                    const cvr = link._count.clicks > 0 ? (convs / link._count.clicks) * 100 : null;
-                    return (
-                      <tr
-                        key={link.id}
-                        className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors"
-                      >
-                        <td className="pl-4 py-3 pr-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm font-semibold text-slate-900 truncate max-w-[200px]">
-                                {link.title || `/${link.code}`}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <code className="text-xs text-[#03A9F4]">/{link.code}</code>
-                              <button
-                                onClick={() => copyLink(shortUrl, link.id)}
-                                className="p-0.5 rounded hover:bg-slate-100 transition-colors"
-                              >
-                                {copiedId === link.id ? (
-                                  <Check className="w-3 h-3 text-emerald-600" />
-                                ) : (
-                                  <Copy className="w-3 h-3 text-slate-400" />
-                                )}
-                              </button>
-                            </div>
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Link</th>
+                  <th>Source / Medium / Content</th>
+                  <th style={{ width: 100 }}>Status</th>
+                  <th className="num" style={{ width: 180 }}>
+                    Clicks
+                  </th>
+                  <th className="num" style={{ width: 120 }}>
+                    Conv.
+                  </th>
+                  <th style={{ width: 140 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {links.map((link) => {
+                  const shortUrl = `${shortBaseUrl}/${link.code}`;
+                  const convs = link._count.conversions ?? 0;
+                  const cvr = link._count.clicks > 0 ? (convs / link._count.clicks) * 100 : null;
+                  return (
+                    <tr key={link.id}>
+                      <td>
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontFamily: "var(--font-mono)",
+                              fontSize: 12.5,
+                              fontWeight: 500,
+                              color: "var(--ink-100)",
+                              maxWidth: 220,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {link.title || `/${link.code}`}
                           </div>
-                        </td>
-                        <td className="py-3 pr-3">
-                          <div className="flex flex-wrap gap-1">
-                            {link.utmSource && (
-                              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-cyan-50 text-cyan-700 border border-cyan-100 rounded">
-                                {link.utmSource}
-                              </span>
-                            )}
-                            {link.utmMedium && (
-                              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-violet-50 text-violet-700 border border-violet-100 rounded">
-                                {link.utmMedium}
-                              </span>
-                            )}
-                            {link.utmContent && (
-                              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-100 rounded">
-                                {link.utmContent}
-                              </span>
-                            )}
-                            {!link.utmSource && !link.utmMedium && !link.utmContent && (
-                              <span className="text-xs text-slate-300">—</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3 pr-3">
-                          <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3 }}>
                             <span
-                              className={`w-1.5 h-1.5 rounded-full ${
-                                statusDot[link.status] || "bg-slate-300"
-                              }`}
-                            />
-                            {link.status}
-                          </span>
-                        </td>
-                        <td className="py-3 pr-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <div className="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-violet-400 rounded-full"
-                                style={{ width: `${clickPct}%` }}
-                              />
-                            </div>
-                            <span className="text-sm font-medium text-slate-900 tabular-nums w-10 text-right">
-                              {link._count.clicks.toLocaleString()}
+                              style={{
+                                fontFamily: "var(--font-mono)",
+                                fontSize: 11,
+                                color: "var(--brand-600)",
+                              }}
+                            >
+                              /{link.code}
                             </span>
-                          </div>
-                        </td>
-                        <td className="py-3 pr-3 text-right">
-                          {convs > 0 ? (
-                            <div className="flex items-center justify-end gap-1 text-xs">
-                              <span className="font-medium text-emerald-600 tabular-nums">
-                                {convs.toLocaleString()}
-                              </span>
-                              {cvr !== null && (
-                                <span className="text-slate-400 tabular-nums">
-                                  · {cvr.toFixed(1)}%
-                                </span>
+                            <button
+                              className="btn btn-ghost"
+                              style={{ padding: 2, height: "auto" }}
+                              onClick={() => copyLink(shortUrl, link.id)}
+                            >
+                              {copiedId === link.id ? (
+                                <Check size={11} style={{ color: "var(--ok-fg)" }} />
+                              ) : (
+                                <Copy size={11} style={{ color: "var(--ink-500)" }} />
                               )}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-slate-300">—</span>
-                          )}
-                        </td>
-                        <td className="py-3 pr-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Link
-                              href={`/analytics?linkId=${link.id}`}
-                              className="text-xs text-[#03A9F4] hover:text-[#0288D1] font-medium"
-                            >
-                              Analytics →
-                            </Link>
-                            <a
-                              href={shortUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
+                            </button>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          {link.utmSource && <span className="pill pill-source">{link.utmSource}</span>}
+                          {link.utmMedium && <span className="pill pill-medium">{link.utmMedium}</span>}
+                          {link.utmContent && <span className="pill pill-content">{link.utmContent}</span>}
+                          {!link.utmSource && !link.utmMedium && !link.utmContent && (
+                            <span className="muted">—</span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`badge ${statusBadgeClass[link.status] || "draft"}`}>
+                          <span className="badge-dot" />
+                          {link.status.charAt(0) + link.status.slice(1).toLowerCase()}
+                        </span>
+                      </td>
+                      <td className="num">
+                        <div className="bar-cell">
+                          <div className="bar-track">
+                            <div
+                              className="bar-fill"
+                              style={{
+                                width: `${(link._count.clicks / maxClicks) * 100}%`,
+                                background: "var(--data-violet)",
+                              }}
+                            />
+                          </div>
+                          <span className="num">{link._count.clicks.toLocaleString()}</span>
+                        </div>
+                      </td>
+                      <td className="num">
+                        {convs > 0 ? (
+                          <span style={{ color: "var(--ok-fg)" }}>
+                            {convs.toLocaleString()}
+                            {cvr !== null && (
+                              <span className="muted" style={{ marginLeft: 4 }}>
+                                · {cvr.toFixed(1)}%
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <Link
+                            href={`/analytics?linkId=${link.id}`}
+                            style={{
+                              color: "var(--brand-600)",
+                              fontSize: 12,
+                              fontWeight: 500,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            Analytics <span style={{ fontSize: 10 }}>→</span>
+                          </Link>
+                          <a
+                            href={shortUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: "var(--ink-500)", display: "inline-flex" }}
+                          >
+                            <ExternalLink size={12} />
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }
 
-/**
- * Minimal top-N list with a bar showing each entry's share of total.
- * Inlined rather than split into its own component because the
- * styling is campaign-detail-specific (chip colour varies) and the
- * component is tiny.
- */
 function TopList({
   title,
+  subtitle,
   rows,
   total,
-  colorClass,
+  pillClass,
   icon,
 }: {
   title: string;
+  subtitle?: string;
   rows: { name: string; clicks: number }[];
   total: number;
-  colorClass: string;
+  pillClass: string;
   icon?: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-100 p-4">
-      <div className="flex items-center gap-2 mb-3">
+    <div className="card card-padded">
+      <div className="section-title">
         {icon}
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        {title}
       </div>
+      <p className="section-sub">{subtitle || "\u00a0"}</p>
       {rows.length === 0 ? (
-        <p className="text-xs text-slate-400 py-4 text-center">No data</p>
+        <p className="placeholder" style={{ textAlign: "center", padding: "24px 0" }}>
+          No data
+        </p>
       ) : (
-        <div className="space-y-2">
+        <div className="stack" style={{ gap: 10 }}>
           {rows.slice(0, 8).map((row) => {
             const pct = total > 0 ? (row.clicks / total) * 100 : 0;
             return (
-              <div key={row.name} className="flex items-center gap-3">
-                <span
-                  className={`px-2 py-0.5 text-xs font-medium rounded border ${colorClass} truncate max-w-[140px]`}
-                  title={row.name}
-                >
-                  {row.name || "—"}
-                </span>
-                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-slate-400 rounded-full"
-                    style={{ width: `${pct}%` }}
-                  />
+              <div key={row.name} className="row" style={{ gap: 12 }}>
+                <div style={{ minWidth: 80 }}>
+                  <span className={`pill ${pillClass}`} title={row.name}>
+                    {row.name || "—"}
+                  </span>
                 </div>
-                <span className="text-sm font-medium text-slate-700 tabular-nums w-10 text-right">
+                <div className="bar-track" style={{ flex: 1 }}>
+                  <div className="bar-fill" style={{ width: `${pct}%` }} />
+                </div>
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 12.5,
+                    color: "var(--ink-200)",
+                    minWidth: 30,
+                    textAlign: "right",
+                  }}
+                >
                   {row.clicks.toLocaleString()}
                 </span>
               </div>

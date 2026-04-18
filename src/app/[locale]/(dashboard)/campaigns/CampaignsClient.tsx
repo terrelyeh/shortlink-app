@@ -3,19 +3,9 @@
 /**
  * Campaigns list — the "how's every campaign doing?" hub.
  *
- * Previously this page was a bare table (name / status / link count) and
- * the rich leaderboard sat on Analytics. That left Campaigns feeling
- * empty, and Analytics doing campaign-management work it shouldn't.
- *
- * Now the leaderboard lives here — every campaign row shows windowed
- * clicks, conversions, CVR, and goal progress. Marketers open this page
- * to answer "is spring_sale hitting target? which auto-created utm is
- * surprisingly strong? is there a campaign we should archive?". Analytics
- * is free to be about traffic patterns (devices, geo, referrers).
- *
- * Data lifecycle: fetched once from /api/analytics/campaigns-summary on
- * mount (Redis-cached 60s). Window change → refetch. Search / status /
- * sort are client-side useMemo so they're zero-latency.
+ * Leaderboard lives here — every campaign row shows windowed clicks,
+ * conversions, CVR and goal progress. Select 2–4 rows to overlay a
+ * daily-clicks chart and jump into /campaigns/compare for side-by-side.
  */
 
 import { useState, useMemo, useEffect, useCallback } from "react";
@@ -26,13 +16,14 @@ import {
   Search,
   Link2,
   Plus,
-  Info,
-  X,
-  Loader2,
   Target,
-  BarChart3,
+  Trophy,
   LineChart as LineChartIcon,
   ArrowRight,
+  Loader2,
+  MousePointerClick,
+  Flag,
+  SlidersHorizontal,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { MultiCampaignChart } from "@/components/analytics/MultiCampaignChart";
@@ -77,44 +68,28 @@ interface SummaryResponse {
   };
 }
 
-// Max campaigns overlaid at once — more than 4 lines gets unreadable.
 const MAX_SELECTION = 4;
 
 type SortKey = "clicks" | "conversions" | "cvr" | "goalPct" | "name";
 
-// Maps our date-range preset to the days query param on the summary API.
 const windowPresets: { value: string; labelKey: string; days: number }[] = [
   { value: "7d", labelKey: "last7Days", days: 7 },
   { value: "30d", labelKey: "last30Days", days: 30 },
   { value: "90d", labelKey: "last90Days", days: 90 },
 ];
 
-function statusDot(status: string | null) {
+function statusClass(status: string | null): string {
   switch (status) {
     case "ACTIVE":
-      return "bg-emerald-500";
+      return "active";
     case "DRAFT":
-      return "bg-slate-300";
+      return "draft";
     case "COMPLETED":
-      return "bg-sky-400";
+      return "completed";
     case "ARCHIVED":
-      return "bg-slate-400";
+      return "archived";
     default:
-      return "bg-slate-300";
-  }
-}
-function statusBg(status: string | null) {
-  switch (status) {
-    case "ACTIVE":
-      return "bg-emerald-50 text-emerald-700 border-emerald-100";
-    case "DRAFT":
-      return "bg-slate-50 text-slate-600 border-slate-200";
-    case "COMPLETED":
-      return "bg-sky-50 text-sky-700 border-sky-100";
-    case "ARCHIVED":
-      return "bg-slate-50 text-slate-400 border-slate-200";
-    default:
-      return "bg-slate-50 text-slate-600 border-slate-200";
+      return "draft";
   }
 }
 
@@ -128,18 +103,13 @@ export default function CampaignsClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [sortKey, setSortKey] = useState<SortKey>("clicks");
-  const [showTip, setShowTip] = useState(true);
-  // Campaign names the user has ticked for the overlay comparison chart.
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const toggleSelected = useCallback((name: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(name)) {
-        next.delete(name);
-      } else if (next.size < MAX_SELECTION) {
-        next.add(name);
-      }
+      if (next.has(name)) next.delete(name);
+      else if (next.size < MAX_SELECTION) next.add(name);
       return next;
     });
   }, []);
@@ -164,8 +134,6 @@ export default function CampaignsClient() {
     fetchData();
   }, [fetchData]);
 
-  // Derived list — search / status / sort all client-side useMemo so
-  // keystrokes and tab clicks are instant.
   const campaigns = useMemo(() => {
     if (!data) return [];
     const q = searchQuery.trim().toLowerCase();
@@ -173,7 +141,6 @@ export default function CampaignsClient() {
       if (statusFilter) {
         if (c.status !== statusFilter) return false;
       } else {
-        // Default: hide ARCHIVED; leaderboard should feel "live"
         if (c.status === "ARCHIVED") return false;
       }
       if (q) {
@@ -195,18 +162,19 @@ export default function CampaignsClient() {
   }, [data, searchQuery, statusFilter, sortKey]);
 
   const totals = useMemo(() => {
-    if (!data) return { clicks: 0, conversions: 0, withGoal: 0 };
+    if (!data) return { clicks: 0, conversions: 0, withGoal: 0, active: 0, drafts: 0, archived: 0 };
     return {
       clicks: data.campaigns.reduce((s, c) => s + c.clicks, 0),
       conversions: data.campaigns.reduce((s, c) => s + c.conversions, 0),
       withGoal: data.campaigns.filter((c) => c.goalClicks).length,
+      active: data.campaigns.filter((c) => c.status === "ACTIVE").length,
+      drafts: data.campaigns.filter((c) => c.status === "DRAFT").length,
+      archived: data.campaigns.filter((c) => c.status === "ARCHIVED").length,
     };
   }, [data]);
 
-  const overallCvr =
-    totals.clicks > 0 ? (totals.conversions / totals.clicks) * 100 : 0;
+  const overallCvr = totals.clicks > 0 ? (totals.conversions / totals.clicks) * 100 : 0;
 
-  // Pull out only the selected campaigns' time series for the overlay.
   const overlaySeries = useMemo(() => {
     if (!data?.timeseries || selected.size < 2) return null;
     const out: Record<string, number[]> = {};
@@ -217,149 +185,18 @@ export default function CampaignsClient() {
     return out;
   }, [data, selected]);
 
+  const maxClicks = Math.max(1, ...campaigns.map((c) => c.clicks));
+
   return (
-    <div className="space-y-6">
+    <>
       <PageHeader
         title={t("title")}
         description={t("subtitle")}
         actions={
-          <button
-            onClick={() => router.push("/links/new")}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            {t("createLinkWithUTM")}
-          </button>
-        }
-      />
-
-      {/* Summary strip — fast "is anything on fire?" glance. */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard
-          icon={<Megaphone className="w-4 h-4 text-violet-500" />}
-          label="Active campaigns"
-          value={
-            data
-              ? data.campaigns.filter((c) => c.status === "ACTIVE").length.toString()
-              : "—"
-          }
-        />
-        <StatCard
-          icon={<Link2 className="w-4 h-4 text-slate-400" />}
-          label={`Clicks · last ${data?.meta.days ?? 30}d`}
-          value={data ? totals.clicks.toLocaleString() : "—"}
-        />
-        <StatCard
-          icon={<Target className="w-4 h-4 text-emerald-500" />}
-          label={`Conversions · last ${data?.meta.days ?? 30}d`}
-          value={
-            data
-              ? `${totals.conversions.toLocaleString()}${
-                  totals.clicks > 0 ? ` · ${overallCvr.toFixed(1)}% CVR` : ""
-                }`
-              : "—"
-          }
-        />
-        <StatCard
-          icon={<BarChart3 className="w-4 h-4 text-slate-400" />}
-          label="Campaigns with a goal"
-          value={
-            data
-              ? `${totals.withGoal} / ${data.campaigns.length}`
-              : "—"
-          }
-        />
-      </div>
-
-      {/* Educational callout — only when we have zero data */}
-      {showTip && data && data.campaigns.length === 0 && (
-        <div className="flex items-start gap-3 bg-sky-50/50 border-l-2 border-[#03A9F4] rounded-r-lg p-4">
-          <Info className="w-4 h-4 text-[#03A9F4] mt-0.5 shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm text-slate-700">{t("howItWorks")}</p>
-            <button
-              onClick={() => router.push("/links/new")}
-              className="text-sm font-medium text-[#03A9F4] hover:text-[#0288D1] mt-1"
-            >
-              {t("createLinkWithUTM")} →
-            </button>
-          </div>
-          <button onClick={() => setShowTip(false)} className="p-1 hover:bg-sky-100 rounded">
-            <X className="w-3.5 h-3.5 text-slate-400" />
-          </button>
-        </div>
-      )}
-
-      {/* Controls: window + search + status + sort */}
-      <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
-        <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
-          {windowPresets.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setWindow(p.value)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                window === p.value
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              {p.value}
-            </button>
-          ))}
-        </div>
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t("searchPlaceholder")}
-            className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
-          />
-        </div>
-        <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
-          {["", "ACTIVE", "DRAFT", "COMPLETED", "ARCHIVED"].map((status) => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                statusFilter === status
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              {status === ""
-                ? t("allStatuses") || "All"
-                : status === "ACTIVE"
-                  ? t("statusActive")
-                  : status === "DRAFT"
-                    ? t("statusDraft")
-                    : status === "COMPLETED"
-                      ? t("statusCompleted")
-                      : t("statusArchived")}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Overlay chart — only shown when the user has ticked 2+ rows.
-          Sits above the leaderboard because the comparison is the
-          whole point of selecting, and scrolling down to a chart is
-          wrong ergonomics. */}
-      {overlaySeries && data?.timeseries && (
-        <div className="bg-white rounded-xl border border-slate-100 p-4">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div className="flex items-center gap-2">
-              <LineChartIcon className="w-4 h-4 text-[#03A9F4]" />
-              <h2 className="text-sm font-semibold text-slate-900">
-                Compare {selected.size} campaigns
-              </h2>
-              <span className="text-xs text-slate-400">
-                · daily clicks, last {data.meta.days}d
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
+          <>
+            {selected.size >= 2 && (
               <button
+                className="btn btn-secondary"
                 onClick={() =>
                   router.push(
                     `/campaigns/compare?names=${Array.from(selected)
@@ -367,138 +204,230 @@ export default function CampaignsClient() {
                       .join(",")}`,
                   )
                 }
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[#03A9F4] border border-sky-200 rounded-md hover:bg-sky-50 transition-colors"
               >
-                Side-by-side details
-                <ArrowRight className="w-3 h-3" />
+                <SlidersHorizontal size={13} /> Compare {selected.size}
               </button>
+            )}
+            <button className="btn btn-primary" onClick={() => router.push("/links/new")}>
+              <Plus size={13} /> {t("createLinkWithUTM")}
+            </button>
+          </>
+        }
+      />
+
+      {/* KPI row */}
+      <div className="kpi-row">
+        <div className="kpi">
+          <div className="kpi-label">
+            <Megaphone size={12} /> Active campaigns
+          </div>
+          <div className="kpi-value">{data ? totals.active : "—"}</div>
+          <div className="kpi-sub">
+            <strong>{totals.drafts}</strong> drafts · <strong>{totals.archived}</strong> archived
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">
+            <MousePointerClick size={12} /> Clicks · last {data?.meta.days ?? 30}d
+          </div>
+          <div className="kpi-value">{data ? totals.clicks.toLocaleString() : "—"}</div>
+          <div className="kpi-sub">
+            {data && data.campaigns.length > 0 ? `across ${data.campaigns.length} campaigns` : "—"}
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">
+            <Target size={12} /> Conversions · last {data?.meta.days ?? 30}d
+          </div>
+          <div className="kpi-value">{data ? totals.conversions.toLocaleString() : "—"}</div>
+          <div className="kpi-sub">
+            {overallCvr.toFixed(1)}% <span className="muted">CVR</span>
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">
+            <Flag size={12} /> Campaigns with a goal
+          </div>
+          <div className="kpi-value">
+            {data ? `${totals.withGoal} / ${data.campaigns.length}` : "—"}
+          </div>
+          <div className="kpi-sub muted">
+            {totals.withGoal === 0 ? "set goals to track progress →" : "tracking toward target"}
+          </div>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="toolbar">
+        <div className="segmented">
+          {windowPresets.map((p) => (
+            <button
+              key={p.value}
+              className={window === p.value ? "active" : ""}
+              onClick={() => setWindow(p.value)}
+            >
+              {p.value}
+            </button>
+          ))}
+        </div>
+        <div className="search">
+          <Search size={14} />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t("searchPlaceholder")}
+          />
+        </div>
+        <div style={{ flex: 1 }} />
+        <div className="chip-row">
+          {[
+            { k: "", l: t("allStatuses") || "All Statuses" },
+            { k: "ACTIVE", l: t("statusActive") },
+            { k: "DRAFT", l: t("statusDraft") },
+            { k: "COMPLETED", l: t("statusCompleted") },
+            { k: "ARCHIVED", l: t("statusArchived") },
+          ].map((s) => (
+            <button
+              key={s.k || "all"}
+              className={`chip ${statusFilter === s.k ? "active" : ""}`}
+              onClick={() => setStatusFilter(s.k)}
+            >
+              {s.l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Overlay chart */}
+      {overlaySeries && data?.timeseries && (
+        <div className="card card-padded" style={{ marginBottom: 14 }}>
+          <div className="row-between" style={{ marginBottom: 10 }}>
+            <div className="section-title">
+              <LineChartIcon size={14} style={{ color: "var(--brand-500)" }} />
+              Compare {selected.size} campaigns
+              <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
+                · daily clicks, last {data.meta.days}d
+              </span>
+            </div>
+            <div className="row" style={{ gap: 6 }}>
               <button
-                onClick={() => setSelected(new Set())}
-                className="px-2 py-1 text-xs text-slate-500 hover:text-slate-700 rounded hover:bg-slate-100 transition-colors"
+                className="btn btn-secondary"
+                onClick={() =>
+                  router.push(
+                    `/campaigns/compare?names=${Array.from(selected)
+                      .map((n) => encodeURIComponent(n))
+                      .join(",")}`,
+                  )
+                }
               >
+                Side-by-side details <ArrowRight size={12} />
+              </button>
+              <button className="btn btn-ghost" onClick={() => setSelected(new Set())}>
                 Clear
               </button>
             </div>
           </div>
-          <MultiCampaignChart
-            dates={data.timeseries.dates}
-            series={overlaySeries}
-          />
+          <MultiCampaignChart dates={data.timeseries.dates} series={overlaySeries} />
         </div>
       )}
 
-      {/* Leaderboard table */}
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Megaphone className="w-4 h-4 text-violet-500" />
-            <h2 className="text-sm font-semibold text-slate-900">
-              Leaderboard
-            </h2>
-            <span className="text-xs text-slate-400">· last {data?.meta.days ?? 30}d</span>
+      {/* Leaderboard */}
+      <div className="tbl-wrap">
+        <div className="tbl-head">
+          <div className="tbl-head-title">
+            <Trophy size={14} style={{ color: "var(--data-amber)" }} />
+            Leaderboard
+            <span className="muted">· last {data?.meta.days ?? 30}d</span>
             {selected.size > 0 && (
-              <span className="text-xs font-medium text-[#03A9F4] ml-2">
+              <span style={{ color: "var(--brand-600)", fontSize: 11.5, marginLeft: 4 }}>
                 {selected.size} selected {selected.size < 2 && "(pick 1 more to compare)"}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1 text-xs">
-            <span className="text-slate-400 mr-1">Sort</span>
+          <div className="tbl-head-tools">
+            <span className="sort-label">Sort by</span>
             {(["clicks", "conversions", "cvr", "goalPct", "name"] as SortKey[]).map((k) => (
               <button
                 key={k}
+                className={sortKey === k ? "active" : ""}
                 onClick={() => setSortKey(k)}
-                className={`px-2 py-0.5 rounded transition-colors ${
-                  sortKey === k
-                    ? "bg-slate-100 text-slate-900 font-medium"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
               >
                 {k === "goalPct"
                   ? "Goal %"
                   : k === "cvr"
                     ? "CVR"
-                    : k === "name"
-                      ? "Name"
-                      : k.charAt(0).toUpperCase() + k.slice(1)}
+                    : k.charAt(0).toUpperCase() + k.slice(1)}
               </button>
             ))}
           </div>
         </div>
 
         {loading && !data ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+          <div style={{ padding: 48, textAlign: "center" }}>
+            <Loader2 size={20} className="animate-spin" style={{ color: "var(--ink-500)" }} />
           </div>
         ) : campaigns.length === 0 ? (
-          <div className="py-12 text-center text-sm text-slate-400">
+          <div style={{ padding: 48, textAlign: "center", fontSize: 13, color: "var(--ink-500)" }}>
             {searchQuery || statusFilter
               ? "No campaigns match your filters."
               : "No campaigns yet. Create a link with a UTM campaign value and it'll show up here."}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 text-xs text-slate-400 uppercase tracking-wider">
-                  <th className="pl-4 py-2 pr-2 w-8"></th>
-                  <th className="py-2 pr-3 text-left font-medium">Campaign</th>
-                  <th className="py-2 pr-3 text-left font-medium">Status</th>
-                  <th className="py-2 pr-3 text-left font-medium">Source / Medium</th>
-                  <th className="py-2 pr-3 text-right font-medium">Links</th>
-                  <th className="py-2 pr-3 text-right font-medium">Clicks</th>
-                  <th className="py-2 pr-3 text-right font-medium">Conv.</th>
-                  <th className="py-2 pr-3 text-right font-medium">CVR</th>
-                  <th className="py-2 pr-4 text-right font-medium">Goal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {campaigns.map((c) => {
-                  const isSelected = selected.has(c.name);
-                  const selectionFull = !isSelected && selected.size >= MAX_SELECTION;
-                  return (
+          <table className="data">
+            <thead>
+              <tr>
+                <th style={{ width: 36 }}></th>
+                <th>Campaign</th>
+                <th style={{ width: 110 }}>Status</th>
+                <th>Source / Medium</th>
+                <th className="num" style={{ width: 70 }}>Links</th>
+                <th className="num" style={{ width: 180 }}>Clicks</th>
+                <th className="num" style={{ width: 80 }}>Conv.</th>
+                <th className="num" style={{ width: 80 }}>CVR</th>
+                <th style={{ width: 130 }}>Goal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {campaigns.map((c) => {
+                const isSelected = selected.has(c.name);
+                const selectionFull = !isSelected && selected.size >= MAX_SELECTION;
+                return (
                   <tr
                     key={c.name}
                     onClick={() => router.push(`/campaigns/${encodeURIComponent(c.name)}`)}
-                    className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors cursor-pointer"
+                    style={{ cursor: "pointer" }}
                   >
-                    <td
-                      className="pl-4 py-2.5 pr-2 w-8"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className={`cbx ${isSelected ? "checked" : ""}`}
                         disabled={selectionFull}
-                        onChange={() => toggleSelected(c.name)}
-                        className="w-4 h-4 rounded border-slate-300 text-[#03A9F4] focus:ring-2 focus:ring-[#03A9F4]/30 cursor-pointer disabled:opacity-40"
+                        onClick={() => toggleSelected(c.name)}
+                        aria-label={isSelected ? "Deselect" : "Select"}
                         title={
                           selectionFull
-                            ? `Max ${MAX_SELECTION} campaigns at once — deselect one first`
+                            ? `Max ${MAX_SELECTION} campaigns at once`
                             : isSelected
                               ? "Remove from comparison"
                               : "Add to comparison"
                         }
                       />
                     </td>
-                    <td className="py-2.5 pr-3">
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-sm font-medium text-slate-900 group-hover:text-[#03A9F4] truncate max-w-[240px]">
+                    <td>
+                      <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                        <span className="campaign-name" style={{ maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {c.displayName || c.name}
                         </span>
                         {c.displayName && (
-                          <span className="text-[10px] font-mono text-slate-400 truncate max-w-[240px]">
+                          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--ink-500)", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {c.name}
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="py-2.5 pr-3">
+                    <td>
                       {c.status ? (
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium border ${statusBg(c.status)}`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${statusDot(c.status)}`} />
+                        <span className={`badge ${statusClass(c.status)}`}>
+                          <span className="badge-dot" />
                           {c.status === "ACTIVE"
                             ? t("statusActive")
                             : c.status === "DRAFT"
@@ -508,166 +437,141 @@ export default function CampaignsClient() {
                                 : t("statusArchived")}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-300 italic">utm-only</span>
+                        <span className="muted" style={{ fontSize: 11, fontStyle: "italic" }}>
+                          utm-only
+                        </span>
                       )}
                     </td>
-                    <td className="py-2.5 pr-3">
-                      <div className="flex flex-wrap items-center gap-1">
-                        {c.defaultSource && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-cyan-50 text-cyan-700 border border-cyan-100">
-                            {c.defaultSource}
-                          </span>
-                        )}
-                        {c.defaultMedium && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-50 text-violet-700 border border-violet-100">
-                            {c.defaultMedium}
-                          </span>
-                        )}
-                        {!c.defaultSource && !c.defaultMedium && (
-                          <span className="text-xs text-slate-300">—</span>
-                        )}
+                    <td>
+                      {c.defaultSource || c.defaultMedium ? (
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {c.defaultSource && <span className="pill pill-source">{c.defaultSource}</span>}
+                          {c.defaultMedium && <span className="pill pill-medium">{c.defaultMedium}</span>}
+                        </div>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td className="num">{c.linkCount}</td>
+                    <td className="num">
+                      <div className="bar-cell">
+                        <div className="bar-track">
+                          <div
+                            className="bar-fill"
+                            style={{ width: `${(c.clicks / maxClicks) * 100}%` }}
+                          />
+                        </div>
+                        <span className="num">{c.clicks.toLocaleString()}</span>
                       </div>
                     </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-slate-700">
-                      {c.linkCount}
-                    </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums font-medium text-slate-900">
-                      {c.clicks.toLocaleString()}
-                    </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums">
+                    <td className="num">
                       {c.conversions > 0 ? (
-                        <span className="font-medium text-emerald-600">
-                          {c.conversions.toLocaleString()}
-                        </span>
+                        <span style={{ color: "var(--ok-fg)" }}>{c.conversions.toLocaleString()}</span>
                       ) : (
-                        <span className="text-slate-300">—</span>
+                        <span className="muted">—</span>
                       )}
                     </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums">
-                      {c.conversions > 0 ? (
-                        <span className="text-emerald-700">{c.cvr.toFixed(1)}%</span>
-                      ) : (
-                        <span className="text-slate-300">—</span>
-                      )}
+                    <td className="num">
+                      {c.conversions > 0 ? `${c.cvr.toFixed(1)}%` : <span className="muted">—</span>}
                     </td>
-                    <td className="py-2.5 pr-4 text-right">
+                    <td>
                       {c.goalPct !== null && c.goalClicks ? (
-                        <div className="inline-flex items-center gap-2">
-                          <div className="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="bar-cell">
+                          <div className="bar-track" style={{ minWidth: 50 }}>
                             <div
-                              className={`h-full rounded-full ${
-                                c.goalPct >= 100 ? "bg-emerald-500" : "bg-violet-500"
-                              }`}
-                              style={{ width: `${c.goalPct}%` }}
+                              className="bar-fill"
+                              style={{
+                                width: `${Math.min(100, c.goalPct)}%`,
+                                background: c.goalPct >= 100 ? "var(--data-emerald)" : "var(--data-violet)",
+                              }}
                             />
                           </div>
                           <span
-                            className={`text-xs tabular-nums ${
-                              c.goalPct >= 100
-                                ? "text-emerald-600 font-medium"
-                                : "text-slate-500"
-                            }`}
+                            className="num"
+                            style={{ color: c.goalPct >= 100 ? "var(--ok-fg)" : "var(--ink-400)" }}
                           >
                             {c.goalPct.toFixed(0)}%
                           </span>
                         </div>
                       ) : (
-                        <span className="text-xs text-slate-300">no goal</span>
+                        <span className="placeholder">no goal</span>
                       )}
                     </td>
                   </tr>
                 );
-                })}
-              </tbody>
-            </table>
-          </div>
+              })}
+            </tbody>
+          </table>
         )}
       </div>
 
-      {/* Orphan links — only when they exist. Amber framing so it reads as
-          "something to fix" rather than "campaign you forgot about". */}
+      <p style={{ marginTop: 14, fontSize: 11.5, color: "var(--ink-500)" }}>
+        Tip: select 2 or more campaigns to compare side-by-side.
+      </p>
+
+      {/* Orphan links */}
       {data && data.orphans.length > 0 && (
-        <div className="bg-white rounded-xl border border-amber-100 overflow-hidden">
-          <div className="px-4 py-3 border-b border-amber-100 flex items-center justify-between gap-3 bg-amber-50/50">
-            <div className="flex items-center gap-2">
-              <Link2 className="w-4 h-4 text-amber-600" />
-              <h2 className="text-sm font-semibold text-slate-900">Orphan links</h2>
-              <span className="text-xs text-amber-700">
+        <div
+          className="tbl-wrap"
+          style={{ marginTop: 20, borderColor: "#FCD5B5", background: "#FFFBF5" }}
+        >
+          <div className="tbl-head" style={{ background: "#FFF7EC", borderColor: "#FCD5B5" }}>
+            <div className="tbl-head-title">
+              <Link2 size={14} style={{ color: "var(--data-amber)" }} />
+              Orphan links
+              <span className="muted">
                 · {data.meta.totalOrphans} link{data.meta.totalOrphans === 1 ? "" : "s"} not tied to any campaign
               </span>
             </div>
-            <span className="text-xs text-slate-500">
+            <span className="muted" style={{ fontSize: 11.5 }}>
               Showing top {data.orphans.length} by clicks
             </span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-amber-100 text-xs text-amber-900/70 uppercase tracking-wider">
-                  <th className="pl-4 py-2 pr-3 text-left font-medium">Link</th>
-                  <th className="py-2 pr-3 text-right font-medium">Clicks</th>
-                  <th className="py-2 pr-3 text-right font-medium">Conv.</th>
-                  <th className="py-2 pr-4 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.orphans.map((o) => (
-                  <tr key={o.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                    <td className="pl-4 py-2 pr-3">
-                      <div className="min-w-0">
-                        <span className="text-sm font-medium text-slate-900 truncate max-w-[260px] block">
-                          {o.title || `/${o.code}`}
-                        </span>
-                        <code className="text-[11px] text-[#03A9F4]">/{o.code}</code>
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Link</th>
+                <th className="num" style={{ width: 120 }}>Clicks</th>
+                <th className="num" style={{ width: 100 }}>Conv.</th>
+                <th style={{ width: 160 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.orphans.map((o) => (
+                <tr key={o.id}>
+                  <td>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, fontWeight: 500, color: "var(--ink-100)" }}>
+                        {o.title || `/${o.code}`}
                       </div>
-                    </td>
-                    <td className="py-2 pr-3 text-right tabular-nums font-medium text-slate-900">
-                      {o.clicks.toLocaleString()}
-                    </td>
-                    <td className="py-2 pr-3 text-right tabular-nums">
-                      {o.conversions > 0 ? (
-                        <span className="font-medium text-emerald-600">
-                          {o.conversions.toLocaleString()}
-                        </span>
-                      ) : (
-                        <span className="text-slate-300">—</span>
-                      )}
-                    </td>
-                    <td className="py-2 pr-4 text-right">
-                      <button
-                        onClick={() => router.push(`/links/${o.id}`)}
-                        className="text-xs text-[#03A9F4] hover:text-[#0288D1] font-medium"
-                      >
-                        Assign campaign →
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--brand-600)" }}>
+                        /{o.code}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="num">{o.clicks.toLocaleString()}</td>
+                  <td className="num">
+                    {o.conversions > 0 ? (
+                      <span style={{ color: "var(--ok-fg)" }}>{o.conversions}</span>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
+                  <td>
+                    <button
+                      className="btn btn-ghost"
+                      style={{ color: "var(--brand-600)", height: 28, padding: "0 8px" }}
+                      onClick={() => router.push(`/links/${o.id}`)}
+                    >
+                      Assign campaign →
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-    </div>
-  );
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="bg-white rounded-xl border border-slate-100 p-4">
-      <div className="flex items-center gap-1.5 mb-1.5 text-xs text-slate-400 uppercase tracking-wider">
-        {icon}
-        <span>{label}</span>
-      </div>
-      <p className="text-lg font-semibold text-slate-900 tabular-nums">{value}</p>
-    </div>
+    </>
   );
 }

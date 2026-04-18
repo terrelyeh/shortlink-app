@@ -1,47 +1,31 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import {
-  computeAnalytics,
-  type RawAnalyticsData,
-} from "@/lib/analytics/compute";
+import { computeAnalytics, type RawAnalyticsData } from "@/lib/analytics/compute";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ClicksChart } from "@/components/analytics/ClicksChart";
 import { PieChartComponent } from "@/components/analytics/PieChartComponent";
 import { ShareModal } from "@/components/analytics/ShareModal";
-import { MousePointerClick, Users, TrendingUp, Loader2, Link2, ChevronDown, X, Target, Globe, Megaphone, Download, Share2, Tag } from "lucide-react";
+import {
+  MousePointerClick,
+  Users,
+  TrendingUp,
+  Loader2,
+  Link2,
+  ChevronDown,
+  X,
+  Target,
+  Globe,
+  Megaphone,
+  Download,
+  Share2,
+  Tag as TagIcon,
+  LineChart as LineChartIcon,
+  BarChart3,
+} from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
-import { useToast } from "@/components/ui/Toast";
-
-interface AnalyticsData {
-  summary: {
-    totalClicks: number;
-    uniqueVisitors: number;
-    clicksChange: number;
-  };
-  clicksByDay: { date: string; clicks: number }[];
-  devices: { name: string; value: number }[];
-  browsers: { name: string; value: number }[];
-  operatingSystems: { name: string; value: number }[];
-  referrers: { name: string; value: number }[];
-  countries: { name: string; value: number }[];
-  topLinks: {
-    id: string;
-    code: string;
-    title: string;
-    originalUrl: string;
-    clicks: number;
-  }[];
-  utm: {
-    campaigns: { name: string; clicks: number }[];
-    sources: { name: string; clicks: number }[];
-    mediums: { name: string; clicks: number }[];
-    campaignSource: { campaign: string; source: string; clicks: number }[];
-    campaignContent: { campaign: string; content: string; clicks: number }[];
-  };
-}
 
 interface ShortLink {
   id: string;
@@ -65,70 +49,25 @@ const dateRanges = [
   { value: "custom", labelKey: "custom" },
 ];
 
-function StatCard({
-  title,
-  value,
-  icon,
-  change,
-  changeLabel,
-  iconBg,
-}: {
-  title: string;
-  value: string | number;
-  icon: React.ReactNode;
-  change?: number;
-  changeLabel?: string;
-  iconBg?: string;
-}) {
-  return (
-    <div className="bg-white rounded-xl p-5 border border-slate-100">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-slate-400 uppercase tracking-wider font-medium">{title}</p>
-          <p className="text-2xl font-semibold text-slate-900 mt-1">{value}</p>
-          {change !== undefined && change !== 0 && (
-            <p className={`text-xs mt-1 ${change > 0 ? "text-emerald-600" : "text-red-500"}`}>
-              {change > 0 ? "+" : ""}{change}% {changeLabel}
-            </p>
-          )}
-        </div>
-        <div className={`p-2.5 rounded-xl ${iconBg || "bg-sky-100"}`}>{icon}</div>
-      </div>
-    </div>
-  );
-}
-
-// Section divider component
-function SectionDivider({ title, id }: { title: string; id: string }) {
-  return (
-    <div id={id} className="flex items-center gap-3 pt-2 scroll-mt-6">
-      <h2 className="text-xs font-medium text-slate-400 uppercase tracking-wider whitespace-nowrap">{title}</h2>
-      <div className="flex-1 h-px bg-slate-100" />
-    </div>
-  );
-}
-
 export default function AnalyticsPage() {
   const t = useTranslations("analytics");
   const searchParams = useSearchParams();
-  const { success, error: toastError } = useToast();
   const [range, setRange] = useState("7d");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [selectedCampaign, setSelectedCampaign] = useState<string>(
-    searchParams.get("campaign") || ""
+    searchParams.get("campaign") || "",
   );
   const [selectedLinkId, setSelectedLinkId] = useState<string>("");
   const [selectedTagId, setSelectedTagId] = useState<string>("");
   const [tags, setTags] = useState<TagOption[]>([]);
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(true);
-  // `data` is now derived via useMemo below (see computeAnalytics call)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<string>("performance");
 
-  // Fetch available tags once
   useEffect(() => {
     async function fetchTags() {
       try {
@@ -144,10 +83,8 @@ export default function AnalyticsPage() {
     fetchTags();
   }, []);
 
-  // --- Raw analytics data (fetched once, aggregated in-browser) ---
   const [raw, setRaw] = useState<RawAnalyticsData | null>(null);
 
-  // Fetch raw dataset once on mount. Filter changes no longer touch the network.
   useEffect(() => {
     let cancelled = false;
     async function fetchRaw() {
@@ -159,7 +96,6 @@ export default function AnalyticsPage() {
         const fresh = (await response.json()) as RawAnalyticsData;
         if (cancelled) return;
         setRaw(fresh);
-        // Also seed the link selector dropdown
         setLinks(
           fresh.links.map((l) => ({
             id: l.id,
@@ -170,9 +106,7 @@ export default function AnalyticsPage() {
         );
         setLoadingLinks(false);
       } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load data");
-        }
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load data");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -183,7 +117,6 @@ export default function AnalyticsPage() {
     };
   }, []);
 
-  // Derive start/end dates from the `range` state
   const { rangeStart, rangeEnd } = useMemo(() => {
     const now = new Date();
     if (range === "custom" && customFrom) {
@@ -193,13 +126,13 @@ export default function AnalyticsPage() {
       };
     }
     const days = range === "24h" ? 1 : range === "7d" ? 7 : range === "30d" ? 30 : range === "90d" ? 90 : 7;
-    const start = range === "24h"
-      ? new Date(now.getTime() - 24 * 60 * 60 * 1000)
-      : new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const start =
+      range === "24h"
+        ? new Date(now.getTime() - 24 * 60 * 60 * 1000)
+        : new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
     return { rangeStart: start, rangeEnd: now };
   }, [range, customFrom, customTo]);
 
-  // Derive the aggregated dashboard — pure, instant, zero network.
   const data = useMemo(() => {
     if (!raw) return null;
     return computeAnalytics(raw, {
@@ -213,22 +146,56 @@ export default function AnalyticsPage() {
 
   const handleCampaignChange = (value: string) => {
     setSelectedCampaign(value);
-    setSelectedLinkId(""); // Reset link selection when campaign changes
+    setSelectedLinkId("");
   };
 
-  const selectedLink = links.find(l => l.id === selectedLinkId);
+  const selectedLink = links.find((l) => l.id === selectedLinkId);
+
+  const sections = [
+    { key: "performance", label: t("sections.campaigns"), icon: LineChartIcon },
+    { key: "overview", label: t("sections.overview"), icon: BarChart3 },
+    { key: "traffic", label: t("sections.traffic"), icon: Globe },
+    { key: "audience", label: t("sections.audience"), icon: Users },
+  ];
+
+  useEffect(() => {
+    const scroller = document.querySelector(".analytics-scroll");
+    if (!scroller) return;
+    const handler = () => {
+      for (const s of sections) {
+        const el = document.getElementById(`a-${s.key}`);
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        if (r.top <= 80 && r.bottom > 80) {
+          setActiveSection(s.key);
+          break;
+        }
+      }
+    };
+    scroller.addEventListener("scroll", handler);
+    return () => scroller.removeEventListener("scroll", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const jumpTo = (key: string) => {
+    setActiveSection(key);
+    const el = document.getElementById(`a-${key}`);
+    const scroller = document.querySelector(".analytics-scroll");
+    if (el && scroller) {
+      scroller.scrollTo({ top: (el as HTMLElement).offsetTop - 12, behavior: "smooth" });
+    }
+  };
 
   if (error) {
     return (
-      <div className="p-6 bg-red-50 rounded-xl text-red-700 border border-red-100">
+      <div className="card card-padded" style={{ borderColor: "#FCA5B0", background: "#FEF7F8", color: "var(--err-fg)" }}>
         {error}
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Share Report Modal (extracted component) */}
+    <>
       <ShareModal
         isOpen={shareOpen}
         onClose={() => setShareOpen(false)}
@@ -237,81 +204,72 @@ export default function AnalyticsPage() {
         dateRange={range}
       />
 
-      {/* Header */}
       <PageHeader
         title={t("title")}
         description={t("description")}
         actions={
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShareOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-            >
-              <Share2 className="w-4 h-4" />
-              Share Report
+          <>
+            <button className="btn btn-secondary" onClick={() => setShareOpen(true)}>
+              <Share2 size={12} /> Share report
             </button>
             <a
               href={`/api/export/analytics?range=${range}${selectedCampaign ? `&campaign=${selectedCampaign}` : ""}${selectedLinkId ? `&linkId=${selectedLinkId}` : ""}`}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              className="btn btn-secondary"
             >
-              <Download className="w-4 h-4" />
-              CSV
+              <Download size={12} /> Export CSV
             </a>
-          </div>
+          </>
         }
       />
 
-      {/* Date Range + Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        {/* Date range segmented control */}
-        <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
+      {/* Toolbar */}
+      <div className="toolbar">
+        <div className="segmented">
           {dateRanges.map((r) => (
             <button
               key={r.value}
+              className={range === r.value ? "active" : ""}
               onClick={() => setRange(r.value)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${range === r.value
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-                }`}
             >
               {t(r.labelKey)}
             </button>
           ))}
         </div>
 
-        {/* Custom date range */}
         {range === "custom" && (
-          <div className="flex items-center gap-2">
+          <div className="row" style={{ gap: 8 }}>
             <input
               type="date"
               value={customFrom}
               onChange={(e) => setCustomFrom(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
+              className="input"
+              style={{ height: 32, width: 160 }}
             />
-            <span className="text-sm text-slate-400">–</span>
+            <span className="muted">–</span>
             <input
               type="date"
               value={customTo}
               onChange={(e) => setCustomTo(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
+              className="input"
+              style={{ height: 32, width: 160 }}
             />
           </div>
         )}
 
-        {/* Campaign filter */}
-        <CampaignFilter
-          value={selectedCampaign}
-          onChange={handleCampaignChange}
-          showNoCampaign
-        />
+        <div style={{ flex: 1 }} />
 
-        {/* Tag filter */}
+        <CampaignFilter value={selectedCampaign} onChange={handleCampaignChange} showNoCampaign />
+
         {tags.length > 0 && (
-          <div className="relative">
+          <div style={{ position: "relative" }}>
             <select
               value={selectedTagId}
-              onChange={(e) => { setSelectedTagId(e.target.value); setSelectedLinkId(""); }}
-              className="appearance-none pl-8 pr-7 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] cursor-pointer"
+              onChange={(e) => {
+                setSelectedTagId(e.target.value);
+                setSelectedLinkId("");
+              }}
+              className="input"
+              style={{ height: 32, paddingLeft: 32, paddingRight: 28, appearance: "none", cursor: "pointer" }}
             >
               <option value="">All Tags</option>
               {tags.map((tag) => (
@@ -320,18 +278,38 @@ export default function AnalyticsPage() {
                 </option>
               ))}
             </select>
-            <Tag className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <TagIcon
+              size={13}
+              style={{
+                position: "absolute",
+                left: 10,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "var(--ink-500)",
+                pointerEvents: "none",
+              }}
+            />
+            <ChevronDown
+              size={12}
+              style={{
+                position: "absolute",
+                right: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "var(--ink-500)",
+                pointerEvents: "none",
+              }}
+            />
           </div>
         )}
 
-        {/* Link selector */}
-        <div className="relative flex-1 max-w-xs">
+        <div style={{ position: "relative", minWidth: 180 }}>
           <select
             value={selectedLinkId}
             onChange={(e) => setSelectedLinkId(e.target.value)}
             disabled={loadingLinks}
-            className="w-full appearance-none pl-8 pr-7 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] cursor-pointer disabled:opacity-50"
+            className="input"
+            style={{ height: 32, paddingLeft: 32, paddingRight: 28, appearance: "none", cursor: "pointer", width: "100%" }}
           >
             <option value="">{t("allLinks")}</option>
             {links.map((link) => (
@@ -340,575 +318,642 @@ export default function AnalyticsPage() {
               </option>
             ))}
           </select>
-          <Link2 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          <Link2
+            size={13}
+            style={{
+              position: "absolute",
+              left: 10,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "var(--ink-500)",
+              pointerEvents: "none",
+            }}
+          />
           {loadingLinks ? (
-            <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin pointer-events-none" />
+            <Loader2
+              size={12}
+              className="animate-spin"
+              style={{
+                position: "absolute",
+                right: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "var(--ink-500)",
+                pointerEvents: "none",
+              }}
+            />
           ) : (
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <ChevronDown
+              size={12}
+              style={{
+                position: "absolute",
+                right: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "var(--ink-500)",
+                pointerEvents: "none",
+              }}
+            />
           )}
         </div>
 
-        {/* Clear filters */}
         {(selectedLinkId || selectedTagId) && (
           <button
-            onClick={() => { setSelectedLinkId(""); setSelectedTagId(""); }}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            className="btn btn-ghost"
+            onClick={() => {
+              setSelectedLinkId("");
+              setSelectedTagId("");
+            }}
             title={t("clearFilter")}
           >
-            <X className="w-4 h-4" />
+            <X size={14} />
           </button>
         )}
       </div>
 
-      {/* Selected link info — compact callout */}
+      {/* Selected link callout */}
       {selectedLink && (
-        <div className="flex items-center gap-3 bg-sky-50/50 border-l-2 border-[#03A9F4] rounded-r-lg px-4 py-2.5">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-slate-700">
-              <span className="font-medium">{t("viewingLinkAnalytics")}</span>{" "}
-              <span className="font-mono text-[#03A9F4]">/{selectedLink.code}</span>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            background: "var(--brand-50)",
+            borderLeft: "2px solid var(--brand-500)",
+            borderRadius: "0 6px 6px 0",
+            padding: "10px 14px",
+            marginBottom: 14,
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 13, color: "var(--ink-200)", margin: 0 }}>
+              <span style={{ fontWeight: 500 }}>{t("viewingLinkAnalytics")}</span>{" "}
+              <span style={{ fontFamily: "var(--font-mono)", color: "var(--brand-600)" }}>
+                /{selectedLink.code}
+              </span>
               {selectedLink.title && (
-                <span className="text-slate-500"> — {selectedLink.title}</span>
+                <span className="muted" style={{ marginLeft: 4 }}>
+                  — {selectedLink.title}
+                </span>
               )}
             </p>
-            <p className="text-xs text-slate-400 mt-0.5 truncate">
+            <p
+              style={{
+                fontSize: 11.5,
+                color: "var(--ink-500)",
+                margin: "3px 0 0",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
               {selectedLink.originalUrl}
             </p>
           </div>
-          <button
-            onClick={() => setSelectedLinkId("")}
-            className="p-1 hover:bg-sky-100 rounded shrink-0"
-          >
-            <X className="w-3.5 h-3.5 text-slate-400" />
+          <button className="btn btn-ghost" style={{ padding: 4 }} onClick={() => setSelectedLinkId("")}>
+            <X size={13} />
           </button>
         </div>
       )}
 
-      {/* Campaign Links — shown when a real campaign is selected */}
-      {selectedCampaign && selectedCampaign !== "__none__" && (
-        <div className="bg-white rounded-xl border border-slate-100">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <Link2 className="w-4 h-4 text-slate-400" />
-              <h3 className="text-sm font-semibold text-slate-900">
-                {t("campaignLinks")}{" "}
-                <span className="font-mono text-[#03A9F4]">{selectedCampaign}</span>
-              </h3>
-              {!loadingLinks && (
-                <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full tabular-nums">
-                  {links.length}
-                </span>
-              )}
-            </div>
+      {/* Main grid with anchor rail */}
+      <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 20, alignItems: "start" }}>
+        <div className="anchor-rail">
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: "var(--ink-500)",
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              padding: "4px 10px 8px",
+            }}
+          >
+            On this page
           </div>
-
-          {loadingLinks ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
-            </div>
-          ) : links.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-8">{t("noLinksInCampaign")}</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="pl-4 py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      {t("shortUrl")}
-                    </th>
-                    <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      {t("destination")}
-                    </th>
-                    <th className="py-2.5 pr-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      {t("action")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {links.map((link) => (
-                    <tr
-                      key={link.id}
-                      className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors"
-                    >
-                      <td className="pl-4 py-2.5 pr-3">
-                        <span className="text-[#03A9F4] font-mono text-sm font-medium">
-                          /{link.code}
-                        </span>
-                        {link.title && (
-                          <span className="ml-2 text-xs text-slate-400">{link.title}</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 pr-3 max-w-xs">
-                        <span className="text-xs text-slate-500 truncate block" title={link.originalUrl}>
-                          {link.originalUrl.replace(/^https?:\/\//, "").substring(0, 60)}
-                          {link.originalUrl.length > 63 ? "…" : ""}
-                        </span>
-                      </td>
-                      <td className="py-2.5 pr-4 text-right">
-                        <button
-                          onClick={() => setSelectedLinkId(link.id)}
-                          className={`text-xs font-medium px-2.5 py-1 rounded-lg transition-colors ${selectedLinkId === link.id
-                              ? "bg-[#03A9F4] text-white"
-                              : "text-[#03A9F4] hover:bg-sky-50"
-                            }`}
-                        >
-                          {selectedLinkId === link.id ? t("viewing") : t("viewDetails")}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {loading && !data ? (
-        // First-ever load: show skeleton spinner because there's nothing to show
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-        </div>
-      ) : data ? (
-        <div>
-
-          {/* Anchor Nav — updated order */}
-          <div className="flex items-center gap-1 pb-2 border-b border-slate-100">
-            {[
-              { id: "campaigns", label: t("sections.campaigns") },
-              { id: "overview", label: t("sections.overview") },
-              { id: "traffic", label: t("sections.traffic") },
-              { id: "audience", label: t("sections.audience") },
-            ].map((section) => (
+          {sections.map((s) => {
+            const Icon = s.icon;
+            return (
               <button
-                key={section.id}
-                onClick={() => document.getElementById(section.id)?.scrollIntoView({ behavior: "smooth" })}
-                className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                key={s.key}
+                className={activeSection === s.key ? "active" : ""}
+                onClick={() => jumpTo(s.key)}
               >
-                {section.label}
+                <span className="dot" />
+                <Icon size={13} />
+                {s.label}
               </button>
-            ))}
-          </div>
-
-          {/* — Campaign Performance — (moved to top: most important for marketers) */}
-          <SectionDivider title={t("sections.campaigns")} id="campaigns" />
-
-          {/* UTM Analytics Section */}
-          <div className="space-y-4">
-            {/* Empty State when no UTM data */}
-            {(!data.utm || (data.utm.campaigns.length === 0 && data.utm.sources.length === 0)) && (
-              <div className="bg-white rounded-xl p-8 border border-slate-100 text-center">
-                <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mx-auto mb-3">
-                  <Target className="w-6 h-6 text-amber-600" />
-                </div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-1">{t("utm.emptyState.title")}</h3>
-                <p className="text-sm text-slate-500 mb-4 max-w-md mx-auto">{t("utm.emptyState.description")}</p>
-                <div className="flex items-center justify-center gap-3">
-                  <a
-                    href="/links/new"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white rounded-lg hover:bg-[#0288D1] transition-colors font-medium text-sm"
-                  >
-                    {t("utm.emptyState.createLink")}
-                  </a>
-                  <a
-                    href="/campaigns"
-                    className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium text-sm"
-                  >
-                    <Megaphone className="w-4 h-4" />
-                    {t("utm.emptyState.manageCampaigns")}
-                  </a>
-                </div>
-              </div>
-            )}
-
-            {/* Show UTM data when available */}
-            {data.utm && (data.utm.campaigns.length > 0 || data.utm.sources.length > 0) && (
-              <>
-              {/* Campaign, Source, Medium Cards */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* By Campaign */}
-                <div className="bg-white rounded-xl p-5 border border-slate-100">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Megaphone className="w-4 h-4 text-amber-500" />
-                    <h3 className="text-sm font-semibold text-slate-900">{t("utm.byCampaign")}</h3>
-                  </div>
-                  {data.utm.campaigns.length > 0 ? (
-                    <div className="space-y-3">
-                      {data.utm.campaigns.map((item, i) => {
-                        const maxClicks = data.utm.campaigns[0]?.clicks || 1;
-                        const percentage = (item.clicks / maxClicks) * 100;
-                        return (
-                          <div key={i} className="space-y-1">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-slate-700 font-medium truncate max-w-[150px]" title={item.name}>
-                                {item.name}
-                              </span>
-                              <span className="text-slate-900 font-medium tabular-nums">
-                                {item.clicks.toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-amber-400 rounded-full" style={{ width: `${percentage}%` }} />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-slate-400 text-center py-4 text-sm">{t("utm.noCampaignData")}</p>
-                  )}
-                </div>
-
-                {/* By Source */}
-                <div className="bg-white rounded-xl p-5 border border-slate-100">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Globe className="w-4 h-4 text-cyan-500" />
-                    <h3 className="text-sm font-semibold text-slate-900">{t("utm.bySource")}</h3>
-                  </div>
-                  {data.utm.sources.length > 0 ? (
-                    <div className="space-y-3">
-                      {data.utm.sources.map((item, i) => {
-                        const maxClicks = data.utm.sources[0]?.clicks || 1;
-                        const percentage = (item.clicks / maxClicks) * 100;
-                        return (
-                          <div key={i} className="space-y-1">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-slate-700 font-medium truncate max-w-[150px]" title={item.name}>
-                                {item.name}
-                              </span>
-                              <span className="text-slate-900 font-medium tabular-nums">
-                                {item.clicks.toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-cyan-400 rounded-full" style={{ width: `${percentage}%` }} />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-slate-400 text-center py-4 text-sm">{t("utm.noSourceData")}</p>
-                  )}
-                </div>
-
-                {/* By Medium */}
-                <div className="bg-white rounded-xl p-5 border border-slate-100">
-                  <div className="flex items-center gap-2 mb-4">
-                    <TrendingUp className="w-4 h-4 text-emerald-500" />
-                    <h3 className="text-sm font-semibold text-slate-900">{t("utm.byMedium")}</h3>
-                  </div>
-                  {data.utm.mediums.length > 0 ? (
-                    <div className="space-y-3">
-                      {data.utm.mediums.map((item, i) => {
-                        const maxClicks = data.utm.mediums[0]?.clicks || 1;
-                        const percentage = (item.clicks / maxClicks) * 100;
-                        return (
-                          <div key={i} className="space-y-1">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-slate-700 font-medium truncate max-w-[150px]" title={item.name}>
-                                {item.name}
-                              </span>
-                              <span className="text-slate-900 font-medium tabular-nums">
-                                {item.clicks.toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${percentage}%` }} />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-slate-400 text-center py-4 text-sm">{t("utm.noMediumData")}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Campaign x Source Table */}
-              {data.utm.campaignSource.length > 0 && (
-                <div className="bg-white rounded-xl border border-slate-100">
-                  <div className="px-4 py-3 border-b border-slate-100">
-                    <h3 className="text-sm font-semibold text-slate-900">{t("utm.campaignSource")}</h3>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-slate-100">
-                          <th className="pl-4 py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t("utm.campaign")}</th>
-                          <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t("utm.source")}</th>
-                          <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t("clicks")}</th>
-                          <th className="py-2.5 pr-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider w-28">{t("utm.performance")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.utm.campaignSource.map((item, i) => {
-                          const maxClicks = data.utm.campaignSource[0]?.clicks || 1;
-                          const percentage = (item.clicks / maxClicks) * 100;
-                          return (
-                            <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                              <td className="pl-4 py-2.5 pr-3">
-                                <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-medium border border-amber-100">{item.campaign}</span>
-                              </td>
-                              <td className="py-2.5 pr-3">
-                                <span className="px-1.5 py-0.5 bg-cyan-50 text-cyan-700 rounded text-xs font-medium border border-cyan-100">{item.source}</span>
-                              </td>
-                              <td className="py-2.5 pr-3 text-right text-sm font-medium text-slate-900 tabular-nums">{item.clicks.toLocaleString()}</td>
-                              <td className="py-2.5 pr-4">
-                                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                  <div className="h-full bg-violet-400 rounded-full" style={{ width: `${percentage}%` }} />
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Campaign x Content Table */}
-              {data.utm.campaignContent.length > 0 && (
-                <div className="bg-white rounded-xl border border-slate-100">
-                  <div className="px-4 py-3 border-b border-slate-100">
-                    <h3 className="text-sm font-semibold text-slate-900">{t("utm.campaignContent")}</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">{t("utm.campaignContentDesc")}</p>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-slate-100">
-                          <th className="pl-4 py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t("utm.campaign")}</th>
-                          <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t("utm.content")}</th>
-                          <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t("clicks")}</th>
-                          <th className="py-2.5 pr-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider w-28">{t("utm.performance")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.utm.campaignContent.map((item, i) => {
-                          const maxClicks = data.utm.campaignContent[0]?.clicks || 1;
-                          const percentage = (item.clicks / maxClicks) * 100;
-                          return (
-                            <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                              <td className="pl-4 py-2.5 pr-3">
-                                <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-medium border border-amber-100">{item.campaign}</span>
-                              </td>
-                              <td className="py-2.5 pr-3">
-                                <span className="px-1.5 py-0.5 bg-violet-50 text-violet-700 rounded text-xs font-medium border border-violet-100">{item.content}</span>
-                              </td>
-                              <td className="py-2.5 pr-3 text-right text-sm font-medium text-slate-900 tabular-nums">{item.clicks.toLocaleString()}</td>
-                              <td className="py-2.5 pr-4">
-                                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                  <div className="h-full bg-rose-400 rounded-full" style={{ width: `${percentage}%` }} />
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-              </>
-            )}
-          </div>
-
-          {/* — Overview — */}
-          <SectionDivider title={t("sections.overview")} id="overview" />
-
-          {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <StatCard
-              title={t("clicks")}
-              value={data.summary.totalClicks.toLocaleString()}
-              icon={<MousePointerClick className="w-6 h-6 text-[#03A9F4]" />}
-              iconBg="bg-sky-100"
-              change={data.summary.clicksChange}
-              changeLabel={t("vsPreviousPeriod")}
-            />
-            <StatCard
-              title={t("uniqueClicks")}
-              value={data.summary.uniqueVisitors.toLocaleString()}
-              icon={<Users className="w-6 h-6 text-cyan-600" />}
-              iconBg="bg-cyan-100"
-            />
-            <StatCard
-              title={t("uniqueRate")}
-              value={
-                data.summary.totalClicks > 0
-                  ? `${((data.summary.uniqueVisitors / data.summary.totalClicks) * 100).toFixed(1)}%`
-                  : "0%"
-              }
-              icon={<TrendingUp className="w-6 h-6 text-emerald-600" />}
-              iconBg="bg-emerald-100"
-            />
-          </div>
-
-          {/* Clicks Over Time */}
-          <div className="bg-white rounded-xl p-5 border border-slate-100">
-            <h2 className="text-sm font-semibold text-slate-900 mb-4">
-              {t("clicksOverTime")}
-            </h2>
-            {data.clicksByDay.length > 0 ? (
-              <ClicksChart data={data.clicksByDay} />
-            ) : (
-              <div className="h-[300px] flex items-center justify-center text-slate-400 text-sm">
-                {t("noData")}
-              </div>
-            )}
-          </div>
-
-          {/* — Traffic Sources — */}
-          <SectionDivider title={t("sections.traffic")} id="traffic" />
-
-          {/* Referrers & Countries — with percentage bars */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-white rounded-xl p-5 border border-slate-100">
-              <h2 className="text-sm font-semibold text-slate-900 mb-4">{t("referrers")}</h2>
-              {data.referrers.length > 0 ? (() => {
-                const total = data.referrers.reduce((s, r) => s + r.value, 0) || 1;
-                const max = data.referrers[0]?.value || 1;
-                return (
-                  <div className="space-y-2.5">
-                    {data.referrers.map((referrer, i) => (
-                      <div key={i} className="space-y-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm text-slate-600 truncate flex-1">{referrer.name}</span>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-xs text-slate-400 tabular-nums w-8 text-right">
-                              {((referrer.value / total) * 100).toFixed(0)}%
-                            </span>
-                            <span className="text-sm font-medium text-slate-900 tabular-nums w-12 text-right">
-                              {referrer.value.toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-[#03A9F4] rounded-full"
-                            style={{ width: `${(referrer.value / max) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })() : (
-                <p className="text-slate-400 text-center py-8 text-sm">{t("noData")}</p>
-              )}
-            </div>
-
-            <div className="bg-white rounded-xl p-5 border border-slate-100">
-              <h2 className="text-sm font-semibold text-slate-900 mb-4">{t("countries")}</h2>
-              {data.countries.length > 0 ? (() => {
-                const total = data.countries.reduce((s, c) => s + c.value, 0) || 1;
-                const max = data.countries[0]?.value || 1;
-                return (
-                  <div className="space-y-2.5">
-                    {data.countries.map((country, i) => (
-                      <div key={i} className="space-y-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm text-slate-600 truncate flex-1">{country.name}</span>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-xs text-slate-400 tabular-nums w-8 text-right">
-                              {((country.value / total) * 100).toFixed(0)}%
-                            </span>
-                            <span className="text-sm font-medium text-slate-900 tabular-nums w-12 text-right">
-                              {country.value.toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-violet-400 rounded-full"
-                            style={{ width: `${(country.value / max) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })() : (
-                <p className="text-slate-400 text-center py-8 text-sm">{t("noData")}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Top Links - Only show when viewing all links */}
-          {!selectedLinkId && (
-            <div className="bg-white rounded-xl border border-slate-100">
-              <div className="px-4 py-3 border-b border-slate-100">
-                <h2 className="text-sm font-semibold text-slate-900">{t("topPerformingLinks")}</h2>
-              </div>
-              {data.topLinks.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-slate-100">
-                        <th className="pl-4 py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t("shortUrl")}</th>
-                        <th className="py-2.5 pr-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t("linkTitle")}</th>
-                        <th className="py-2.5 pr-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t("clicks")}</th>
-                        <th className="py-2.5 pr-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t("action")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.topLinks.map((link) => (
-                        <tr key={link.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                          <td className="pl-4 py-2.5 pr-3">
-                            <span className="text-[#03A9F4] font-medium font-mono text-sm">/{link.code}</span>
-                          </td>
-                          <td className="py-2.5 pr-3 text-sm text-slate-600 max-w-xs truncate">
-                            {link.title || link.originalUrl}
-                          </td>
-                          <td className="py-2.5 pr-3 text-right text-sm font-medium text-slate-900 tabular-nums">
-                            {link.clicks.toLocaleString()}
-                          </td>
-                          <td className="py-2.5 pr-4 text-right">
-                            <button
-                              onClick={() => setSelectedLinkId(link.id)}
-                              className="text-xs text-[#03A9F4] hover:text-[#0288D1] font-medium"
-                            >
-                              {t("viewDetails")} →
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-slate-400 text-center py-8 text-sm">{t("noData")}</p>
-              )}
-            </div>
-          )}
-
-          {/* — Audience — (moved to bottom: least actionable for daily marketers) */}
-          <SectionDivider title={t("sections.audience")} id="audience" />
-
-          {/* Distribution Charts — 3-col single row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white rounded-xl p-4 border border-slate-100">
-              <PieChartComponent data={data.devices} title={t("devices")} />
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-slate-100">
-              <PieChartComponent data={data.browsers} title={t("browsers")} />
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-slate-100">
-              <PieChartComponent data={data.operatingSystems} title={t("operatingSystems")} />
-            </div>
-          </div>
+            );
+          })}
         </div>
-      ) : null}
 
-      {/* Truncation warning when the raw dataset hit its cap */}
+        <div
+          className="analytics-scroll"
+          style={{ maxHeight: "calc(100vh - 160px)", overflowY: "auto", paddingRight: 4 }}
+        >
+          {loading && !data ? (
+            <div style={{ padding: 64, textAlign: "center" }}>
+              <Loader2 size={24} className="animate-spin" style={{ color: "var(--ink-500)" }} />
+            </div>
+          ) : data ? (
+            <>
+              {/* Campaign Performance */}
+              <section id="a-performance" className="a-section">
+                <div className="a-section-head">
+                  <h2>{t("sections.campaigns")}</h2>
+                  <span className="hint">by campaign, source and medium</span>
+                </div>
+
+                {!data.utm ||
+                (data.utm.campaigns.length === 0 && data.utm.sources.length === 0) ? (
+                  <div className="card card-padded" style={{ textAlign: "center", padding: 32 }}>
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 10,
+                        background: "var(--warn-bg)",
+                        color: "var(--warn-fg)",
+                        display: "grid",
+                        placeItems: "center",
+                        margin: "0 auto 12px",
+                      }}
+                    >
+                      <Target size={20} />
+                    </div>
+                    <h3 className="section-title" style={{ justifyContent: "center" }}>
+                      {t("utm.emptyState.title")}
+                    </h3>
+                    <p className="section-sub" style={{ maxWidth: 420, margin: "6px auto 16px" }}>
+                      {t("utm.emptyState.description")}
+                    </p>
+                    <div className="row" style={{ justifyContent: "center" }}>
+                      <a href="/links/new" className="btn btn-primary">
+                        {t("utm.emptyState.createLink")}
+                      </a>
+                      <a href="/campaigns" className="btn btn-secondary">
+                        <Megaphone size={12} /> {t("utm.emptyState.manageCampaigns")}
+                      </a>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid-3" style={{ marginBottom: 12 }}>
+                      <PerfTile
+                        label={t("utm.byCampaign")}
+                        rows={data.utm.campaigns}
+                        color="var(--data-amber)"
+                      />
+                      <PerfTile
+                        label={t("utm.bySource")}
+                        rows={data.utm.sources}
+                        color="var(--data-cyan)"
+                      />
+                      <PerfTile
+                        label={t("utm.byMedium")}
+                        rows={data.utm.mediums}
+                        color="var(--data-emerald)"
+                      />
+                    </div>
+
+                    {data.utm.campaignSource.length > 0 && (
+                      <div className="card" style={{ marginBottom: 12 }}>
+                        <div className="tbl-head" style={{ padding: "12px 16px" }}>
+                          <div className="tbl-head-title">{t("utm.campaignSource")}</div>
+                        </div>
+                        <table className="data">
+                          <thead>
+                            <tr>
+                              <th>{t("utm.campaign")}</th>
+                              <th>{t("utm.source")}</th>
+                              <th className="num" style={{ width: 80 }}>
+                                {t("clicks")}
+                              </th>
+                              <th className="num" style={{ width: 180 }}>
+                                {t("utm.performance")}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {data.utm.campaignSource.map((item, i) => {
+                              const max = data.utm.campaignSource[0]?.clicks || 1;
+                              const pct = (item.clicks / max) * 100;
+                              return (
+                                <tr key={i}>
+                                  <td>
+                                    <span className="pill pill-campaign">{item.campaign}</span>
+                                  </td>
+                                  <td>
+                                    <span className="pill pill-source">{item.source}</span>
+                                  </td>
+                                  <td className="num">{item.clicks.toLocaleString()}</td>
+                                  <td className="num">
+                                    <div className="bar-cell">
+                                      <div className="bar-track">
+                                        <div
+                                          className="bar-fill"
+                                          style={{ width: `${pct}%`, background: "var(--data-violet)" }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {data.utm.campaignContent.length > 0 && (
+                      <div className="card">
+                        <div className="tbl-head" style={{ padding: "12px 16px" }}>
+                          <div className="tbl-head-title">{t("utm.campaignContent")}</div>
+                          <span className="muted" style={{ fontSize: 11.5 }}>
+                            {t("utm.campaignContentDesc")}
+                          </span>
+                        </div>
+                        <table className="data">
+                          <thead>
+                            <tr>
+                              <th>{t("utm.campaign")}</th>
+                              <th>{t("utm.content")}</th>
+                              <th className="num" style={{ width: 80 }}>
+                                {t("clicks")}
+                              </th>
+                              <th className="num" style={{ width: 180 }}>
+                                {t("utm.performance")}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {data.utm.campaignContent.map((item, i) => {
+                              const max = data.utm.campaignContent[0]?.clicks || 1;
+                              const pct = (item.clicks / max) * 100;
+                              return (
+                                <tr key={i}>
+                                  <td>
+                                    <span className="pill pill-campaign">{item.campaign}</span>
+                                  </td>
+                                  <td>
+                                    <span className="pill pill-content">{item.content}</span>
+                                  </td>
+                                  <td className="num">{item.clicks.toLocaleString()}</td>
+                                  <td className="num">
+                                    <div className="bar-cell">
+                                      <div className="bar-track">
+                                        <div
+                                          className="bar-fill"
+                                          style={{ width: `${pct}%`, background: "var(--data-rose)" }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                )}
+              </section>
+
+              {/* Overview */}
+              <section id="a-overview" className="a-section">
+                <div className="a-section-head">
+                  <h2>{t("sections.overview")}</h2>
+                  <span className="hint">click volume and uniques</span>
+                </div>
+                <div className="grid-3" style={{ marginBottom: 12 }}>
+                  <div className="kpi">
+                    <div className="kpi-label">
+                      <MousePointerClick size={12} /> {t("clicks")}
+                    </div>
+                    <div className="kpi-value">{data.summary.totalClicks.toLocaleString()}</div>
+                    {data.summary.clicksChange !== 0 && (
+                      <div
+                        className={`kpi-sub ${data.summary.clicksChange > 0 ? "pos" : "neg"}`}
+                      >
+                        {data.summary.clicksChange > 0 ? "▲" : "▼"}{" "}
+                        {Math.abs(data.summary.clicksChange)}% {t("vsPreviousPeriod")}
+                      </div>
+                    )}
+                  </div>
+                  <div className="kpi">
+                    <div className="kpi-label">
+                      <Users size={12} /> {t("uniqueClicks")}
+                    </div>
+                    <div className="kpi-value">{data.summary.uniqueVisitors.toLocaleString()}</div>
+                    <div className="kpi-sub">
+                      {data.summary.uniqueVisitors} unique visitors
+                    </div>
+                  </div>
+                  <div className="kpi">
+                    <div className="kpi-label">
+                      <TrendingUp size={12} /> {t("uniqueRate")}
+                    </div>
+                    <div className="kpi-value">
+                      {data.summary.totalClicks > 0
+                        ? `${((data.summary.uniqueVisitors / data.summary.totalClicks) * 100).toFixed(1)}%`
+                        : "0%"}
+                    </div>
+                    <div className="kpi-sub">above average</div>
+                  </div>
+                </div>
+                <div className="card card-padded">
+                  <div className="section-title" style={{ marginBottom: 10 }}>
+                    <LineChartIcon size={14} style={{ color: "var(--ink-400)" }} />
+                    {t("clicksOverTime")}
+                  </div>
+                  {data.clicksByDay.length > 0 ? (
+                    <ClicksChart data={data.clicksByDay} />
+                  ) : (
+                    <div
+                      style={{
+                        height: 300,
+                        display: "grid",
+                        placeItems: "center",
+                        fontSize: 13,
+                        color: "var(--ink-500)",
+                      }}
+                    >
+                      {t("noData")}
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Traffic Sources */}
+              <section id="a-traffic" className="a-section">
+                <div className="a-section-head">
+                  <h2>{t("sections.traffic")}</h2>
+                  <span className="hint">referrers, countries, top links</span>
+                </div>
+                <div className="grid-2" style={{ marginBottom: 12 }}>
+                  <div className="card card-padded">
+                    <div className="section-title">{t("referrers")}</div>
+                    <p className="section-sub">&nbsp;</p>
+                    {data.referrers.length > 0 ? (
+                      <ProgressList rows={data.referrers} color="var(--data-cyan)" />
+                    ) : (
+                      <div
+                        style={{
+                          padding: "24px 0",
+                          textAlign: "center",
+                        }}
+                      >
+                        <div className="placeholder">{t("noData")}</div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="card card-padded">
+                    <div className="section-title">{t("countries")}</div>
+                    <p className="section-sub">&nbsp;</p>
+                    {data.countries.length > 0 ? (
+                      <ProgressList rows={data.countries} color="var(--data-violet)" pillClass="pill-country" />
+                    ) : (
+                      <div
+                        style={{
+                          padding: "24px 0",
+                          textAlign: "center",
+                        }}
+                      >
+                        <div className="placeholder">{t("noData")}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {!selectedLinkId && data.topLinks.length > 0 && (
+                  <div className="tbl-wrap">
+                    <div className="tbl-head">
+                      <div className="tbl-head-title">{t("topPerformingLinks")}</div>
+                    </div>
+                    <table className="data">
+                      <thead>
+                        <tr>
+                          <th>{t("shortUrl")}</th>
+                          <th>{t("linkTitle")}</th>
+                          <th className="num" style={{ width: 80 }}>
+                            {t("clicks")}
+                          </th>
+                          <th style={{ width: 120 }}>{t("action")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.topLinks.map((link) => (
+                          <tr key={link.id}>
+                            <td>
+                              <span
+                                style={{
+                                  fontFamily: "var(--font-mono)",
+                                  fontSize: 12.5,
+                                  color: "var(--brand-600)",
+                                }}
+                              >
+                                /{link.code}
+                              </span>
+                            </td>
+                            <td
+                              style={{
+                                fontFamily: "var(--font-mono)",
+                                fontSize: 12,
+                                maxWidth: 300,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {link.title || link.originalUrl}
+                            </td>
+                            <td className="num">{link.clicks.toLocaleString()}</td>
+                            <td>
+                              <button
+                                onClick={() => setSelectedLinkId(link.id)}
+                                style={{
+                                  color: "var(--brand-600)",
+                                  fontSize: 12,
+                                  fontWeight: 500,
+                                  background: "none",
+                                  border: 0,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {t("viewDetails")} →
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+
+              {/* Audience */}
+              <section id="a-audience" className="a-section">
+                <div className="a-section-head">
+                  <h2>{t("sections.audience")}</h2>
+                  <span className="hint">device, browser, OS</span>
+                </div>
+                <div className="card card-padded">
+                  <div className="grid-3">
+                    <PieChartComponent data={data.devices} title={t("devices")} />
+                    <PieChartComponent data={data.browsers} title={t("browsers")} />
+                    <PieChartComponent
+                      data={data.operatingSystems}
+                      title={t("operatingSystems")}
+                    />
+                  </div>
+                </div>
+              </section>
+            </>
+          ) : null}
+        </div>
+      </div>
+
       {raw?.meta.truncated && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-start gap-2 px-4 py-2 max-w-md bg-amber-50 border border-amber-200 rounded-lg shadow-lg text-xs text-amber-800">
-          <span>⚠️ 只顯示最近 10,000 筆點擊。更早的資料請縮小日期範圍或選特定連結。</span>
+        <div
+          style={{
+            position: "fixed",
+            bottom: 16,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 40,
+            background: "var(--warn-bg)",
+            border: "1px solid #FCD5B5",
+            borderRadius: 8,
+            padding: "8px 14px",
+            fontSize: 12,
+            color: "var(--warn-fg)",
+            boxShadow: "var(--shadow-md)",
+          }}
+        >
+          ⚠️ 只顯示最近 10,000 筆點擊。更早的資料請縮小日期範圍或選特定連結。
         </div>
       )}
+    </>
+  );
+}
+
+function PerfTile({
+  label,
+  rows,
+  color,
+}: {
+  label: string;
+  rows: { name: string; clicks: number }[];
+  color: string;
+}) {
+  const top = rows[0];
+  return (
+    <div className="kpi" style={{ padding: "12px 14px" }}>
+      <div className="kpi-label" style={{ marginBottom: 6 }}>
+        {label}
+      </div>
+      {top ? (
+        <>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              marginBottom: 6,
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 13,
+                color: "var(--ink-100)",
+                fontWeight: 500,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                maxWidth: 140,
+              }}
+              title={top.name}
+            >
+              {top.name}
+            </span>
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 16,
+                fontWeight: 600,
+                color: "var(--ink-100)",
+              }}
+            >
+              {top.clicks.toLocaleString()}
+            </span>
+          </div>
+          <div className="bar-track">
+            <div className="bar-fill" style={{ width: "100%", background: color }} />
+          </div>
+        </>
+      ) : (
+        <p className="placeholder" style={{ margin: 0 }}>
+          No data
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ProgressList({
+  rows,
+  color,
+  pillClass,
+}: {
+  rows: { name: string; value: number }[];
+  color: string;
+  pillClass?: string;
+}) {
+  const total = rows.reduce((s, r) => s + r.value, 0) || 1;
+  const max = rows[0]?.value || 1;
+  return (
+    <div className="stack" style={{ gap: 10 }}>
+      {rows.map((row, i) => (
+        <div key={i}>
+          <div className="row-between" style={{ marginBottom: 4 }}>
+            {pillClass ? (
+              <span className={`pill ${pillClass}`} title={row.name}>
+                {row.name}
+              </span>
+            ) : (
+              <span style={{ fontSize: 13, color: "var(--ink-300)" }}>{row.name}</span>
+            )}
+            <div className="row" style={{ gap: 8 }}>
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  color: "var(--ink-500)",
+                }}
+              >
+                {((row.value / total) * 100).toFixed(0)}%
+              </span>
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 12.5,
+                  color: "var(--ink-200)",
+                }}
+              >
+                {row.value.toLocaleString()}
+              </span>
+            </div>
+          </div>
+          <div className="bar-track">
+            <div
+              className="bar-fill"
+              style={{ width: `${(row.value / max) * 100}%`, background: color }}
+            />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

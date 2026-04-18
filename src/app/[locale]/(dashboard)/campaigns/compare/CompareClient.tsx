@@ -2,22 +2,6 @@
 
 /**
  * /campaigns/compare?names=a,b,c — side-by-side deep comparison.
- *
- * Flow: user ticks 2-4 rows on /campaigns → "Side-by-side details" → lands
- * here. Top of page shows an overlay line chart and the winner callouts
- * ("best CVR", "most clicks", "closest to goal"). Below, one column per
- * campaign with its own KPIs + top sources + top mediums, so the user
- * can spot "why is A's CVR so much higher? — ah, it's mostly email
- * whereas B is mostly FB ads".
- *
- * Data sources:
- *   - /api/analytics/campaigns-summary — leaderboard numbers + daily
- *     time series, already Redis-cached
- *   - /api/analytics/raw — full click stream, so we can compute per-
- *     campaign source/medium breakdowns client-side via the same
- *     computeAnalytics helper the Campaign Detail Traffic tab uses.
- *     That payload is also cached, and we only hit it once regardless
- *     of how many campaigns are in the compare set.
  */
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -32,12 +16,11 @@ import {
   Trophy,
   LineChart as LineChartIcon,
   X,
+  Flag,
 } from "lucide-react";
 import { MultiCampaignChart } from "@/components/analytics/MultiCampaignChart";
-import {
-  computeAnalytics,
-  type RawAnalyticsData,
-} from "@/lib/analytics/compute";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { computeAnalytics, type RawAnalyticsData } from "@/lib/analytics/compute";
 
 interface CampaignRow {
   id: string | null;
@@ -68,12 +51,19 @@ const windowPresets: { value: string; days: number }[] = [
   { value: "90d", days: 90 },
 ];
 
-function statusDot(status: string | null) {
-  if (status === "ACTIVE") return "bg-emerald-500";
-  if (status === "COMPLETED") return "bg-sky-400";
-  if (status === "DRAFT") return "bg-slate-300";
-  if (status === "ARCHIVED") return "bg-slate-400";
-  return "bg-slate-300";
+const COLUMN_COLORS = [
+  "var(--brand-500)",
+  "var(--data-violet)",
+  "var(--data-emerald)",
+  "var(--data-amber)",
+];
+
+function statusClass(status: string | null): string {
+  if (status === "ACTIVE") return "active";
+  if (status === "COMPLETED") return "completed";
+  if (status === "DRAFT") return "draft";
+  if (status === "ARCHIVED") return "archived";
+  return "draft";
 }
 
 export default function CompareClient({ initialNames }: { initialNames: string[] }) {
@@ -110,23 +100,18 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
     (name: string) => {
       const next = names.filter((n) => n !== name);
       setNames(next);
-      // Update URL so reloads preserve the trimmed set.
       const search = next.length > 0 ? `?names=${next.map(encodeURIComponent).join(",")}` : "";
       router.replace(`/campaigns/compare${search}`);
     },
     [names, router],
   );
 
-  // Match the caller-supplied names against the summary. Gracefully
-  // drop names that don't exist (e.g. stale URL after a delete).
   const selectedCampaigns = useMemo(() => {
     if (!summary) return [];
     const byName = new Map(summary.campaigns.map((c) => [c.name, c]));
     return names.map((n) => byName.get(n)).filter(Boolean) as CampaignRow[];
   }, [summary, names]);
 
-  // Per-campaign top sources / mediums / top-link, computed client-side
-  // from the raw analytics so we don't need a dedicated endpoint.
   const perCampaignBreakdown = useMemo(() => {
     if (!raw) return {};
     const end = new Date();
@@ -162,7 +147,6 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
     return out;
   }, [raw, names, window]);
 
-  // Time-series subset filtered to the selected names.
   const overlaySeries = useMemo(() => {
     if (!summary?.timeseries) return null;
     const out: Record<string, number[]> = {};
@@ -173,14 +157,9 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
     return Object.keys(out).length >= 2 ? out : null;
   }, [summary, names]);
 
-  // Winner callouts — who leads on each headline metric. Null when
-  // nobody has numbers yet (e.g. brand-new campaigns, no traffic).
   const winners = useMemo(() => {
     if (selectedCampaigns.length === 0) return null;
-    const best = <K extends keyof CampaignRow>(
-      key: K,
-      min = 0,
-    ): CampaignRow | null => {
+    const best = <K extends keyof CampaignRow>(key: K, min = 0): CampaignRow | null => {
       let top: CampaignRow | null = null;
       for (const c of selectedCampaigns) {
         const v = (c[key] as number | null) ?? 0;
@@ -198,97 +177,85 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
 
   if (initialNames.length === 0) {
     return (
-      <div className="max-w-xl mx-auto py-12 text-center space-y-4">
-        <h1 className="text-xl font-semibold text-slate-900">Nothing selected</h1>
-        <p className="text-sm text-slate-500">
+      <div style={{ maxWidth: 520, margin: "48px auto", textAlign: "center" }}>
+        <h1 className="page-title" style={{ marginBottom: 8 }}>
+          Nothing selected
+        </h1>
+        <p className="page-sub" style={{ marginBottom: 20 }}>
           Head back to the Campaigns list, tick 2–4 campaigns, then click the
           &quot;Side-by-side details&quot; button.
         </p>
-        <Link
-          href="/campaigns"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Campaigns
+        <Link href="/campaigns" className="btn btn-primary">
+          <ArrowLeft size={13} /> Back to Campaigns
         </Link>
       </div>
     );
   }
 
+  const days = summary?.meta.days ?? 30;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <Link
-            href="/campaigns"
-            className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 transition-colors text-sm"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to Campaigns
-          </Link>
-          <h1 className="text-xl font-semibold text-slate-900 mt-2">
-            Compare {names.length} campaigns
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Side-by-side breakdown over the last {summary?.meta.days ?? 30} days.
-          </p>
-        </div>
-        <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
-          {windowPresets.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setWindow(p.value)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                window === p.value
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              {p.value}
-            </button>
-          ))}
-        </div>
-      </div>
+    <>
+      <PageHeader
+        back="Back to Campaigns"
+        onBack={() => router.push("/campaigns")}
+        title={`Compare ${names.length} campaigns`}
+        description={`Side-by-side breakdown over the last ${days} days.`}
+        actions={
+          <div className="segmented">
+            {windowPresets.map((p) => (
+              <button
+                key={p.value}
+                className={window === p.value ? "active" : ""}
+                onClick={() => setWindow(p.value)}
+              >
+                {p.value}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
       {loading && !summary ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+        <div style={{ padding: 64, textAlign: "center" }}>
+          <Loader2 size={24} className="animate-spin" style={{ color: "var(--ink-500)" }} />
         </div>
       ) : selectedCampaigns.length === 0 ? (
-        <div className="bg-white border border-slate-100 rounded-xl p-8 text-center">
-          <p className="text-sm text-slate-500">
+        <div className="card card-padded" style={{ textAlign: "center", padding: 32 }}>
+          <p className="muted" style={{ fontSize: 13 }}>
             None of the requested campaigns were found. They may have been deleted.
           </p>
         </div>
       ) : (
         <>
-          {/* Winner callouts */}
+          {/* Winner KPIs */}
           {winners && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="kpi-row">
               <WinnerCard
-                icon={<MousePointerClick className="w-4 h-4 text-slate-500" />}
+                icon={<MousePointerClick size={12} />}
                 label="Most clicks"
                 winner={winners.clicks}
                 format={(c) => c.clicks.toLocaleString()}
               />
               <WinnerCard
-                icon={<Target className="w-4 h-4 text-emerald-500" />}
+                icon={<Target size={12} />}
                 label="Most conversions"
                 winner={winners.conversions}
                 format={(c) => c.conversions.toLocaleString()}
+                emptyHint="no conversions recorded"
               />
               <WinnerCard
-                icon={<Trophy className="w-4 h-4 text-amber-500" />}
+                icon={<Trophy size={12} />}
                 label="Best CVR"
                 winner={winners.cvr}
                 format={(c) => `${c.cvr.toFixed(1)}%`}
+                emptyHint="no conversions recorded"
               />
               <WinnerCard
-                icon={<Megaphone className="w-4 h-4 text-violet-500" />}
+                icon={<Flag size={12} />}
                 label="Closest to goal"
                 winner={winners.goalPct}
-                format={(c) =>
-                  c.goalPct !== null ? `${c.goalPct.toFixed(0)}%` : "—"
-                }
+                format={(c) => (c.goalPct !== null ? `${c.goalPct.toFixed(0)}%` : "—")}
                 emptyHint="No goals set"
               />
             </div>
@@ -296,15 +263,31 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
 
           {/* Overlay chart */}
           {overlaySeries && summary?.timeseries && (
-            <div className="bg-white rounded-xl border border-slate-100 p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <LineChartIcon className="w-4 h-4 text-[#03A9F4]" />
-                <h2 className="text-sm font-semibold text-slate-900">
+            <div className="card card-padded" style={{ marginBottom: 14 }}>
+              <div className="row-between" style={{ marginBottom: 10 }}>
+                <div className="section-title">
+                  <LineChartIcon size={14} style={{ color: "var(--ink-400)" }} />
                   Daily clicks
-                </h2>
-                <span className="text-xs text-slate-400">
-                  · last {summary.meta.days}d
-                </span>
+                  <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
+                    · last {days}d
+                  </span>
+                </div>
+                <div className="row" style={{ gap: 12, fontSize: 11.5 }}>
+                  {selectedCampaigns.map((c, i) => (
+                    <div key={c.name} className="row" style={{ gap: 6 }}>
+                      <span
+                        style={{
+                          width: 10,
+                          height: 2,
+                          background: COLUMN_COLORS[i % COLUMN_COLORS.length],
+                          borderRadius: 1,
+                          display: "inline-block",
+                        }}
+                      />
+                      <span style={{ fontFamily: "var(--font-mono)" }}>{c.name}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
               <MultiCampaignChart
                 dates={summary.timeseries.dates}
@@ -314,152 +297,177 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
             </div>
           )}
 
-          {/* Side-by-side campaign columns */}
+          {/* Columns */}
           <div
-            className={`grid gap-4 ${
-              selectedCampaigns.length === 2
-                ? "md:grid-cols-2"
-                : selectedCampaigns.length === 3
-                  ? "md:grid-cols-3"
-                  : "md:grid-cols-2 xl:grid-cols-4"
-            }`}
+            className="compare-grid"
+            style={{
+              gridTemplateColumns: `repeat(${Math.min(selectedCampaigns.length, 4)}, minmax(0, 1fr))`,
+            }}
           >
-            {selectedCampaigns.map((c) => {
+            {selectedCampaigns.map((c, idx) => {
               const breakdown = perCampaignBreakdown[c.name];
+              const accent = COLUMN_COLORS[idx % COLUMN_COLORS.length];
               return (
-                <div
-                  key={c.name}
-                  className="bg-white border border-slate-100 rounded-xl overflow-hidden flex flex-col"
-                >
-                  {/* Header */}
-                  <div className="px-4 py-3 border-b border-slate-100 flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="text-sm font-semibold text-slate-900 truncate">
+                <div key={c.name} className="compare-col">
+                  <div
+                    className="compare-col-head"
+                    style={{ borderTop: `2px solid ${accent}` }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        className="compare-col-name"
+                        style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      >
                         {c.displayName || c.name}
-                      </h3>
-                      {c.displayName && (
-                        <code className="text-[10px] text-slate-400">{c.name}</code>
-                      )}
-                      <div className="flex items-center gap-1.5 mt-1">
+                      </div>
+                      <div className="compare-col-meta">
                         {c.status && (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-slate-500">
-                            <span className={`w-1.5 h-1.5 rounded-full ${statusDot(c.status)}`} />
+                          <span className={`badge ${statusClass(c.status)}`}>
+                            <span className="badge-dot" />
                             {c.status}
                           </span>
                         )}
-                        <span className="text-[10px] text-slate-400">· {c.linkCount} links</span>
+                        <span>·</span>
+                        <span>
+                          {c.linkCount} link{c.linkCount !== 1 ? "s" : ""}
+                        </span>
                       </div>
                     </div>
                     <button
+                      className="btn btn-ghost"
+                      style={{ padding: 4 }}
                       onClick={() => removeName(c.name)}
-                      className="p-1 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors shrink-0"
                       title="Remove from comparison"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X size={14} />
                     </button>
                   </div>
 
-                  {/* KPIs */}
-                  <div className="px-4 py-3 grid grid-cols-3 gap-2 border-b border-slate-100">
+                  <div className="compare-metrics">
                     <div>
-                      <p className="text-[10px] uppercase tracking-wider text-slate-400">
-                        Clicks
-                      </p>
-                      <p className="text-base font-semibold text-slate-900 tabular-nums">
-                        {c.clicks.toLocaleString()}
-                      </p>
+                      <div className="compare-metric-label">Clicks</div>
+                      <div className="compare-metric-val">{c.clicks.toLocaleString()}</div>
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase tracking-wider text-slate-400">
-                        Conv.
-                      </p>
-                      <p className="text-base font-semibold text-emerald-600 tabular-nums">
+                      <div className="compare-metric-label">Conv.</div>
+                      <div
+                        className="compare-metric-val"
+                        style={{ color: c.conversions > 0 ? "var(--data-emerald)" : "var(--ink-500)" }}
+                      >
                         {c.conversions.toLocaleString()}
-                      </p>
+                      </div>
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase tracking-wider text-slate-400">
-                        CVR
-                      </p>
-                      <p className="text-base font-semibold text-slate-900 tabular-nums">
+                      <div className="compare-metric-label">CVR</div>
+                      <div
+                        className="compare-metric-val"
+                        style={{ color: c.conversions > 0 ? "var(--ink-100)" : "var(--ink-500)" }}
+                      >
                         {c.conversions > 0 ? `${c.cvr.toFixed(1)}%` : "—"}
-                      </p>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Goal bar */}
                   {c.goalPct !== null && c.goalClicks ? (
-                    <div className="px-4 py-3 border-b border-slate-100">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] uppercase tracking-wider text-slate-400">
-                          Goal
+                    <div className="compare-row">
+                      <div className="row-between" style={{ marginBottom: 6 }}>
+                        <span className="compare-row-label" style={{ margin: 0 }}>
+                          Goal progress
                         </span>
-                        <span className="text-xs tabular-nums text-slate-600">
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontFamily: "var(--font-mono)",
+                            color: "var(--ink-500)",
+                          }}
+                        >
                           {c.clicks.toLocaleString()} / {c.goalClicks.toLocaleString()}
                         </span>
                       </div>
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="goal-progress" style={{ margin: 0 }}>
                         <div
-                          className={`h-full rounded-full ${
-                            c.goalPct >= 100 ? "bg-emerald-500" : "bg-violet-500"
-                          }`}
-                          style={{ width: `${c.goalPct}%` }}
+                          style={{
+                            width: `${Math.min(c.goalPct, 100)}%`,
+                            background:
+                              c.goalPct >= 100
+                                ? "var(--data-emerald)"
+                                : "linear-gradient(90deg, var(--brand-500), var(--data-violet))",
+                          }}
                         />
                       </div>
                     </div>
                   ) : (
-                    <div className="px-4 py-3 border-b border-slate-100 text-center">
+                    <div
+                      className="compare-row"
+                      style={{ textAlign: "center", fontSize: 11.5, color: "var(--ink-500)" }}
+                    >
+                      No goal set —{" "}
                       <Link
                         href={`/campaigns/${encodeURIComponent(c.name)}`}
-                        className="text-xs text-slate-400 hover:text-[#03A9F4]"
+                        style={{ color: "var(--brand-600)" }}
                       >
-                        No goal set — add one →
+                        add one →
                       </Link>
                     </div>
                   )}
 
-                  {/* Breakdown sections */}
-                  <div className="px-4 py-3 space-y-3 flex-1">
-                    <BreakdownList
-                      title="Top sources"
-                      rows={breakdown?.sources ?? []}
-                      total={c.clicks}
-                      badgeClass="bg-cyan-50 text-cyan-700 border-cyan-100"
-                    />
-                    <BreakdownList
-                      title="Top mediums"
-                      rows={breakdown?.mediums ?? []}
-                      total={c.clicks}
-                      badgeClass="bg-violet-50 text-violet-700 border-violet-100"
-                    />
-                    {breakdown && breakdown.topLinks.length > 0 && (
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">
-                          Top links
-                        </p>
-                        <ul className="space-y-1">
-                          {breakdown.topLinks.map((l) => (
-                            <li
-                              key={l.id}
-                              className="flex items-center justify-between gap-2 text-xs"
-                            >
-                              <span className="truncate text-slate-700 flex-1 min-w-0">
-                                {l.title || `/${l.code}`}
-                              </span>
-                              <span className="tabular-nums font-medium text-slate-900">
-                                {l.clicks.toLocaleString()}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                  <div className="compare-row">
+                    <div className="compare-row-label">Top sources</div>
+                    {breakdown && breakdown.sources.length > 0 ? (
+                      <BreakdownList rows={breakdown.sources} total={c.clicks} pillClass="pill-source" />
+                    ) : (
+                      <div className="placeholder">No data</div>
                     )}
                   </div>
 
-                  {/* Deep-link CTA */}
+                  <div className="compare-row">
+                    <div className="compare-row-label">Top mediums</div>
+                    {breakdown && breakdown.mediums.length > 0 ? (
+                      <BreakdownList rows={breakdown.mediums} total={c.clicks} pillClass="pill-medium" />
+                    ) : (
+                      <div className="placeholder">No data</div>
+                    )}
+                  </div>
+
+                  <div className="compare-row">
+                    <div className="compare-row-label">Top links</div>
+                    {breakdown && breakdown.topLinks.length > 0 ? (
+                      <div className="stack" style={{ gap: 4 }}>
+                        {breakdown.topLinks.map((l) => (
+                          <div key={l.id} className="row-between" style={{ fontSize: 12 }}>
+                            <span
+                              style={{
+                                fontFamily: "var(--font-mono)",
+                                fontSize: 12,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                flex: 1,
+                                minWidth: 0,
+                              }}
+                            >
+                              {l.title || `/${l.code}`}
+                            </span>
+                            <span
+                              style={{
+                                fontFamily: "var(--font-mono)",
+                                fontSize: 12,
+                                color: "var(--ink-200)",
+                              }}
+                            >
+                              {l.clicks.toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="placeholder">No data</div>
+                    )}
+                  </div>
+
                   <Link
                     href={`/campaigns/${encodeURIComponent(c.name)}`}
-                    className="block px-4 py-2.5 text-xs font-medium text-[#03A9F4] border-t border-slate-100 hover:bg-sky-50/40 transition-colors text-center"
+                    className="compare-col-foot"
                   >
                     Open full detail →
                   </Link>
@@ -469,7 +477,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
           </div>
         </>
       )}
-    </div>
+    </>
   );
 }
 
@@ -487,69 +495,72 @@ function WinnerCard({
   emptyHint?: string;
 }) {
   return (
-    <div className="bg-white border border-slate-100 rounded-xl p-4">
-      <div className="flex items-center gap-1.5 text-xs text-slate-400 uppercase tracking-wider mb-1.5">
+    <div className="kpi">
+      <div className="kpi-label">
         {icon}
-        <span>{label}</span>
+        {label}
       </div>
       {winner ? (
         <>
-          <p className="text-sm font-semibold text-slate-900 truncate">
-            {winner.displayName || winner.name}
-          </p>
-          <p className="text-lg font-semibold text-[#03A9F4] tabular-nums">
+          <div
+            className="kpi-value mono"
+            style={{ color: "var(--brand-600)", fontSize: 22 }}
+          >
             {format(winner)}
-          </p>
+          </div>
+          <div className="kpi-sub" style={{ fontFamily: "var(--font-mono)" }}>
+            {winner.displayName || winner.name}
+          </div>
         </>
       ) : (
-        <p className="text-sm text-slate-400 italic">{emptyHint ?? "No data"}</p>
+        <>
+          <div className="kpi-value">
+            <span className="placeholder" style={{ fontSize: 18 }}>
+              No data
+            </span>
+          </div>
+          <div className="kpi-sub muted">{emptyHint ?? ""}</div>
+        </>
       )}
     </div>
   );
 }
 
 function BreakdownList({
-  title,
   rows,
   total,
-  badgeClass,
+  pillClass,
 }: {
-  title: string;
   rows: { name: string; clicks: number }[];
   total: number;
-  badgeClass: string;
+  pillClass: string;
 }) {
   return (
-    <div>
-      <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">{title}</p>
-      {rows.length === 0 ? (
-        <p className="text-xs text-slate-300 italic">No data</p>
-      ) : (
-        <ul className="space-y-1.5">
-          {rows.map((row) => {
-            const pct = total > 0 ? (row.clicks / total) * 100 : 0;
-            return (
-              <li key={row.name} className="flex items-center gap-2 text-xs">
-                <span
-                  className={`px-1.5 py-0.5 rounded border text-[10px] font-medium truncate max-w-[100px] ${badgeClass}`}
-                  title={row.name}
-                >
-                  {row.name || "—"}
-                </span>
-                <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden min-w-0">
-                  <div
-                    className="h-full bg-slate-400 rounded-full"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <span className="tabular-nums text-slate-700 w-10 text-right">
-                  {row.clicks.toLocaleString()}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+    <div className="stack" style={{ gap: 8 }}>
+      {rows.map((row) => {
+        const pct = total > 0 ? (row.clicks / total) * 100 : 0;
+        return (
+          <div key={row.name} className="row" style={{ gap: 8 }}>
+            <span className={`pill ${pillClass}`} title={row.name} style={{ maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {row.name || "—"}
+            </span>
+            <div className="bar-track" style={{ flex: 1, minWidth: 40 }}>
+              <div className="bar-fill" style={{ width: `${pct}%` }} />
+            </div>
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 12,
+                color: "var(--ink-200)",
+                minWidth: 30,
+                textAlign: "right",
+              }}
+            >
+              {row.clicks.toLocaleString()}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

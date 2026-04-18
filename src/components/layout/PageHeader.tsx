@@ -1,21 +1,52 @@
+import { ChevronLeft } from "lucide-react";
+import type { ReactNode } from "react";
+
 interface PageHeaderProps {
-  title: string;
-  description?: string;
-  actions?: React.ReactNode;
+  title: ReactNode;
+  description?: ReactNode;
+  actions?: ReactNode;
+  back?: string;
+  onBack?: () => void;
+  backHref?: string;
 }
 
-export function PageHeader({ title, description, actions }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  description,
+  actions,
+  back,
+  onBack,
+  backHref,
+}: PageHeaderProps) {
+  const titleIsString = typeof title === "string";
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
-        {description && (
-          <p className="text-sm text-slate-500 mt-0.5">{description}</p>
-        )}
+    <>
+      {back &&
+        (backHref ? (
+          <a href={backHref} className="back-link">
+            <ChevronLeft size={13} /> {back}
+          </a>
+        ) : (
+          <button className="back-link" onClick={onBack}>
+            <ChevronLeft size={13} /> {back}
+          </button>
+        ))}
+      <div className="page-head">
+        <div style={{ minWidth: 0, flex: 1 }}>
+          {titleIsString ? (
+            <>
+              <h1 className="page-title">{title}</h1>
+              {description && <p className="page-sub">{description}</p>}
+            </>
+          ) : (
+            <>
+              {title}
+              {description && <p className="page-sub">{description}</p>}
+            </>
+          )}
+        </div>
+        {actions && <div className="row" style={{ flexShrink: 0 }}>{actions}</div>}
       </div>
-      {actions && (
-        <div className="flex items-center gap-2 shrink-0">{actions}</div>
-      )}
-    </div>
+    </>
   );
 }
