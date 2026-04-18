@@ -62,7 +62,9 @@ export async function cacheSet<T>(
   try {
     await redis.set(key, value, { ex: ttlSeconds });
   } catch (err) {
-    console.warn("[cache] set failed, ignoring:", err);
+    // console.error surfaces in Vercel runtime logs so we can diagnose if
+    // the Upstash URL/token is wrong or the network call failed.
+    console.error("[cache] SET failed:", key, err);
   }
 }
 
@@ -80,6 +82,12 @@ export async function cacheDel(key: string): Promise<void> {
 /**
  * Cache-aside helper: look up key; on miss, call `compute`, store the
  * result with TTL, and return it. Returns computed value on cache errors too.
+ *
+ * IMPORTANT: we `await` cacheSet before returning. Fire-and-forget looked
+ * tempting (save ~50ms), but Vercel terminates the Lambda the moment the
+ * response is sent, killing any pending promise — meaning the SET never
+ * actually happens, every request is a miss, and Redis stays empty. The
+ * extra 50ms on a cache-miss buys 60 seconds of sub-100ms cache-hits.
  */
 export async function cached<T>(
   key: string,
@@ -87,11 +95,15 @@ export async function cached<T>(
   compute: () => Promise<T>,
 ): Promise<T> {
   const hit = await cacheGet<T>(key);
-  if (hit !== null) return hit;
+  if (hit !== null) {
+    if (process.env.NODE_ENV !== "production") console.log(`[cache] HIT  ${key}`);
+    return hit;
+  }
 
+  if (process.env.NODE_ENV !== "production") console.log(`[cache] MISS ${key}`);
   const fresh = await compute();
-  // Fire-and-forget — failing to write to cache shouldn't block the response.
-  cacheSet(key, fresh, ttlSeconds).catch(() => {});
+  // Await so the Lambda stays alive long enough for Upstash to ack the write.
+  await cacheSet(key, fresh, ttlSeconds);
   return fresh;
 }
 
