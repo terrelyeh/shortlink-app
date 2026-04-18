@@ -68,6 +68,14 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
   const [approvedSources, setApprovedSources] = useState<string[]>([]);
   const [approvedMediums, setApprovedMediums] = useState<string[]>([]);
 
+  // Existing Campaign row names, used to populate the campaign datalist.
+  // Typing a new value still works and will auto-upsert on save (existing
+  // campaign-autolink behavior), but 99% of the time users should be
+  // picking from here to avoid typo-driven duplicates.
+  const [existingCampaigns, setExistingCampaigns] = useState<
+    { name: string; displayName: string | null; status: string | null }[]
+  >([]);
+
   // Fetch templates on mount
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -85,6 +93,27 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
       }
     };
     fetchTemplates();
+  }, []);
+
+  // Fetch existing Campaign rows (exclude archived — they'd be noise in
+  // the picker). API is Redis-side-browser-cached for 30s so this is cheap.
+  useEffect(() => {
+    fetch("/api/campaigns")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data?.campaigns) return;
+        type ApiCampaign = { name: string; displayName: string | null; status: string | null };
+        setExistingCampaigns(
+          (data.campaigns as ApiCampaign[]).map((c) => ({
+            name: c.name,
+            displayName: c.displayName,
+            status: c.status,
+          })),
+        );
+      })
+      .catch(() => {
+        /* silent — picker just degrades to free-text if fetch fails */
+      });
   }, []);
 
   // Fetch workspace UTM governance rules once on mount. If the workspace
@@ -398,7 +427,8 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
           </div>
         )}
 
-        {/* UTM Campaign */}
+        {/* UTM Campaign — combobox via datalist. Pick from existing Campaign
+            rows (99% case) or type a new one (auto-upserts on save). */}
         <div>
           <label className="flex items-center text-sm font-medium text-slate-700 mb-1">
             {t("campaign")}
@@ -409,18 +439,61 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
             )}
             <FieldHint text={t("campaignTip")} />
           </label>
-          <input
-            type="text"
-            value={values.utmCampaign}
-            onChange={(e) => handleChange("utmCampaign", e.target.value)}
-            placeholder={t("campaignPlaceholder")}
-            readOnly={campaignLocked}
-            className={`w-full px-3 py-2 border rounded-lg ${
-              campaignLocked
-                ? "border-violet-200 bg-violet-50/50 text-violet-700 cursor-not-allowed"
-                : "border-slate-200 focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
-            }`}
-          />
+          <div className="relative">
+            <input
+              type="text"
+              list="utm-campaign-options"
+              value={values.utmCampaign}
+              onChange={(e) => handleChange("utmCampaign", e.target.value)}
+              placeholder={t("campaignPlaceholder")}
+              readOnly={campaignLocked}
+              autoComplete="off"
+              className={`w-full px-3 py-2 pr-9 border rounded-lg ${
+                campaignLocked
+                  ? "border-violet-200 bg-violet-50/50 text-violet-700 cursor-not-allowed"
+                  : "border-slate-200 bg-white focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
+              }`}
+            />
+            {!campaignLocked &&
+              (values.utmCampaign ? (
+                <button
+                  type="button"
+                  onClick={() => handleChange("utmCampaign", "")}
+                  aria-label="Clear campaign"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              ))}
+            <datalist id="utm-campaign-options">
+              {existingCampaigns.map((c) => (
+                <option
+                  key={c.name}
+                  value={c.name}
+                  label={c.displayName ? `${c.name} — ${c.displayName}` : c.name}
+                >
+                  {c.displayName ? `${c.name} — ${c.displayName}` : c.name}
+                </option>
+              ))}
+            </datalist>
+          </div>
+          {!campaignLocked && values.utmCampaign && (
+            <p className="mt-1 text-xs text-slate-500">
+              {existingCampaigns.some((c) => c.name === values.utmCampaign.trim()) ? (
+                <>
+                  <span className="inline-flex items-center gap-1 text-emerald-600">
+                    ✓ existing campaign
+                  </span>
+                </>
+              ) : (
+                <span className="text-slate-500">
+                  new campaign — will be created on save
+                </span>
+              )}
+            </p>
+          )}
         </div>
 
         {/* UTM Content */}
