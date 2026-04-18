@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useRouter } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
@@ -15,8 +15,6 @@ import {
   Target,
   AlertCircle,
   CheckCircle,
-  Megaphone,
-  Clock,
   Tag,
   ChevronDown,
   ChevronUp,
@@ -29,13 +27,6 @@ interface TagOption {
   id: string;
   name: string;
   color?: string | null;
-}
-
-interface UtmCampaignSuggestion {
-  name: string;
-  linkCount: number;
-  clickCount: number;
-  lastUsed: string;
 }
 
 interface LinkVariantUI {
@@ -73,7 +64,6 @@ export default function EditLinkPage() {
   const t = useTranslations("links");
   const tCommon = useTranslations("common");
   const tErrors = useTranslations("errors");
-  const tCampaigns = useTranslations("campaigns");
   const tUtm = useTranslations("utm");
   const toast = useToast();
 
@@ -104,14 +94,6 @@ export default function EditLinkPage() {
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showUTM, setShowUTM] = useState(false);
-
-  // Campaign autocomplete
-  const [campaignSuggestions, setCampaignSuggestions] = useState<UtmCampaignSuggestion[]>([]);
-  const [loadingCampaigns, setLoadingCampaigns] = useState(true);
-  const [showCampaignDropdown, setShowCampaignDropdown] = useState(false);
-  const [campaignInputFocused, setCampaignInputFocused] = useState(false);
-  const campaignInputRef = useRef<HTMLInputElement>(null);
-  const campaignDropdownRef = useRef<HTMLDivElement>(null);
 
   // Fetch link data
   useEffect(() => {
@@ -178,57 +160,6 @@ export default function EditLinkPage() {
     }
     fetchLink();
   }, [linkId]);
-
-  // Fetch campaign suggestions
-  useEffect(() => {
-    async function fetchCampaigns() {
-      try {
-        const response = await fetch("/api/utm-campaigns?limit=50");
-        if (response.ok) {
-          const data = await response.json();
-          setCampaignSuggestions(data.campaigns || []);
-        }
-      } catch {
-        // ignore
-      } finally {
-        setLoadingCampaigns(false);
-      }
-    }
-    fetchCampaigns();
-  }, []);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        campaignDropdownRef.current &&
-        !campaignDropdownRef.current.contains(event.target as Node) &&
-        campaignInputRef.current &&
-        !campaignInputRef.current.contains(event.target as Node)
-      ) {
-        setShowCampaignDropdown(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const handleCampaignInputChange = (value: string) => {
-    const normalized = value.toLowerCase().replace(/\s+/g, "_");
-    setUtmCampaign(normalized);
-    setShowCampaignDropdown(true);
-    if (normalized && !showUTM) setShowUTM(true);
-  };
-
-  const handleCampaignSelect = (name: string) => {
-    setUtmCampaign(name);
-    setShowCampaignDropdown(false);
-    if (!showUTM) setShowUTM(true);
-  };
-
-  const filteredSuggestions = campaignSuggestions.filter((c) =>
-    c.name.toLowerCase().includes(utmCampaign.toLowerCase())
-  );
 
   const handleUTMChange = (values: {
     utmSource: string;
@@ -440,87 +371,6 @@ export default function EditLinkPage() {
               onChange={setSelectedTags}
               placeholder={t("addTag")}
             />
-          </div>
-
-          {/* Campaign Input */}
-          <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
-            <div className="px-5 py-4">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-                  <Megaphone className="w-5 h-5 text-slate-500" />
-                </div>
-                <div className="text-left">
-                  <span className="font-semibold text-slate-700 block">{tCampaigns("title")}</span>
-                  <span className="text-xs text-slate-500">{tCampaigns("campaignDescription")}</span>
-                </div>
-              </div>
-
-              <div className="relative">
-                <input
-                  ref={campaignInputRef}
-                  type="text"
-                  value={utmCampaign}
-                  onChange={(e) => handleCampaignInputChange(e.target.value)}
-                  onFocus={() => {
-                    setCampaignInputFocused(true);
-                    setShowCampaignDropdown(true);
-                  }}
-                  onBlur={() => setCampaignInputFocused(false)}
-                  placeholder={tCampaigns("campaignPlaceholder")}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] bg-white text-slate-700 font-mono text-sm"
-                />
-                {loadingCampaigns && (
-                  <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 animate-spin text-slate-400" />
-                )}
-
-                {showCampaignDropdown && !loadingCampaigns && (campaignInputFocused || showCampaignDropdown) && (
-                  <div
-                    ref={campaignDropdownRef}
-                    className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-64 overflow-y-auto"
-                  >
-                    {filteredSuggestions.length > 0 ? (
-                      <>
-                        <div className="px-3 py-2 text-xs text-slate-500 border-b border-slate-100">
-                          {tCampaigns("recentCampaigns")}
-                        </div>
-                        {filteredSuggestions.map((suggestion) => (
-                          <button
-                            key={suggestion.name}
-                            type="button"
-                            onClick={() => handleCampaignSelect(suggestion.name)}
-                            className="w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-center justify-between group"
-                          >
-                            <div>
-                              <span className="font-mono text-sm text-slate-700">{suggestion.name}</span>
-                              <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
-                                <span>{suggestion.linkCount} {tCampaigns("linksCount")}</span>
-                                <span>{suggestion.clickCount} {tCampaigns("clicksCount")}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Clock className="w-3 h-3" />
-                              <span>{new Date(suggestion.lastUsed).toLocaleDateString()}</span>
-                            </div>
-                          </button>
-                        ))}
-                      </>
-                    ) : utmCampaign ? (
-                      <div className="px-4 py-3 text-sm text-slate-600">
-                        <span className="text-slate-400">{tCampaigns("newCampaign")}</span>{" "}
-                        <span className="font-mono font-medium text-[#03A9F4]">{utmCampaign}</span>
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-              </div>
-
-              {utmCampaign && (
-                <p className="mt-2 text-xs text-slate-600 bg-slate-50 px-3 py-2 rounded-lg">
-                  utm_campaign={" "}
-                  <span className="font-mono font-medium">{utmCampaign}</span>
-                </p>
-              )}
-            </div>
           </div>
 
           {/* UTM Builder Toggle */}

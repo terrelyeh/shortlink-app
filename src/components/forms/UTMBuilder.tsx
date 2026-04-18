@@ -73,7 +73,13 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
   // campaign-autolink behavior), but 99% of the time users should be
   // picking from here to avoid typo-driven duplicates.
   const [existingCampaigns, setExistingCampaigns] = useState<
-    { name: string; displayName: string | null; status: string | null }[]
+    {
+      name: string;
+      displayName: string | null;
+      status: string | null;
+      defaultSource: string | null;
+      defaultMedium: string | null;
+    }[]
   >([]);
 
   // Fetch templates on mount
@@ -102,12 +108,20 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data?.campaigns) return;
-        type ApiCampaign = { name: string; displayName: string | null; status: string | null };
+        type ApiCampaign = {
+          name: string;
+          displayName: string | null;
+          status: string | null;
+          defaultSource: string | null;
+          defaultMedium: string | null;
+        };
         setExistingCampaigns(
           (data.campaigns as ApiCampaign[]).map((c) => ({
             name: c.name,
             displayName: c.displayName,
             status: c.status,
+            defaultSource: c.defaultSource,
+            defaultMedium: c.defaultMedium,
           })),
         );
       })
@@ -190,6 +204,22 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
         !isCustomSourceAllowed(value)
       ) {
         newValues.utmSource = "";
+      }
+    }
+
+    // When campaign value matches an existing Campaign row (i.e. user picked
+    // from the datalist rather than typing a new name), pull in its default
+    // source / medium. Only fills fields that are CURRENTLY EMPTY so we
+    // never overwrite what the user already typed.
+    if (field === "utmCampaign" && value) {
+      const picked = existingCampaigns.find((c) => c.name === value.trim());
+      if (picked) {
+        if (!newValues.utmSource && picked.defaultSource) {
+          newValues.utmSource = picked.defaultSource;
+        }
+        if (!newValues.utmMedium && picked.defaultMedium) {
+          newValues.utmMedium = picked.defaultMedium;
+        }
       }
     }
 
