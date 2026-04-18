@@ -48,8 +48,12 @@ function isBot(ua: string | null): boolean {
   return BOT_PATTERNS.some((pattern) => pattern.test(ua));
 }
 
-// Click deduplication window (in seconds)
-const DEDUP_WINDOW_SECONDS = 10;
+// Click deduplication window (in seconds).
+// 2s is tuned to catch obvious double-clicks / misfires without trapping
+// legitimate re-visits. A longer window (previously 10s) ate too many
+// real clicks — marketers testing a link they just created would see
+// only the first of their taps recorded.
+const DEDUP_WINDOW_SECONDS = 2;
 
 // Helper to parse User Agent
 function parseUserAgent(ua: string | null): {

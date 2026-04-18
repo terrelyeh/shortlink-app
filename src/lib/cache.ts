@@ -69,14 +69,21 @@ export async function cacheSet<T>(
 }
 
 /**
- * Atomic SETNX with TTL. Returns true when the key was set (caller "wins"),
- * false when it already existed or when caching is disabled.
+ * Atomic SETNX with TTL.
  *
- * When caching is disabled we return **false** on purpose — callers use the
- * return value as "I have exclusive ownership of this token right now", and
- * claiming ownership you can't actually hold would be a bug. Callers that
- * want a graceful fallback (e.g. dedup) should handle `false` with a
- * best-effort path.
+ * Return semantics:
+ *   - `true`  — caller "wins" this token (key was new, or Redis erred
+ *               out — fail-open so a transient network hiccup doesn't
+ *               silently drop every request through this path)
+ *   - `false` — caller should back off (key already exists, meaning
+ *               someone else is still holding the token) OR the cache
+ *               layer is disabled entirely (caller should take its
+ *               own non-Redis fallback)
+ *
+ * The "disabled" and "error" cases return *different* values on purpose.
+ * Disabled means "Redis isn't part of this deployment, use your plan B";
+ * error means "Redis was supposed to be here but didn't answer, don't
+ * let that cause data loss".
  */
 export async function cacheSetIfAbsent(
   key: string,
@@ -89,8 +96,11 @@ export async function cacheSetIfAbsent(
     const res = await redis.set(key, value, { ex: ttlSeconds, nx: true });
     return res === "OK";
   } catch (err) {
-    console.warn("[cache] SETNX failed:", key, err);
-    return false;
+    // Fail-open: if Redis is unreachable, don't block the caller. The
+    // worst case is a duplicate click getting recorded (which dedup was
+    // supposed to prevent); the better-than-that case is no click lost.
+    console.warn("[cache] SETNX failed — failing open:", key, err);
+    return true;
   }
 }
 
