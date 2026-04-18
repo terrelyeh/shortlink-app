@@ -11,6 +11,7 @@ import {
   validateUtmAgainstGovernance,
 } from "@/lib/utm-governance";
 import { fetchOpenGraph } from "@/lib/og-scraper";
+import { upsertCampaignForUtm } from "@/lib/campaign-autolink";
 import { z } from "zod";
 
 /**
@@ -298,6 +299,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Auto-link: if the caller provided utmCampaign but no campaignId,
+    // upsert a Campaign row for that name and attach it. Keeps the
+    // Campaigns list in sync with utm values the marketer actually uses
+    // so the "why is my Campaigns page empty?" gap disappears.
+    let resolvedCampaignId = validated.campaignId ?? null;
+    if (!resolvedCampaignId && utmCampaign) {
+      resolvedCampaignId = await upsertCampaignForUtm({
+        utmCampaign,
+        workspaceId: scope.workspaceId,
+        userId: session.user.id,
+      });
+    }
+
     // Build final URL with UTM parameters
     let finalUrl = validated.originalUrl;
     if (utmSource || utmMedium || utmCampaign) {
@@ -330,7 +344,7 @@ export async function POST(request: NextRequest) {
         createdById: session.user.id,
         workspaceId: workspaceId || undefined,
         groupId: validated.groupId,
-        campaignId: validated.campaignId,
+        campaignId: resolvedCampaignId ?? undefined,
         ...(validated.tags && validated.tags.length > 0 && {
           tags: {
             create: validated.tags.map((tagId) => ({

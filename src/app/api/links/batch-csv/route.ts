@@ -41,6 +41,7 @@ import {
   getWorkspaceUtmGovernance,
   validateUtmAgainstGovernance,
 } from "@/lib/utm-governance";
+import { upsertCampaignForUtm } from "@/lib/campaign-autolink";
 import Papa from "papaparse";
 import { z } from "zod";
 
@@ -291,6 +292,18 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Auto-link each row's utm_campaign string to a real Campaign row.
+      // Serial per-row is fine — upsertCampaignForUtm returns cached ids
+      // on the 2nd+ lookup of the same name (findFirst hit).
+      let rowCampaignId: string | null = null;
+      if (r.utm_campaign) {
+        rowCampaignId = await upsertCampaignForUtm({
+          utmCampaign: r.utm_campaign,
+          workspaceId: scope.workspaceId,
+          userId: session.user.id,
+        });
+      }
+
       try {
         const created = await prisma.shortLink.create({
           data: {
@@ -307,6 +320,7 @@ export async function POST(request: NextRequest) {
             utmCampaign: r.utm_campaign ?? null,
             utmContent: r.utm_content ?? null,
             utmTerm: r.utm_term ?? null,
+            campaignId: rowCampaignId ?? undefined,
             createdById: session.user.id,
             workspaceId: scope.workspaceId ?? undefined,
             ...(rowTagIds.length > 0 && {

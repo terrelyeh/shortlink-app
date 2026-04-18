@@ -6,6 +6,7 @@ import {
   getWorkspaceUtmGovernance,
   validateUtmAgainstGovernance,
 } from "@/lib/utm-governance";
+import { upsertCampaignForUtm } from "@/lib/campaign-autolink";
 import { z } from "zod";
 
 const variantSchema = z.object({
@@ -136,6 +137,22 @@ export async function PATCH(
     }
     if (validated.variants !== undefined) {
       updateData.variants = validated.variants;
+    }
+
+    // Auto-link Campaign when utmCampaign is being set/changed and no
+    // explicit campaignId was preserved on the link. Uses the link's own
+    // workspace scope so the new Campaign lands in the right place.
+    if (
+      validated.utmCampaign !== undefined &&
+      validated.utmCampaign !== existingLink.utmCampaign &&
+      !existingLink.campaignId
+    ) {
+      const newCampaignId = await upsertCampaignForUtm({
+        utmCampaign: validated.utmCampaign,
+        workspaceId: existingLink.workspaceId,
+        userId: existingLink.createdById ?? session.user.id,
+      });
+      if (newCampaignId) updateData.campaignId = newCampaignId;
     }
     if (validated.expiresAt !== undefined) {
       updateData.expiresAt = validated.expiresAt ? new Date(validated.expiresAt) : null;
