@@ -603,9 +603,9 @@ export default function CampaignDetailPage() {
               <thead>
                 <tr>
                   <th>Link</th>
-                  <th>Source / Medium / Content</th>
+                  <th>Campaign / Source / Medium / Content</th>
                   <th style={{ width: 100 }}>Status</th>
-                  <th className="num" style={{ width: 180 }}>
+                  <th className="num" style={{ width: 100 }}>
                     Clicks
                   </th>
                   <th className="num" style={{ width: 80 }} title="Distinct visitors (by hashed IP)">
@@ -618,17 +618,12 @@ export default function CampaignDetailPage() {
                     7d trend
                   </th>
                   <th style={{ width: 110 }}>Last click</th>
-                  <th className="num" style={{ width: 120 }}>
-                    Conv.
-                  </th>
                   <th style={{ width: 140 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {links.map((link) => {
                   const shortUrl = `${shortBaseUrl}/${link.code}`;
-                  const convs = link._count.conversions ?? 0;
-                  const cvr = link._count.clicks > 0 ? (convs / link._count.clicks) * 100 : null;
                   const m = perLinkMetrics.get(link.id);
                   const sharePct = (link._count.clicks / totalCampaignClicks) * 100;
                   return (
@@ -675,12 +670,10 @@ export default function CampaignDetailPage() {
                       </td>
                       <td>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          <span className="pill pill-campaign">{campaignName}</span>
                           {link.utmSource && <span className="pill pill-source">{link.utmSource}</span>}
                           {link.utmMedium && <span className="pill pill-medium">{link.utmMedium}</span>}
                           {link.utmContent && <span className="pill pill-content">{link.utmContent}</span>}
-                          {!link.utmSource && !link.utmMedium && !link.utmContent && (
-                            <span className="muted">—</span>
-                          )}
                         </div>
                       </td>
                       <td>
@@ -724,20 +717,6 @@ export default function CampaignDetailPage() {
                             title={m.lastClickAt.toLocaleString()}
                           >
                             {formatRelativeTime(m.lastClickAt)}
-                          </span>
-                        ) : (
-                          <span className="muted">—</span>
-                        )}
-                      </td>
-                      <td className="num">
-                        {convs > 0 ? (
-                          <span style={{ color: "var(--ok-fg)" }}>
-                            {convs.toLocaleString()}
-                            {cvr !== null && (
-                              <span className="muted" style={{ marginLeft: 4 }}>
-                                · {cvr.toFixed(1)}%
-                              </span>
-                            )}
                           </span>
                         ) : (
                           <span className="muted">—</span>
