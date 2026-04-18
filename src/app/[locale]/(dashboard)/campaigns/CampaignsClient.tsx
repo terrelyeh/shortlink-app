@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/routing";
-import { useDebounce } from "@/hooks/useDebounce";
+// (debounce removed — client-side filter is already instant)
 import {
-  Loader2,
   Megaphone,
   Search,
   Link2,
@@ -60,41 +59,33 @@ export default function CampaignsClient({ initialCampaigns }: CampaignsClientPro
   const t = useTranslations("campaigns");
   const router = useRouter();
 
-  const [campaigns, setCampaigns] = useState<CampaignEntity[]>(initialCampaigns);
-  // Server already supplied the list — no spinner on first paint
-  const [loading, setLoading] = useState(false);
-  const isInitialMount = useRef(true);
+  // All campaigns live in state once — we filter in-memory on every keystroke
+  // and status-button click. No debounce, no fetch, no spinner.
+  const [allCampaigns] = useState<CampaignEntity[]>(initialCampaigns);
   const [searchQuery, setSearchQuery] = useState("");
-  const debouncedSearch = useDebounce(searchQuery, 300);
   const [showTip, setShowTip] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("");
+  // Default hides ARCHIVED; clicking the filter button shows them.
+  const [statusFilter, setStatusFilter] = useState<string>("");
 
-  const fetchCampaigns = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (debouncedSearch) params.set("search", debouncedSearch);
-      if (statusFilter) params.set("status", statusFilter);
-      if (statusFilter === "" || statusFilter === "ARCHIVED") params.set("includeArchived", "true");
-
-      const response = await fetch(`/api/campaigns?${params}`);
-      const data = await response.json();
-      setCampaigns(data.campaigns || []);
-    } catch (error) {
-      console.error("Failed to fetch campaigns:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [debouncedSearch, statusFilter]);
-
-  useEffect(() => {
-    // Server already rendered the initial list — skip the mount-time fetch
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    fetchCampaigns();
-  }, [fetchCampaigns]);
+  // Derived list — instant whenever inputs change.
+  const campaigns = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return allCampaigns.filter((c) => {
+      // Status: "" means "all non-archived"; a specific status matches exactly.
+      if (statusFilter) {
+        if (c.status !== statusFilter) return false;
+      } else {
+        if (c.status === "ARCHIVED") return false;
+      }
+      if (q) {
+        const name = c.name.toLowerCase();
+        const display = (c.displayName || "").toLowerCase();
+        const desc = (c.description || "").toLowerCase();
+        if (!name.includes(q) && !display.includes(q) && !desc.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [allCampaigns, searchQuery, statusFilter]);
 
   // Calculate totals
   const totalLinks = campaigns.reduce((sum, c) => sum + c.linkCount, 0);
@@ -103,14 +94,8 @@ export default function CampaignsClient({ initialCampaigns }: CampaignsClientPro
     router.push(`/campaigns/${encodeURIComponent(campaignName)}`);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-      </div>
-    );
-  }
-
+  // No `loading` branch needed — the server page supplies initial data and
+  // every filter change is a pure useMemo, no async work.
   return (
     <div className="space-y-6">
       <PageHeader
@@ -161,7 +146,7 @@ export default function CampaignsClient({ initialCampaigns }: CampaignsClientPro
       )}
 
       {/* Campaign List */}
-      {campaigns.length === 0 && !debouncedSearch && !statusFilter ? (
+      {campaigns.length === 0 && !searchQuery && !statusFilter ? (
         <EmptyState
           icon={<BarChart3 className="w-10 h-10" />}
           title={t("emptyState.title")}

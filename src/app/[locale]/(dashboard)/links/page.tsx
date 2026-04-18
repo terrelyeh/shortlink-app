@@ -1,13 +1,11 @@
 /**
- * /links — Server Component.
+ * /links — Server Component (client-side filter mode).
  *
- * Fetches the initial page of links and the tag list directly from Prisma
- * on the server so the HTML already contains the data when it reaches the
- * browser. No mount-time spinner or client fetch waterfall on first visit.
+ * Loads up to LINK_CAP links and all tags in one shot, then hands the
+ * whole list to LinksClient which filters/sorts/searches in-memory.
+ * No more round-trips on every keystroke or filter button.
  *
- * LinksClient still owns all interactivity (search, filters, batch ops).
- * It re-fetches via /api/links when the user changes filters — we only skip
- * the mount fetch, not the subsequent ones.
+ * Over LINK_CAP the server truncates and the client shows a banner.
  */
 
 import { auth } from "@/lib/auth";
@@ -18,43 +16,20 @@ import { redirect } from "next/navigation";
 import LinksClient from "./LinksClient";
 import type { Prisma } from "@prisma/client";
 
-interface SearchParams {
-  page?: string;
-  search?: string;
-  status?: string;
-  campaign?: string;
-  tagId?: string;
-  sortBy?: string;
-  sortOrder?: string;
-}
+const LINK_CAP = 500;
 
 export default async function LinksPage({
   searchParams,
 }: {
-  searchParams: Promise<SearchParams>;
+  searchParams: Promise<{ campaign?: string; workspaceId?: string }>;
 }) {
   const session = await auth();
-  if (!session?.user) {
-    redirect("/auth/signin");
-  }
+  if (!session?.user) redirect("/auth/signin");
 
   const params = await searchParams;
-  const page = parseInt(params.page || "1");
-  const limit = 20;
-  const search = params.search || "";
-  const status = params.status;
-  const campaign = params.campaign;
-  const tagId = params.tagId;
-  const sortBy = params.sortBy || "createdAt";
-  const sortOrder = params.sortOrder || "desc";
-
-  // Same lookup order as getWorkspaceId() in /api/* routes, but adapted for
-  // a Server Component: check query param, then the x-workspace-id request header.
   const requestHeaders = await headers();
   const workspaceId =
-    (params as Record<string, string | undefined>).workspaceId ||
-    requestHeaders.get("x-workspace-id") ||
-    null;
+    params.workspaceId || requestHeaders.get("x-workspace-id") || null;
   const workspaceWhere = buildWorkspaceWhere(
     workspaceId,
     session.user.id,
@@ -66,27 +41,11 @@ export default async function LinksPage({
     ...workspaceWhere,
   };
 
-  if (search) {
-    where.OR = [
-      { code: { contains: search, mode: "insensitive" } },
-      { originalUrl: { contains: search, mode: "insensitive" } },
-      { title: { contains: search, mode: "insensitive" } },
-    ];
-  }
-  if (status) where.status = status as Prisma.ShortLinkWhereInput["status"];
-  if (campaign) {
-    where.utmCampaign = campaign === "__none__" ? null : campaign;
-  }
-  if (tagId) {
-    where.tags = { some: { tagId } };
-  }
-
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const fourteenDaysAgo = new Date();
   fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
-  // One Promise.all wave for everything we need on first paint
   const [links, total, tags] = await Promise.all([
     prisma.shortLink.findMany({
       where,
@@ -94,12 +53,8 @@ export default async function LinksPage({
         _count: { select: { clicks: true } },
         tags: { include: { tag: true } },
       },
-      orderBy:
-        sortBy === "clicks"
-          ? { clicks: { _count: sortOrder as "asc" | "desc" } }
-          : { [sortBy]: sortOrder },
-      skip: (page - 1) * limit,
-      take: limit,
+      orderBy: { createdAt: "desc" },
+      take: LINK_CAP,
     }),
     prisma.shortLink.count({ where }),
     prisma.tag.findMany({
@@ -109,7 +64,7 @@ export default async function LinksPage({
     }),
   ]);
 
-  // Trend enrichment (same as /api/links) — only if we have any links
+  // Trend enrichment — 7d clicks per link plus the previous 7d for percentage change
   const linkIds = links.map((l) => l.id);
   const [clicks7d, clicksPrev7d] =
     linkIds.length > 0
@@ -148,7 +103,6 @@ export default async function LinksPage({
     const c7 = clicks7dMap.get(link.id) ?? 0;
     const cp = clicksPrev7dMap.get(link.id) ?? 0;
     const trendPct = cp > 0 ? Math.round(((c7 - cp) / cp) * 100) : null;
-    // Serialise Dates to strings so client-side props are pure JSON
     return {
       ...link,
       createdAt: link.createdAt.toISOString(),
@@ -157,14 +111,6 @@ export default async function LinksPage({
     };
   });
 
-  const pagination = {
-    page,
-    limit,
-    total,
-    totalPages: Math.max(1, Math.ceil(total / limit)),
-  };
-
-  // TagOption in LinksClient expects { id, name, color?, _count: { links } }
   const initialTags = tags.map((t) => ({
     id: t.id,
     name: t.name,
@@ -174,13 +120,11 @@ export default async function LinksPage({
 
   return (
     <LinksClient
-      // Cast: enrichedLinks has the superset of fields LinksClient needs (id, code,
-      // originalUrl, title, status, createdAt, utmCampaign, _count, tags, clicksLast7d,
-      // trendPct). Extra fields are harmless.
       initialLinks={enrichedLinks as unknown as Parameters<typeof LinksClient>[0]["initialLinks"]}
-      initialPagination={pagination}
       initialTags={initialTags}
-      initialCampaign={campaign ?? ""}
+      initialCampaign={params.campaign ?? ""}
+      totalLinks={total}
+      loadedCap={LINK_CAP}
     />
   );
 }

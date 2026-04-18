@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/routing";
-import { useDebounce } from "@/hooks/useDebounce";
+// (useDebounce removed — client-side filter is instant, no debouncing needed)
 import { LinkTableRow } from "@/components/links/LinkTableRow";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
-import { TableSkeleton } from "@/components/ui/TableSkeleton";
-import { Plus, Search, Loader2, Link2, Layers, ChevronLeft, ChevronRight, Tag, Trash2, Pause, Play, Archive, Download, ArrowUpDown, Check, ChevronDown } from "lucide-react";
+import { Plus, Search, Loader2, Link2, Layers, Tag, Trash2, Pause, Play, Archive, Download, ArrowUpDown, Check, ChevronDown } from "lucide-react";
 import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
 
 interface LinkTag {
@@ -38,39 +37,32 @@ interface ShortLink {
   tags?: LinkTag[];
 }
 
-interface Pagination {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
-
 interface LinksClientProps {
   initialLinks: ShortLink[];
-  initialPagination: Pagination | null;
   initialTags: TagOption[];
   initialCampaign?: string;
+  totalLinks: number;
+  loadedCap: number;
 }
 
 export default function LinksClient({
   initialLinks,
-  initialPagination,
   initialTags,
   initialCampaign = "",
+  totalLinks,
+  loadedCap,
 }: LinksClientProps) {
   const t = useTranslations("links");
   const tCommon = useTranslations("common");
   const { success, error: toastError } = useToast();
   const searchParams = useSearchParams();
 
-  const [links, setLinks] = useState<ShortLink[]>(initialLinks);
-  const [pagination, setPagination] = useState<Pagination | null>(initialPagination);
-  // Server already supplied the first page — no spinner needed on mount.
-  const [loading, setLoading] = useState(false);
-  // Skip the mount-time fetchLinks() since we hydrated from SSR data.
-  const isInitialMount = useRef(true);
+  // `allLinks` is the raw list loaded from the server. Filters/sorts/search
+  // derive from this via useMemo — zero-latency on every keystroke.
+  const [allLinks, setAllLinks] = useState<ShortLink[]>(initialLinks);
+  // Used only after mutations (delete, clone, batch actions) to pull fresh data.
+  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 300);
   const [statusFilter, setStatusFilter] = useState("");
   const [tagFilter, setTagFilter] = useState("");
   const [allTags, setAllTags] = useState<TagOption[]>(initialTags);
@@ -109,39 +101,66 @@ export default function LinksClient({
 
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
 
-  const fetchLinks = useCallback(async (page = 1) => {
-    setLoading(true);
+  /**
+   * Pull a fresh copy of all links from the server. Used only after
+   * mutations (clone, batch actions) — NOT wired to filter changes.
+   */
+  const refreshLinks = useCallback(async () => {
+    setRefreshing(true);
     try {
-      const params = new URLSearchParams({ page: page.toString() });
-      if (debouncedSearch) params.set("search", debouncedSearch);
-      if (statusFilter) params.set("status", statusFilter);
-      if (campaignFilter) params.set("campaign", campaignFilter);
-      if (tagFilter) params.set("tagId", tagFilter);
-      if (sortBy !== "createdAt") params.set("sortBy", sortBy);
-      if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
-
-      const response = await fetch(`/api/links?${params}`);
-      const data = await response.json();
-
-      setLinks(data.links || []);
-      setPagination(data.pagination);
+      const response = await fetch(`/api/links?limit=${loadedCap}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAllLinks(data.links || []);
+      }
     } catch (err) {
-      console.error("Failed to fetch links:", err);
-      setLinks([]);
+      console.error("Failed to refresh links:", err);
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
-  }, [debouncedSearch, statusFilter, campaignFilter, tagFilter, sortBy, sortOrder]);
+  }, [loadedCap]);
 
-  useEffect(() => {
-    // Skip the mount fetch: the server already rendered the first page.
-    // Subsequent runs (filter/search/sort/searchParams change) re-fetch normally.
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
+  // Derived list: filter → sort in-memory. Instant on every keystroke.
+  const links = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let out = allLinks;
+
+    if (q) {
+      out = out.filter((l) => {
+        return (
+          l.code.toLowerCase().includes(q) ||
+          l.originalUrl.toLowerCase().includes(q) ||
+          (l.title?.toLowerCase() ?? "").includes(q)
+        );
+      });
     }
-    fetchLinks();
-  }, [fetchLinks, searchParams]);
+    if (statusFilter) out = out.filter((l) => l.status === statusFilter);
+    if (campaignFilter) {
+      if (campaignFilter === "__none__") {
+        out = out.filter((l) => !l.utmCampaign);
+      } else {
+        out = out.filter((l) => l.utmCampaign === campaignFilter);
+      }
+    }
+    if (tagFilter) {
+      out = out.filter((l) =>
+        (l.tags || []).some((t) => t.tag.id === tagFilter),
+      );
+    }
+
+    const dir = sortOrder === "asc" ? 1 : -1;
+    out = [...out].sort((a, b) => {
+      if (sortBy === "clicks") {
+        return (a._count.clicks - b._count.clicks) * dir;
+      }
+      // createdAt (default)
+      return (
+        (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir
+      );
+    });
+
+    return out;
+  }, [allLinks, search, statusFilter, campaignFilter, tagFilter, sortBy, sortOrder]);
 
   // Called from row — opens confirm modal
   const confirmDelete = (id: string) => {
@@ -156,7 +175,7 @@ export default function LinksClient({
     try {
       const response = await fetch(`/api/links/${id}`, { method: "DELETE" });
       if (response.ok) {
-        setLinks((prev) => prev.filter((link) => link.id !== id));
+        setAllLinks((prev) => prev.filter((link) => link.id !== id));
         success("Link deleted.");
       } else {
         toastError("Failed to delete link.");
@@ -174,7 +193,7 @@ export default function LinksClient({
         body: JSON.stringify({ status }),
       });
       if (response.ok) {
-        setLinks((prev) =>
+        setAllLinks((prev) =>
           prev.map((link) => (link.id === id ? { ...link, status } : link))
         );
         success(status === "ACTIVE" ? "Link activated." : status === "PAUSED" ? "Link paused." : "Link archived.");
@@ -190,7 +209,7 @@ export default function LinksClient({
     try {
       const response = await fetch(`/api/links/${id}/clone`, { method: "POST" });
       if (response.ok) {
-        fetchLinks(pagination?.page || 1);
+        refreshLinks();
         success("Link cloned successfully.");
       } else {
         toastError("Failed to clone link.");
@@ -228,7 +247,7 @@ export default function LinksClient({
         body: JSON.stringify({ ids: Array.from(selectedIds), action: "add_tag", tagId }),
       });
       if (response.ok) {
-        fetchLinks(pagination?.page || 1);
+        refreshLinks();
         success(`Tag added to ${selectedIds.size} link${selectedIds.size > 1 ? "s" : ""}.`);
       } else {
         toastError("Failed to add tag.");
@@ -252,7 +271,7 @@ export default function LinksClient({
       if (response.ok) {
         const count = selectedIds.size;
         setSelectedIds(new Set());
-        fetchLinks(pagination?.page || 1);
+        refreshLinks();
         success(`${count} link${count > 1 ? "s" : ""} deleted.`);
       } else {
         toastError("Batch delete failed.");
@@ -276,7 +295,7 @@ export default function LinksClient({
       if (response.ok) {
         const count = selectedIds.size;
         setSelectedIds(new Set());
-        fetchLinks(pagination?.page || 1);
+        refreshLinks();
         const label = action === "activate" ? "activated" : action === "pause" ? "paused" : "archived";
         success(`${count} link${count > 1 ? "s" : ""} ${label}.`);
       } else {
@@ -317,17 +336,20 @@ export default function LinksClient({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">{t("title")}</h1>
-          {pagination && (
-            <p className="text-sm text-slate-500 mt-0.5">
-              {pagination.total} {pagination.total === 1 ? "link" : "links"}
-              {campaignFilter && campaignFilter !== "__none__" && (
-                <span className="text-slate-400"> in <span className="font-mono">{campaignFilter}</span></span>
-              )}
-              {campaignFilter === "__none__" && (
-                <span className="text-slate-400"> without campaign</span>
-              )}
-            </p>
-          )}
+          <p className="text-sm text-slate-500 mt-0.5">
+            {links.length} of {totalLinks} {totalLinks === 1 ? "link" : "links"}
+            {totalLinks > loadedCap && (
+              <span className="ml-1 text-amber-600">
+                (showing first {loadedCap} — create fewer links or contact admin)
+              </span>
+            )}
+            {campaignFilter && campaignFilter !== "__none__" && (
+              <span className="text-slate-400"> in <span className="font-mono">{campaignFilter}</span></span>
+            )}
+            {campaignFilter === "__none__" && (
+              <span className="text-slate-400"> without campaign</span>
+            )}
+          </p>
         </div>
         <div className="flex gap-2">
           <a
@@ -500,9 +522,7 @@ export default function LinksClient({
       )}
 
       {/* Links Table */}
-      {loading ? (
-        <TableSkeleton rows={6} columns={5} />
-      ) : links.length === 0 ? (
+      {links.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-100">
           <EmptyState
             icon={<Link2 className="w-10 h-10" />}
@@ -572,53 +592,11 @@ export default function LinksClient({
         </div>
       )}
 
-      {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => fetchLinks(pagination.page - 1)}
-            disabled={pagination.page === 1}
-            className="inline-flex items-center gap-1 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            {tCommon("previous")}
-          </button>
-
-          <div className="flex items-center gap-1">
-            {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-              let pageNum;
-              if (pagination.totalPages <= 5) {
-                pageNum = i + 1;
-              } else if (pagination.page <= 3) {
-                pageNum = i + 1;
-              } else if (pagination.page >= pagination.totalPages - 2) {
-                pageNum = pagination.totalPages - 4 + i;
-              } else {
-                pageNum = pagination.page - 2 + i;
-              }
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => fetchLinks(pageNum)}
-                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${pagination.page === pageNum
-                      ? "bg-[#03A9F4] text-white"
-                      : "text-slate-600 hover:bg-slate-100"
-                    }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
-          </div>
-
-          <button
-            onClick={() => fetchLinks(pagination.page + 1)}
-            disabled={pagination.page === pagination.totalPages}
-            className="inline-flex items-center gap-1 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {tCommon("next")}
-            <ChevronRight className="w-4 h-4" />
-          </button>
+      {/* Subtle refresh indicator shown after mutations */}
+      {refreshing && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-3 py-1.5 bg-slate-900/85 text-white text-xs rounded-full shadow-lg backdrop-blur">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <span>更新中…</span>
         </div>
       )}
     </div>

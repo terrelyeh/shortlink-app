@@ -26,10 +26,10 @@ export default async function CampaignsPage() {
     session.user.role,
   );
 
+  // Load ALL campaigns (including ARCHIVED) so the client can filter without
+  // round-trips. At realistic scale (<500 campaigns) this is cheap.
   const where: Prisma.CampaignWhereInput = {
     ...workspaceWhere,
-    // Default view excludes archived (client toggles ARCHIVED separately)
-    status: { not: "ARCHIVED" },
   };
 
   const campaigns = await prisma.campaign.findMany({
