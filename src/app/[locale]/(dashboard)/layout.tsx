@@ -22,7 +22,7 @@ export default async function DashboardLayout({
           userName={session.user.name}
           userImage={session.user.image}
         />
-        <main className="lg:pl-[240px]">
+        <main className="lg:pl-[260px]">
           <div className="main">{children}</div>
         </main>
       </div>

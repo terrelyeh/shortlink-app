@@ -152,7 +152,7 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       )}
 
       <div
-        className={`lg:hidden fixed inset-y-0 left-0 w-64 z-50 transform transition-transform duration-300 ease-out ${
+        className={`lg:hidden fixed inset-y-0 left-0 w-[260px] z-50 transform transition-transform duration-300 ease-out ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -165,7 +165,7 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
         <NavContent />
       </div>
 
-      <div className="hidden lg:block lg:w-[240px] lg:fixed lg:inset-y-0">
+      <div className="hidden lg:block lg:w-[260px] lg:fixed lg:inset-y-0">
         <NavContent />
       </div>
     </>
