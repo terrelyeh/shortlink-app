@@ -24,6 +24,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { resolveWorkspaceScope } from "@/lib/workspace";
 import { cached, cacheKey } from "@/lib/cache";
 
@@ -94,9 +95,11 @@ export async function GET(request: NextRequest) {
       });
 
       const linkIds = links.map((l) => l.id);
-      // Windowed click counts — faster & more accurate than using the
-      // all-time clickCount when the marketer asked for a 7/30/90d view.
-      const [windowClicks, windowConversions] = linkIds.length > 0
+      // Windowed click counts + a per-(link, day) breakdown for the
+      // overlay chart on /campaigns. Raw SQL because Prisma groupBy
+      // can't bucket by day. The breakdown stays small (links × days ≤
+      // 90 ≈ a few thousand rows max) so in-memory reshaping is cheap.
+      const [windowClicks, windowConversions, dailyRaw] = linkIds.length > 0
         ? await Promise.all([
             prisma.click.groupBy({
               by: ["shortLinkId"],
@@ -108,8 +111,20 @@ export async function GET(request: NextRequest) {
               where: { shortLinkId: { in: linkIds }, timestamp: { gte: since } },
               _count: { _all: true },
             }),
+            prisma.$queryRaw<
+              { short_link_id: string; day: Date; clicks: bigint }[]
+            >(Prisma.sql`
+              SELECT short_link_id,
+                     date_trunc('day', timestamp) AS day,
+                     COUNT(*)::bigint AS clicks
+              FROM clicks
+              WHERE short_link_id IN (${Prisma.join(linkIds)})
+                AND timestamp >= ${since}
+              GROUP BY short_link_id, day
+              ORDER BY day
+            `),
           ])
-        : [[], []];
+        : [[], [], []];
 
       const windowClicksMap = new Map(
         (windowClicks as { shortLinkId: string; _count: { _all: number } }[]).map((r) => [
@@ -208,9 +223,44 @@ export async function GET(request: NextRequest) {
         .sort((a, b) => b.clicks - a.clicks)
         .slice(0, ORPHAN_LIMIT);
 
+      // Build the time-series payload: for each campaign, an array of
+      // daily click counts aligned to the same date axis. Empty days
+      // are zero-filled so the chart draws continuous lines. Orphan
+      // link traffic is excluded — the overlay is about campaigns.
+      const linkIdToCampaign = new Map<string, string>();
+      for (const l of links) {
+        const name = l.campaign?.name ?? l.utmCampaign;
+        if (name) linkIdToCampaign.set(l.id, name);
+      }
+
+      const dateAxis: string[] = [];
+      const cursor = new Date(since);
+      cursor.setUTCHours(0, 0, 0, 0);
+      const endDay = new Date();
+      endDay.setUTCHours(0, 0, 0, 0);
+      while (cursor <= endDay) {
+        dateAxis.push(cursor.toISOString().slice(0, 10));
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+      const dayIndex = new Map(dateAxis.map((d, i) => [d, i]));
+
+      const perCampaign: Record<string, number[]> = {};
+      for (const campaignName of buckets.keys()) {
+        perCampaign[campaignName] = new Array(dateAxis.length).fill(0);
+      }
+      for (const row of dailyRaw as { short_link_id: string; day: Date; clicks: bigint }[]) {
+        const campaignName = linkIdToCampaign.get(row.short_link_id);
+        if (!campaignName) continue;
+        const dateKey = new Date(row.day).toISOString().slice(0, 10);
+        const idx = dayIndex.get(dateKey);
+        if (idx === undefined) continue;
+        perCampaign[campaignName][idx] += Number(row.clicks);
+      }
+
       return {
         campaigns,
         orphans,
+        timeseries: { dates: dateAxis, perCampaign },
         meta: {
           days,
           totalCampaigns: campaigns.length,

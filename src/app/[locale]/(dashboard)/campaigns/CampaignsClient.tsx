@@ -31,8 +31,11 @@ import {
   Loader2,
   Target,
   BarChart3,
+  LineChart as LineChartIcon,
+  ArrowRight,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { MultiCampaignChart } from "@/components/analytics/MultiCampaignChart";
 
 interface CampaignRow {
   id: string | null;
@@ -62,6 +65,10 @@ interface OrphanRow {
 interface SummaryResponse {
   campaigns: CampaignRow[];
   orphans: OrphanRow[];
+  timeseries?: {
+    dates: string[];
+    perCampaign: Record<string, number[]>;
+  };
   meta: {
     days: number;
     totalCampaigns: number;
@@ -69,6 +76,9 @@ interface SummaryResponse {
     since: string;
   };
 }
+
+// Max campaigns overlaid at once — more than 4 lines gets unreadable.
+const MAX_SELECTION = 4;
 
 type SortKey = "clicks" | "conversions" | "cvr" | "goalPct" | "name";
 
@@ -119,6 +129,20 @@ export default function CampaignsClient() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [sortKey, setSortKey] = useState<SortKey>("clicks");
   const [showTip, setShowTip] = useState(true);
+  // Campaign names the user has ticked for the overlay comparison chart.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const toggleSelected = useCallback((name: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else if (next.size < MAX_SELECTION) {
+        next.add(name);
+      }
+      return next;
+    });
+  }, []);
 
   const fetchData = useCallback(async () => {
     const preset = windowPresets.find((p) => p.value === window) ?? windowPresets[1];
@@ -181,6 +205,17 @@ export default function CampaignsClient() {
 
   const overallCvr =
     totals.clicks > 0 ? (totals.conversions / totals.clicks) * 100 : 0;
+
+  // Pull out only the selected campaigns' time series for the overlay.
+  const overlaySeries = useMemo(() => {
+    if (!data?.timeseries || selected.size < 2) return null;
+    const out: Record<string, number[]> = {};
+    for (const name of selected) {
+      const arr = data.timeseries.perCampaign[name];
+      if (arr) out[name] = arr;
+    }
+    return out;
+  }, [data, selected]);
 
   return (
     <div className="space-y-6">
@@ -307,6 +342,51 @@ export default function CampaignsClient() {
         </div>
       </div>
 
+      {/* Overlay chart — only shown when the user has ticked 2+ rows.
+          Sits above the leaderboard because the comparison is the
+          whole point of selecting, and scrolling down to a chart is
+          wrong ergonomics. */}
+      {overlaySeries && data?.timeseries && (
+        <div className="bg-white rounded-xl border border-slate-100 p-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2">
+              <LineChartIcon className="w-4 h-4 text-[#03A9F4]" />
+              <h2 className="text-sm font-semibold text-slate-900">
+                Compare {selected.size} campaigns
+              </h2>
+              <span className="text-xs text-slate-400">
+                · daily clicks, last {data.meta.days}d
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() =>
+                  router.push(
+                    `/campaigns/compare?names=${Array.from(selected)
+                      .map((n) => encodeURIComponent(n))
+                      .join(",")}`,
+                  )
+                }
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[#03A9F4] border border-sky-200 rounded-md hover:bg-sky-50 transition-colors"
+              >
+                Side-by-side details
+                <ArrowRight className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => setSelected(new Set())}
+                className="px-2 py-1 text-xs text-slate-500 hover:text-slate-700 rounded hover:bg-slate-100 transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+          <MultiCampaignChart
+            dates={data.timeseries.dates}
+            series={overlaySeries}
+          />
+        </div>
+      )}
+
       {/* Leaderboard table */}
       <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
@@ -316,6 +396,11 @@ export default function CampaignsClient() {
               Leaderboard
             </h2>
             <span className="text-xs text-slate-400">· last {data?.meta.days ?? 30}d</span>
+            {selected.size > 0 && (
+              <span className="text-xs font-medium text-[#03A9F4] ml-2">
+                {selected.size} selected {selected.size < 2 && "(pick 1 more to compare)"}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1 text-xs">
             <span className="text-slate-400 mr-1">Sort</span>
@@ -356,7 +441,8 @@ export default function CampaignsClient() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-xs text-slate-400 uppercase tracking-wider">
-                  <th className="pl-4 py-2 pr-3 text-left font-medium">Campaign</th>
+                  <th className="pl-4 py-2 pr-2 w-8"></th>
+                  <th className="py-2 pr-3 text-left font-medium">Campaign</th>
                   <th className="py-2 pr-3 text-left font-medium">Status</th>
                   <th className="py-2 pr-3 text-left font-medium">Source / Medium</th>
                   <th className="py-2 pr-3 text-right font-medium">Links</th>
@@ -367,13 +453,35 @@ export default function CampaignsClient() {
                 </tr>
               </thead>
               <tbody>
-                {campaigns.map((c) => (
+                {campaigns.map((c) => {
+                  const isSelected = selected.has(c.name);
+                  const selectionFull = !isSelected && selected.size >= MAX_SELECTION;
+                  return (
                   <tr
                     key={c.name}
                     onClick={() => router.push(`/campaigns/${encodeURIComponent(c.name)}`)}
                     className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors cursor-pointer"
                   >
-                    <td className="pl-4 py-2.5 pr-3">
+                    <td
+                      className="pl-4 py-2.5 pr-2 w-8"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        disabled={selectionFull}
+                        onChange={() => toggleSelected(c.name)}
+                        className="w-4 h-4 rounded border-slate-300 text-[#03A9F4] focus:ring-2 focus:ring-[#03A9F4]/30 cursor-pointer disabled:opacity-40"
+                        title={
+                          selectionFull
+                            ? `Max ${MAX_SELECTION} campaigns at once — deselect one first`
+                            : isSelected
+                              ? "Remove from comparison"
+                              : "Add to comparison"
+                        }
+                      />
+                    </td>
+                    <td className="py-2.5 pr-3">
                       <div className="flex flex-col min-w-0">
                         <span className="text-sm font-medium text-slate-900 group-hover:text-[#03A9F4] truncate max-w-[240px]">
                           {c.displayName || c.name}
@@ -468,7 +576,8 @@ export default function CampaignsClient() {
                       )}
                     </td>
                   </tr>
-                ))}
+                );
+                })}
               </tbody>
             </table>
           </div>
