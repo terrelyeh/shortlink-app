@@ -68,6 +68,38 @@ export async function cacheSet<T>(
   }
 }
 
+/**
+ * Atomic SETNX with TTL. Returns true when the key was set (caller "wins"),
+ * false when it already existed or when caching is disabled.
+ *
+ * When caching is disabled we return **false** on purpose — callers use the
+ * return value as "I have exclusive ownership of this token right now", and
+ * claiming ownership you can't actually hold would be a bug. Callers that
+ * want a graceful fallback (e.g. dedup) should handle `false` with a
+ * best-effort path.
+ */
+export async function cacheSetIfAbsent(
+  key: string,
+  value: string | number,
+  ttlSeconds: number,
+): Promise<boolean> {
+  const redis = getClient();
+  if (!redis) return false;
+  try {
+    const res = await redis.set(key, value, { ex: ttlSeconds, nx: true });
+    return res === "OK";
+  } catch (err) {
+    console.warn("[cache] SETNX failed:", key, err);
+    return false;
+  }
+}
+
+/** True iff Upstash env vars are configured. Used by callers to choose a
+ * fallback path when the cache is disabled. */
+export function cacheEnabled(): boolean {
+  return getClient() !== null;
+}
+
 /** Delete a cached value (or pattern). Used for invalidation on writes. */
 export async function cacheDel(key: string): Promise<void> {
   const redis = getClient();
@@ -76,6 +108,38 @@ export async function cacheDel(key: string): Promise<void> {
     await redis.del(key);
   } catch (err) {
     console.warn("[cache] del failed, ignoring:", err);
+  }
+}
+
+/**
+ * Versioned-key invalidation.
+ *
+ * Instead of deleting specific cache keys on every write (hard when keys are
+ * parameterised by filter combinations), bake a monotonic version number
+ * into the key. Writes bump the version → all prior keys become unreachable
+ * and expire on their own TTL.
+ *
+ * One Redis `INCR` per write, one `GET` per read. Safe when disabled
+ * (version stays at 0, keys still work — they just never invalidate until
+ * TTL, which is fine without Redis since computes are also direct DB).
+ */
+export async function cacheGetVersion(namespace: string): Promise<number> {
+  const redis = getClient();
+  if (!redis) return 0;
+  try {
+    return (await redis.get<number>(`ver:${namespace}`)) ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function cacheBumpVersion(namespace: string): Promise<void> {
+  const redis = getClient();
+  if (!redis) return;
+  try {
+    await redis.incr(`ver:${namespace}`);
+  } catch (err) {
+    console.warn("[cache] bump version failed:", namespace, err);
   }
 }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getWorkspaceId } from "@/lib/workspace";
+import { resolveWorkspaceScope } from "@/lib/workspace";
 import { z } from "zod";
 
 const templateSchema = z.object({
@@ -21,9 +21,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const workspaceId = getWorkspaceId(request);
-    const where: Record<string, unknown> = workspaceId
-      ? { workspaceId }
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const where: Record<string, unknown> = scope.workspaceId
+      ? { workspaceId: scope.workspaceId }
       : { createdById: session.user.id };
 
     const templates = await prisma.uTMTemplate.findMany({
@@ -49,12 +50,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = templateSchema.parse(body);
 
-    const workspaceId = getWorkspaceId(request);
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const template = await prisma.uTMTemplate.create({
       data: {
         ...validated,
         createdById: session.user.id,
-        workspaceId: workspaceId || undefined,
+        workspaceId: scope.workspaceId || undefined,
       },
     });
 

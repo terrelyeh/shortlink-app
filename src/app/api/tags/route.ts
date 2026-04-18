@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getWorkspaceId } from "@/lib/workspace";
+import { resolveWorkspaceScope } from "@/lib/workspace";
 import { z } from "zod";
 
 const createTagSchema = z.object({
@@ -17,10 +17,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const workspaceId = getWorkspaceId(request);
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const where: Record<string, unknown> = {};
-    if (workspaceId) {
-      where.workspaceId = workspaceId;
+    if (scope.workspaceId) {
+      where.workspaceId = scope.workspaceId;
     }
 
     const tags = await prisma.tag.findMany({
@@ -66,12 +67,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(existing);
     }
 
-    const workspaceId = getWorkspaceId(request);
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const tag = await prisma.tag.create({
       data: {
         name: validated.name,
         color: validated.color,
-        workspaceId: workspaceId || undefined,
+        workspaceId: scope.workspaceId || undefined,
       },
     });
 

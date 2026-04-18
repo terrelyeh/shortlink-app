@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { createHash } from "crypto";
 import { headers } from "next/headers";
 import { getGeoFromHeaders } from "@/lib/geoip";
+import { allowRedirect } from "@/lib/ratelimit";
+import { cacheEnabled, cacheSetIfAbsent } from "@/lib/cache";
 
 // Helper to hash IP address — validates IP_HASH_SALT at runtime (not module load)
 // so Vercel build can succeed without env vars present
@@ -83,6 +85,12 @@ export async function GET(
                    headersList.get("x-real-ip") ||
                    "unknown";
 
+  // Per-IP rate limit on the redirect endpoint. Fails open if Upstash env
+  // vars are missing so local dev and fresh deploys still work.
+  if (!(await allowRedirect(clientIp))) {
+    return new NextResponse("Too many requests", { status: 429 });
+  }
+
   try {
     // Find the short link
     const shortLink = await prisma.shortLink.findUnique({
@@ -107,14 +115,11 @@ export async function GET(
       return NextResponse.redirect(new URL("/link-expired", request.url));
     }
 
-    // Check max clicks
-    if (shortLink.maxClicks) {
-      const clickCount = await prisma.click.count({
-        where: { shortLinkId: shortLink.id },
-      });
-      if (clickCount >= shortLink.maxClicks) {
-        return NextResponse.redirect(new URL("/link-limit-reached", request.url));
-      }
+    // Check max clicks — reads the denormalized counter on the row we just
+    // fetched, so this is O(1) instead of SELECT COUNT(*) on the clicks
+    // table. The counter is incremented atomically in recordClick().
+    if (shortLink.maxClicks && shortLink.clickCount >= shortLink.maxClicks) {
+      return NextResponse.redirect(new URL("/link-limit-reached", request.url));
     }
 
     // Redirect immediately
@@ -133,6 +138,7 @@ export async function GET(
         try {
           await recordClick({
             shortLinkId: shortLink.id,
+            workspaceId: shortLink.workspaceId,
             ip: clientIp,
             userAgent,
             referrer,
@@ -155,6 +161,7 @@ export async function GET(
 // Background click recording — runs after response via after() API
 async function recordClick({
   shortLinkId,
+  workspaceId,
   ip,
   userAgent,
   referrer,
@@ -162,6 +169,7 @@ async function recordClick({
   code,
 }: {
   shortLinkId: string;
+  workspaceId: string | null;
   ip: string;
   userAgent: string | null;
   referrer: string | null;
@@ -170,35 +178,58 @@ async function recordClick({
 }) {
   const ipHashed = hashIP(ip);
 
-  // Dedup check
-  const dedupCutoff = new Date(Date.now() - DEDUP_WINDOW_SECONDS * 1000);
-  const recentClick = await prisma.click.findFirst({
-    where: {
-      shortLinkId,
-      ipHash: ipHashed,
-      timestamp: { gte: dedupCutoff },
-    },
-    select: { id: true },
-  });
-
-  if (recentClick) return;
+  // Dedup: atomic SETNX on Redis so two parallel requests can't both pass.
+  // The DB-side select-then-insert pattern used previously had a race
+  // window where both branches would read "no recent click" and both insert.
+  // If Redis isn't configured, fall back to the old select-then-insert —
+  // best-effort, not bulletproof, but preserves graceful degradation.
+  if (cacheEnabled()) {
+    const won = await cacheSetIfAbsent(
+      `dedup:click:${shortLinkId}:${ipHashed}`,
+      1,
+      DEDUP_WINDOW_SECONDS,
+    );
+    if (!won) return;
+  } else {
+    const dedupCutoff = new Date(Date.now() - DEDUP_WINDOW_SECONDS * 1000);
+    const recentClick = await prisma.click.findFirst({
+      where: {
+        shortLinkId,
+        ipHash: ipHashed,
+        timestamp: { gte: dedupCutoff },
+      },
+      select: { id: true },
+    });
+    if (recentClick) return;
+  }
 
   const { device, os, browser } = parseUserAgent(userAgent);
   if (!geo.country) {
     console.warn(`[click] No geo data for code: ${code}`);
   }
 
-  await prisma.click.create({
-    data: {
-      shortLinkId,
-      ipHash: ipHashed,
-      userAgent,
-      referrer: referrer || null,
-      device,
-      os,
-      browser,
-      country: geo.country,
-      city: geo.city,
-    },
-  });
+  // Insert the click + bump the denormalized counter in one transaction so
+  // they can't drift. Note: we only `update` the counter when maxClicks is
+  // non-null would be an optimization, but unconditional is simpler and a
+  // single indexed PK update is cheap.
+  await prisma.$transaction([
+    prisma.click.create({
+      data: {
+        shortLinkId,
+        workspaceId: workspaceId ?? undefined,
+        ipHash: ipHashed,
+        userAgent,
+        referrer: referrer || null,
+        device,
+        os,
+        browser,
+        country: geo.country,
+        city: geo.city,
+      },
+    }),
+    prisma.shortLink.update({
+      where: { id: shortLinkId },
+      data: { clickCount: { increment: 1 } },
+    }),
+  ]);
 }

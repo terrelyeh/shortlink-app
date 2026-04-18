@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getWorkspaceId } from "@/lib/workspace";
+import { resolveWorkspaceScope } from "@/lib/workspace";
+import { bumpLinksCache } from "@/lib/cache-scopes";
 import { z } from "zod";
 
 const batchActionSchema = z.object({
@@ -21,13 +22,13 @@ export async function POST(request: NextRequest) {
     const { ids, action, tagId } = batchActionSchema.parse(body);
 
     // Verify ownership/workspace scope
-    const workspaceId = getWorkspaceId(request);
-    const accessWhere: Record<string, unknown> = { id: { in: ids }, deletedAt: null };
-    if (workspaceId) {
-      accessWhere.workspaceId = workspaceId;
-    } else if (session.user.role === "MEMBER") {
-      accessWhere.createdById = session.user.id;
-    }
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const accessWhere: Record<string, unknown> = {
+      id: { in: ids },
+      deletedAt: null,
+      ...scope.where,
+    };
     const accessibleCount = await prisma.shortLink.count({ where: accessWhere });
     if (accessibleCount !== ids.length) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -86,6 +87,8 @@ export async function POST(request: NextRequest) {
         metadata: { batchAction: action, linkIds: ids, affected: result.count },
       },
     });
+
+    await bumpLinksCache(scope.workspaceId, session.user.id);
 
     return NextResponse.json({ success: true, affected: result.count });
   } catch (error) {

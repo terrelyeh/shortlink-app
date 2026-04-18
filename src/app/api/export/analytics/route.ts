@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getWorkspaceId, buildWorkspaceWhere } from "@/lib/workspace";
+import { resolveWorkspaceScope } from "@/lib/workspace";
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,9 +37,9 @@ export async function GET(request: NextRequest) {
     if (linkId) {
       whereClicks.shortLinkId = linkId;
     } else {
-      const workspaceId = getWorkspaceId(request);
-      const workspaceWhere = buildWorkspaceWhere(workspaceId, session.user.id, session.user.role);
-      const whereLinks: Record<string, unknown> = { deletedAt: null, ...workspaceWhere };
+      const scope = await resolveWorkspaceScope(request, session);
+      if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      const whereLinks: Record<string, unknown> = { deletedAt: null, ...scope.where };
       const userLinks = await prisma.shortLink.findMany({
         where: whereLinks,
         select: { id: true },

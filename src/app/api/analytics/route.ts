@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getWorkspaceId, buildWorkspaceWhere } from "@/lib/workspace";
+import { buildWorkspaceWhere, resolveWorkspaceScope } from "@/lib/workspace";
 import { cached, cacheKey } from "@/lib/cache";
 
 interface QueryInput {
@@ -315,7 +315,9 @@ export async function GET(request: NextRequest) {
     const customFrom = searchParams.get("from");
     const customTo = searchParams.get("to");
 
-    const workspaceId = getWorkspaceId(request);
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const workspaceId = scope.workspaceId;
 
     // Two layers of cache in front of the DB:
     // 1. Redis (60s TTL) — shared across all instances, survives user refresh

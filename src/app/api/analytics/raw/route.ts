@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { buildWorkspaceWhere, getWorkspaceId } from "@/lib/workspace";
+import { resolveWorkspaceScope } from "@/lib/workspace";
 import { cached, cacheKey } from "@/lib/cache";
 
 const DAYS_WINDOW = 90;
@@ -26,12 +26,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const workspaceId = getWorkspaceId(request);
-    const workspaceWhere = buildWorkspaceWhere(
-      workspaceId,
-      session.user.id,
-      session.user.role,
-    );
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const { workspaceId, where: workspaceWhere } = scope;
 
     const since = new Date();
     since.setDate(since.getDate() - DAYS_WINDOW);
@@ -62,6 +59,11 @@ export async function GET(request: NextRequest) {
         prisma.click.findMany({
           where: {
             timestamp: { gte: since },
+            // Denormalized workspace filter lets Postgres use the
+            // (workspace_id, timestamp) index directly. Fall back to the
+            // joined shortLink filter for the no-workspace case (MEMBER
+            // scoped to own links).
+            ...(workspaceId ? { workspaceId } : {}),
             shortLink: { deletedAt: null, ...workspaceWhere },
           },
           select: {

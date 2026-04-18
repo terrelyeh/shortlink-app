@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { bumpLinksCache } from "@/lib/cache-scopes";
 import { z } from "zod";
 
 const updateLinkSchema = z.object({
@@ -175,6 +176,12 @@ export async function PATCH(
       },
     });
 
+    await bumpLinksCache(existingLink.workspaceId, session.user.id);
+    if (existingLink.createdById && existingLink.createdById !== session.user.id) {
+      // Also invalidate the creator's user-scope cache in non-workspace mode.
+      await bumpLinksCache(null, existingLink.createdById);
+    }
+
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -230,6 +237,11 @@ export async function DELETE(
         metadata: { code: existingLink.code },
       },
     });
+
+    await bumpLinksCache(existingLink.workspaceId, session.user.id);
+    if (existingLink.createdById && existingLink.createdById !== session.user.id) {
+      await bumpLinksCache(null, existingLink.createdById);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

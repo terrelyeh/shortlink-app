@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createShortCode } from "@/lib/utils/shortcode";
+import { bumpLinksCache } from "@/lib/cache-scopes";
 
 // POST - Clone an existing link
 export async function POST(
@@ -91,6 +92,8 @@ export async function POST(
         metadata: { clonedFrom: id, code: clonedLink.code },
       },
     });
+
+    await bumpLinksCache(clonedLink.workspaceId, session.user.id);
 
     return NextResponse.json(clonedLink, { status: 201 });
   } catch (error) {

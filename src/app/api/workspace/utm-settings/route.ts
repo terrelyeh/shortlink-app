@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getWorkspaceId } from "@/lib/workspace";
+import { checkWorkspaceAccess, getWorkspaceId } from "@/lib/workspace";
 import { z } from "zod";
 
 const utmSettingsSchema = z.object({
@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
     if (!workspaceId) {
       return NextResponse.json({ approvedSources: [], approvedMediums: [] });
     }
+    const access = await checkWorkspaceAccess(workspaceId, session.user.id);
+    if (!access) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const workspace = await prisma.workspace.findUnique({
       where: { id: workspaceId },
@@ -63,6 +65,8 @@ export async function PATCH(request: NextRequest) {
     if (!workspaceId) {
       return NextResponse.json({ error: "Workspace required" }, { status: 400 });
     }
+    const access = await checkWorkspaceAccess(workspaceId, session.user.id);
+    if (!access) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const body = await request.json();
     const validated = utmSettingsSchema.parse(body);

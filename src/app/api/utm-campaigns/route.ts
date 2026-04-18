@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getWorkspaceId } from "@/lib/workspace";
+import { resolveWorkspaceScope } from "@/lib/workspace";
 
 interface CampaignGroupByResult {
   utmCampaign: string | null;
@@ -33,15 +33,13 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const limit = parseInt(searchParams.get("limit") || "20");
 
-    const workspaceId = getWorkspaceId(request);
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const workspaceId = scope.workspaceId;
     const isMember = session.user.role === "MEMBER";
     const userId = session.user.id;
 
-    const ownerFilter = workspaceId
-      ? { workspaceId }
-      : isMember
-        ? { createdById: userId }
-        : {};
+    const ownerFilter = scope.where;
 
     // Get aggregated campaign data using groupBy
     // Using type assertion to work around Prisma groupBy type limitation

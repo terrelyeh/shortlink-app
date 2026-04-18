@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createShortCode } from "@/lib/utils/shortcode";
+import { bumpLinksCache } from "@/lib/cache-scopes";
 import { z } from "zod";
 
 const batchCreateSchema = z.object({
@@ -82,6 +83,12 @@ export async function POST(request: NextRequest) {
       } catch (err) {
         errors.push({ content, error: err instanceof Error ? err.message : "Unknown error" });
       }
+    }
+
+    if (createdLinks.length > 0) {
+      // batch/route.ts doesn't currently accept a workspaceId — links are
+      // created in user-scope fallback. Bump that namespace.
+      await bumpLinksCache(null, session.user.id);
     }
 
     return NextResponse.json({

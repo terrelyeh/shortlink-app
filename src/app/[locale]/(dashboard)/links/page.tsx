@@ -10,7 +10,7 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { buildWorkspaceWhere } from "@/lib/workspace";
+import { buildWorkspaceWhere, checkWorkspaceAccess } from "@/lib/workspace";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import LinksClient from "./LinksClient";
@@ -30,6 +30,9 @@ export default async function LinksPage({
   const requestHeaders = await headers();
   const workspaceId =
     params.workspaceId || requestHeaders.get("x-workspace-id") || null;
+  if (workspaceId && !(await checkWorkspaceAccess(workspaceId, session.user.id))) {
+    redirect("/");
+  }
   const workspaceWhere = buildWorkspaceWhere(
     workspaceId,
     session.user.id,

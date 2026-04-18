@@ -199,6 +199,10 @@ model ShortLink {
   expiresAt DateTime?
   maxClicks Int?
 
+  // Denormalized click counter — avoids SELECT COUNT(*) on the hot redirect
+  // path. Incremented atomically inside recordClick().
+  clickCount Int @default(0) @map("click_count")
+
   // Metadata (optional for migration, will be required after data migration)
   workspaceId String?  @map("workspace_id")
   createdById String?  @map("created_by_id") // User who created the link
@@ -232,6 +236,9 @@ model ShortLink {
 model Click {
   id          String   @id @default(cuid())
   shortLinkId String   @map("short_link_id")
+  // Denormalized from ShortLink.workspaceId so analytics queries filter
+  // directly without joining. Nullable for legacy rows pre-migration.
+  workspaceId String?  @map("workspace_id")
   timestamp   DateTime @default(now())
   ipHash      String?  @map("ip_hash") // SHA-256 hashed IP
   userAgent   String?  @db.Text
@@ -248,6 +255,7 @@ model Click {
   @@index([timestamp])
   @@index([shortLinkId, ipHash, timestamp])
   @@index([ipHash])
+  @@index([workspaceId, timestamp])
   @@map("clicks")
 }
 

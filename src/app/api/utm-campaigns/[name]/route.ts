@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getWorkspaceId } from "@/lib/workspace";
+import { resolveWorkspaceScope } from "@/lib/workspace";
 import { z } from "zod";
 
 const patchSchema = z.object({
@@ -21,7 +21,9 @@ export async function GET(
 
     const { name } = await params;
     const campaignName = decodeURIComponent(name);
-    const workspaceId = getWorkspaceId(request);
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const workspaceId = scope.workspaceId;
 
     // Find the Campaign DB record by name (matches utmCampaign)
     const campaign = await prisma.campaign.findFirst({
@@ -93,7 +95,9 @@ export async function PATCH(
 
     const { name } = await params;
     const campaignName = decodeURIComponent(name);
-    const workspaceId = getWorkspaceId(request);
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const workspaceId = scope.workspaceId;
 
     const body = await request.json();
     const { goalClicks } = patchSchema.parse(body);

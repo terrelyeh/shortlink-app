@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createShortCode, isValidCustomCode, isReservedCode } from "@/lib/utils/shortcode";
-import { getWorkspaceId, buildWorkspaceWhere } from "@/lib/workspace";
+import { resolveWorkspaceScope } from "@/lib/workspace";
+import { cacheGetVersion, cacheKey, cached } from "@/lib/cache";
+import { bumpLinksCache, linksCacheNamespace } from "@/lib/cache-scopes";
 import { z } from "zod";
 
 // Validation schema
@@ -41,12 +43,12 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get("sortBy") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";
 
-    const workspaceId = getWorkspaceId(request);
-    const workspaceWhere = buildWorkspaceWhere(workspaceId, session.user.id, session.user.role);
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const where: Record<string, unknown> = {
       deletedAt: null,
-      ...workspaceWhere,
+      ...scope.where,
     };
 
     if (search) {
@@ -75,56 +77,74 @@ export async function GET(request: NextRequest) {
       where.tags = { some: { tagId } };
     }
 
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const fourteenDaysAgo = new Date();
-    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    // Redis cache wraps the whole query + trend groupBys. Key includes
+    // workspace/user scope + all filter params + a versioned counter that
+    // gets bumped on any write (POST/PATCH/DELETE under /api/links/*).
+    const ns = linksCacheNamespace(scope.workspaceId, session.user.id);
+    const version = await cacheGetVersion(ns);
+    const key = cacheKey(
+      "links-list",
+      ns,
+      version,
+      page,
+      limit,
+      search,
+      status ?? "_",
+      campaign ?? "_",
+      tagId ?? "_",
+      sortBy,
+      sortOrder,
+    );
 
-    const [links, total] = await Promise.all([
-      prisma.shortLink.findMany({
-        where,
-        include: {
-          _count: { select: { clicks: true } },
-          tags: { include: { tag: true } },
-        },
-        orderBy: sortBy === "clicks"
-          ? { clicks: { _count: sortOrder as "asc" | "desc" } }
-          : { [sortBy]: sortOrder },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.shortLink.count({ where }),
-    ]);
+    const payload = await cached(key, 30, async () => {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const fourteenDaysAgo = new Date();
+      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
-    // Add 7d and prev-7d click counts for trend display
-    const linkIds = links.map((l: { id: string }) => l.id);
-    const [clicks7d, clicksPrev7d] = linkIds.length > 0
-      ? await Promise.all([
-        prisma.click.groupBy({
-          by: ["shortLinkId"],
-          where: { shortLinkId: { in: linkIds }, timestamp: { gte: sevenDaysAgo } },
-          _count: { _all: true },
+      const [links, total] = await Promise.all([
+        prisma.shortLink.findMany({
+          where,
+          include: {
+            _count: { select: { clicks: true } },
+            tags: { include: { tag: true } },
+          },
+          orderBy: sortBy === "clicks"
+            ? { clicks: { _count: sortOrder as "asc" | "desc" } }
+            : { [sortBy]: sortOrder },
+          skip: (page - 1) * limit,
+          take: limit,
         }),
-        prisma.click.groupBy({
-          by: ["shortLinkId"],
-          where: { shortLinkId: { in: linkIds }, timestamp: { gte: fourteenDaysAgo, lt: sevenDaysAgo } },
-          _count: { _all: true },
-        }),
-      ])
-      : [[], []];
+        prisma.shortLink.count({ where }),
+      ]);
 
-    const clicks7dMap = new Map((clicks7d as { shortLinkId: string; _count: { _all: number } }[]).map((r) => [r.shortLinkId, r._count._all]));
-    const clicksPrev7dMap = new Map((clicksPrev7d as { shortLinkId: string; _count: { _all: number } }[]).map((r) => [r.shortLinkId, r._count._all]));
+      const linkIds = links.map((l: { id: string }) => l.id);
+      const [clicks7d, clicksPrev7d] = linkIds.length > 0
+        ? await Promise.all([
+          prisma.click.groupBy({
+            by: ["shortLinkId"],
+            where: { shortLinkId: { in: linkIds }, timestamp: { gte: sevenDaysAgo } },
+            _count: { _all: true },
+          }),
+          prisma.click.groupBy({
+            by: ["shortLinkId"],
+            where: { shortLinkId: { in: linkIds }, timestamp: { gte: fourteenDaysAgo, lt: sevenDaysAgo } },
+            _count: { _all: true },
+          }),
+        ])
+        : [[], []];
 
-    const enrichedLinks = links.map((link: { id: string }) => {
-      const c7 = clicks7dMap.get(link.id) ?? 0;
-      const cp = clicksPrev7dMap.get(link.id) ?? 0;
-      const trendPct = cp > 0 ? Math.round(((c7 - cp) / cp) * 100) : null;
-      return { ...link, clicksLast7d: c7, trendPct };
-    });
+      const clicks7dMap = new Map((clicks7d as { shortLinkId: string; _count: { _all: number } }[]).map((r) => [r.shortLinkId, r._count._all]));
+      const clicksPrev7dMap = new Map((clicksPrev7d as { shortLinkId: string; _count: { _all: number } }[]).map((r) => [r.shortLinkId, r._count._all]));
 
-    return NextResponse.json(
-      {
+      const enrichedLinks = links.map((link: { id: string }) => {
+        const c7 = clicks7dMap.get(link.id) ?? 0;
+        const cp = clicksPrev7dMap.get(link.id) ?? 0;
+        const trendPct = cp > 0 ? Math.round(((c7 - cp) / cp) * 100) : null;
+        return { ...link, clicksLast7d: c7, trendPct };
+      });
+
+      return {
         links: enrichedLinks,
         pagination: {
           page,
@@ -132,16 +152,14 @@ export async function GET(request: NextRequest) {
           total,
           totalPages: Math.ceil(total / limit),
         },
+      };
+    });
+
+    return NextResponse.json(payload, {
+      headers: {
+        "Cache-Control": "private, max-age=10, stale-while-revalidate=30",
       },
-      {
-        headers: {
-          // Short 10s browser cache — enough to dedupe repeat fetches from
-          // tab switches and back-button, not long enough to show stale
-          // data after creating/deleting.
-          "Cache-Control": "private, max-age=10, stale-while-revalidate=30",
-        },
-      }
-    );
+    });
   } catch (error) {
     console.error("Failed to fetch links:", error);
     return NextResponse.json({ error: "Failed to fetch links" }, { status: 500 });
@@ -238,7 +256,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the short link with tags
-    const workspaceId = getWorkspaceId(request);
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const workspaceId = scope.workspaceId;
     const shortLink = await prisma.shortLink.create({
       data: {
         code: code!,
@@ -278,6 +298,8 @@ export async function POST(request: NextRequest) {
         metadata: { code: shortLink.code, originalUrl: shortLink.originalUrl },
       },
     });
+
+    await bumpLinksCache(workspaceId, session.user.id);
 
     return NextResponse.json(shortLink, { status: 201 });
   } catch (error) {
