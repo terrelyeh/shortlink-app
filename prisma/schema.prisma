@@ -450,7 +450,9 @@ model UTMTemplate {
   name        String
   source      String?
   medium      String?
-  campaign    String?
+  // Templates are channel-level presets (same source/medium/content/term reused
+  // across many campaigns). utm_campaign is intentionally absent — it's always
+  // per-link and comes from the Campaign combobox at link-creation time.
   content     String?
   term        String?
   workspaceId String?  @map("workspace_id")

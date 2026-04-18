@@ -56,7 +56,6 @@ interface UTMTemplate {
   name: string;
   source: string | null;
   medium: string | null;
-  campaign: string | null;
   content: string | null;
   term: string | null;
 }
@@ -243,10 +242,13 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
 
     const template = templates.find((t) => t.id === templateId);
     if (template) {
+      // Templates carry channel-level defaults only. utm_campaign is
+      // intentionally preserved from whatever the user already has set
+      // (or left empty) — campaign is always per-link, not per-template.
       onChange({
+        ...values,
         utmSource: template.source || "",
         utmMedium: template.medium || "",
-        utmCampaign: template.campaign || "",
         utmContent: template.content || "",
         utmTerm: template.term || "",
       });

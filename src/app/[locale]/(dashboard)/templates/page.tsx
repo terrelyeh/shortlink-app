@@ -4,8 +4,12 @@ import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import {
   UTM_MEDIUMS,
+  UTM_MEDIUM_LABELS,
+  getSourceOptionsForMedium,
   getSourcesForMedium,
   isCustomSourceAllowed,
+  normalizeSource,
+  type UTMMedium,
 } from "@/lib/utils/utm";
 import {
   Plus,
@@ -16,6 +20,7 @@ import {
   FileText,
   ChevronDown,
   ArrowRight,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -26,7 +31,6 @@ interface Template {
   name: string;
   source: string | null;
   medium: string | null;
-  campaign: string | null;
   content: string | null;
   term: string | null;
   createdAt: string;
@@ -36,7 +40,6 @@ interface TemplateFormData {
   name: string;
   source: string;
   medium: string;
-  campaign: string;
   content: string;
   term: string;
 }
@@ -45,7 +48,6 @@ const emptyForm: TemplateFormData = {
   name: "",
   source: "",
   medium: "",
-  campaign: "",
   content: "",
   term: "",
 };
@@ -90,7 +92,6 @@ export default function TemplatesPage() {
       name: template.name,
       source: template.source || "",
       medium: template.medium || "",
-      campaign: template.campaign || "",
       content: template.content || "",
       term: template.term || "",
     });
@@ -146,7 +147,6 @@ export default function TemplatesPage() {
     const pills: { label: string; value: string }[] = [];
     if (template.medium) pills.push({ label: t("medium"), value: template.medium });
     if (template.source) pills.push({ label: t("source"), value: template.source });
-    if (template.campaign) pills.push({ label: t("campaign"), value: template.campaign });
     if (template.content) pills.push({ label: t("content"), value: template.content });
     if (template.term) pills.push({ label: t("term"), value: template.term });
     return pills;
@@ -276,6 +276,9 @@ export default function TemplatesPage() {
                 />
               </div>
 
+              {/* Channel-level presets only — campaign intentionally absent.
+                  Campaign is always set per-link at creation time, not baked
+                  into a template. */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -285,29 +288,57 @@ export default function TemplatesPage() {
                     </span>
                   </label>
                   <div className="relative">
-                    <select
+                    <input
+                      type="text"
+                      list="template-medium-options"
                       value={formData.medium}
                       onChange={(e) => {
                         const newMedium = e.target.value;
                         const newSources = getSourcesForMedium(newMedium);
-                        const newFormData = { ...formData, medium: newMedium };
+                        const next = { ...formData, medium: newMedium };
+                        // If the newly-picked medium has a restricted source
+                        // list and the currently-typed source isn't in it,
+                        // clear source — prevents stale combinations like
+                        // medium=email + source=google.
                         if (
+                          formData.source &&
                           newSources.length > 0 &&
-                          !newSources.includes(formData.source) &&
+                          !newSources.includes(normalizeSource(formData.source)) &&
                           !isCustomSourceAllowed(newMedium)
                         ) {
-                          newFormData.source = "";
+                          next.source = "";
                         }
-                        setFormData(newFormData);
+                        setFormData(next);
                       }}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] appearance-none bg-white"
-                    >
-                      <option value="">{t("mediumPlaceholder")}</option>
+                      placeholder={t("mediumPlaceholder")}
+                      autoComplete="off"
+                      className="w-full px-3 py-2 pr-9 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] bg-white"
+                    />
+                    {formData.medium ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData({ ...formData, medium: "", source: "" })
+                        }
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                        aria-label="Clear medium"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    )}
+                    <datalist id="template-medium-options">
                       {UTM_MEDIUMS.map((m) => (
-                        <option key={m} value={m}>{m}</option>
+                        <option
+                          key={m}
+                          value={m}
+                          label={UTM_MEDIUM_LABELS[m as UTMMedium] ?? m}
+                        >
+                          {UTM_MEDIUM_LABELS[m as UTMMedium] ?? m}
+                        </option>
                       ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    </datalist>
                   </div>
                 </div>
 
@@ -316,48 +347,56 @@ export default function TemplatesPage() {
                     {t("source")}
                   </label>
                   <div className="relative">
-                    <select
-                      value={formData.source}
-                      onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#03A9F4] appearance-none bg-white ${
-                        !formData.medium
-                          ? "border-slate-100 bg-slate-50 text-slate-400"
-                          : "border-slate-200"
-                      }`}
-                      disabled={!formData.medium}
-                    >
-                      <option value="">
-                        {!formData.medium ? t("selectMediumFirst") : t("sourcePlaceholder")}
-                      </option>
-                      {getSourcesForMedium(formData.medium).map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                  </div>
-                  {isCustomSourceAllowed(formData.medium) && (
                     <input
                       type="text"
+                      list="template-source-options"
                       value={formData.source}
-                      onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-                      placeholder={t("sourceCustomPlaceholder")}
-                      className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4] text-sm"
+                      onChange={(e) =>
+                        setFormData({ ...formData, source: e.target.value })
+                      }
+                      disabled={!formData.medium}
+                      placeholder={
+                        !formData.medium
+                          ? t("selectMediumFirst")
+                          : isCustomSourceAllowed(formData.medium)
+                            ? t("sourceCustomPlaceholder")
+                            : t("sourcePlaceholder")
+                      }
+                      autoComplete="off"
+                      className={`w-full px-3 py-2 pr-9 border rounded-lg focus:ring-2 focus:ring-[#03A9F4] ${
+                        !formData.medium
+                          ? "border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed"
+                          : "border-slate-200 bg-white"
+                      }`}
                     />
-                  )}
+                    {formData.source && formData.medium ? (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, source: "" })}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                        aria-label="Clear source"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    )}
+                    <datalist id="template-source-options">
+                      {getSourceOptionsForMedium(formData.medium).map((opt) => (
+                        <option key={opt.value} value={opt.value} label={opt.label}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </datalist>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  {t("campaign")}
-                </label>
-                <input
-                  type="text"
-                  value={formData.campaign}
-                  onChange={(e) => setFormData({ ...formData, campaign: e.target.value })}
-                  placeholder={t("campaignPlaceholder")}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#03A9F4]"
-                />
+              <div className="flex items-start gap-2 p-3 bg-violet-50/70 border border-violet-100 rounded-lg text-xs text-violet-800/90">
+                <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-violet-500" />
+                <span>
+                  模板不綁定 campaign — 這是「通路預設」，campaign 每次建 link 時再填。
+                </span>
               </div>
 
               <div>

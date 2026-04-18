@@ -7,7 +7,6 @@ const updateTemplateSchema = z.object({
   name: z.string().min(1).optional(),
   source: z.string().optional().nullable(),
   medium: z.string().optional().nullable(),
-  campaign: z.string().optional().nullable(),
   content: z.string().optional().nullable(),
   term: z.string().optional().nullable(),
 });

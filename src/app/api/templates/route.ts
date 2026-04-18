@@ -8,7 +8,6 @@ const templateSchema = z.object({
   name: z.string().min(1, "Name is required"),
   source: z.string().optional(),
   medium: z.string().optional(),
-  campaign: z.string().optional(),
   content: z.string().optional(),
   term: z.string().optional(),
 });
