@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createHash } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { headers } from "next/headers";
 import { getGeoFromHeaders } from "@/lib/geoip";
 import { allowRedirect } from "@/lib/ratelimit";
 import { cacheEnabled, cacheSetIfAbsent } from "@/lib/cache";
+import { appendSessionParam, parseVariants, pickVariant } from "@/lib/variants";
+
+// Opaque session token handed to the destination page via ?_sl= so
+// later /api/track calls can attribute conversions back to this click.
+// 16 bytes (128 bits) — collision-free for any realistic volume, short
+// enough to not bloat URLs.
+function createSessionId(): string {
+  return randomBytes(12).toString("base64url");
+}
 
 // Helper to hash IP address — validates IP_HASH_SALT at runtime (not module load)
 // so Vercel build can succeed without env vars present
@@ -142,9 +151,22 @@ export async function GET(
       }
     }
 
+    // A/B variant pick. Empty variants → fall back to originalUrl.
+    // Variant ID is stamped onto the Click for later breakdown reports.
+    const variants = parseVariants(shortLink.variants);
+    const chosenVariant = pickVariant(variants);
+    const rawDestination = chosenVariant?.url ?? shortLink.originalUrl;
+
+    // Session ID for conversion attribution. Regenerated per click so each
+    // conversion is scoped to one visit, not a returning user. Appended as
+    // ?_sl=<id> to the destination URL — the landing-page snippet reads it
+    // and POSTs back to /api/track on purchase/signup/etc.
+    const sessionId = createSessionId();
+    const destinationUrl = appendSessionParam(rawDestination, sessionId);
+
     // Redirect immediately
     const redirectStatus = shortLink.redirectType === "PERMANENT" ? 301 : 302;
-    const response = NextResponse.redirect(shortLink.originalUrl, redirectStatus);
+    const response = NextResponse.redirect(destinationUrl, redirectStatus);
 
     // Record click AFTER the response is sent using Next.js after() API
     // This is guaranteed to complete on Vercel (unlike fire-and-forget)
@@ -154,6 +176,8 @@ export async function GET(
           await recordClick({
             shortLinkId: shortLink.id,
             workspaceId: shortLink.workspaceId,
+            sessionId,
+            variantId: chosenVariant?.id ?? null,
             ip: clientIp,
             userAgent,
             referrer,
@@ -177,6 +201,8 @@ export async function GET(
 async function recordClick({
   shortLinkId,
   workspaceId,
+  sessionId,
+  variantId,
   ip,
   userAgent,
   referrer,
@@ -185,6 +211,8 @@ async function recordClick({
 }: {
   shortLinkId: string;
   workspaceId: string | null;
+  sessionId: string;
+  variantId: string | null;
   ip: string;
   userAgent: string | null;
   referrer: string | null;
@@ -232,6 +260,8 @@ async function recordClick({
       data: {
         shortLinkId,
         workspaceId: workspaceId ?? undefined,
+        sessionId,
+        variantId,
         ipHash: ipHashed,
         userAgent,
         referrer: referrer || null,

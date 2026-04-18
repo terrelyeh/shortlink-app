@@ -8,6 +8,13 @@ import {
 } from "@/lib/utm-governance";
 import { z } from "zod";
 
+const variantSchema = z.object({
+  id: z.string().min(1).max(40),
+  url: z.string().url(),
+  weight: z.number().int().positive().max(1000),
+  label: z.string().max(60).optional(),
+});
+
 const updateLinkSchema = z.object({
   originalUrl: z.string().url().optional(),
   title: z.string().optional().nullable(),
@@ -20,6 +27,7 @@ const updateLinkSchema = z.object({
     .array(z.string().regex(/^[A-Z]{2}$/, "Use ISO 3166-1 alpha-2 codes"))
     .max(50)
     .optional(),
+  variants: z.array(variantSchema).max(10).optional(),
   utmSource: z.string().optional().nullable(),
   utmMedium: z.string().optional().nullable(),
   utmCampaign: z.string().optional().nullable(),
@@ -125,6 +133,9 @@ export async function PATCH(
     }
     if (validated.allowedCountries !== undefined) {
       updateData.allowedCountries = validated.allowedCountries;
+    }
+    if (validated.variants !== undefined) {
+      updateData.variants = validated.variants;
     }
     if (validated.expiresAt !== undefined) {
       updateData.expiresAt = validated.expiresAt ? new Date(validated.expiresAt) : null;

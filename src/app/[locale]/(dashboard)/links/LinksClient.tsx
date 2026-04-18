@@ -37,7 +37,7 @@ interface ShortLink {
   trendPct?: number | null;
   ogImage?: string | null;
   ogTitle?: string | null;
-  _count: { clicks: number };
+  _count: { clicks: number; conversions?: number };
   tags?: LinkTag[];
 }
 

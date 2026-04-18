@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
         prisma.shortLink.findMany({
           where,
           include: {
-            _count: { select: { clicks: true } },
+            _count: { select: { clicks: true, conversions: true } },
             tags: { include: { tag: true } },
           },
           orderBy: sortBy === "clicks"

@@ -227,9 +227,16 @@ model ShortLink {
   // DEPRECATED: Legacy field kept for migration. Will be removed after data migration.
   userId      String?  @map("user_id")
 
+  // A/B variants — optional JSON array of { id, url, weight, label? }.
+  // When present and non-empty the redirect picks weighted-randomly from
+  // these (the primary originalUrl is not served as a default; marketers
+  // who want the original in the mix should include it as a variant row).
+  variants Json? @default("[]")
+
   // Relations
   workspace   Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   clicks      Click[]
+  conversions Conversion[]
   tags        TagOnLink[]
   shareTokens ShareToken[]
   group       LinkGroup?   @relation(fields: [groupId], references: [id])
@@ -253,6 +260,13 @@ model Click {
   // Denormalized from ShortLink.workspaceId so analytics queries filter
   // directly without joining. Nullable for legacy rows pre-migration.
   workspaceId String?  @map("workspace_id")
+  // Opaque session token we hand to the destination page via ?_sl= so the
+  // /api/track endpoint can attribute later conversions back to this click.
+  // Unique + indexed because track lookups are always by sessionId.
+  sessionId   String?  @unique @map("session_id")
+  // A/B variant chosen for this click (null = primary originalUrl). Links
+  // the click back to ShortLink.variants[variantId] for breakdown reports.
+  variantId   String?  @map("variant_id")
   timestamp   DateTime @default(now())
   ipHash      String?  @map("ip_hash") // SHA-256 hashed IP
   userAgent   String?  @db.Text
@@ -263,7 +277,8 @@ model Click {
   os          String?  // iOS, Android, Windows, macOS, Linux
   browser     String?  // Chrome, Safari, Firefox, etc.
 
-  shortLink ShortLink @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
+  shortLink   ShortLink   @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
+  conversions Conversion[]
 
   @@index([shortLinkId])
   @@index([timestamp])
@@ -271,6 +286,44 @@ model Click {
   @@index([ipHash])
   @@index([workspaceId, timestamp])
   @@map("clicks")
+}
+
+// ============================================
+// Conversions
+// ============================================
+
+// A conversion event reported by a landing page (or backend webhook) that
+// we attribute back to a Click via sessionId. Multiple events per session
+// are allowed (e.g. "add_to_cart", then "purchase"). Uniqueness is enforced
+// on (shortLinkId, externalId) when externalId is supplied — lets the
+// caller pass an order ID and retry the POST safely.
+model Conversion {
+  id          String   @id @default(cuid())
+  clickId     String   @map("click_id")
+  shortLinkId String   @map("short_link_id")
+  workspaceId String?  @map("workspace_id")
+  // Variant copied from Click at conversion time so grouping queries don't
+  // need a join.
+  variantId   String?  @map("variant_id")
+  eventName   String   @default("conversion") @map("event_name")
+  value       Decimal? @db.Decimal(12, 2) // e.g. order total
+  currency    String?  @db.VarChar(3)     // ISO 4217, e.g. "TWD"
+  // Caller-supplied unique key per conversion (e.g. order_id). Prevents
+  // double-counting on retries. Partial unique index applied at DB level
+  // in the migration script (can't express @@unique([shortLinkId, externalId])
+  // with nullable externalId here the way we want — see prisma docs).
+  externalId  String?  @map("external_id")
+  metadata    Json?
+  timestamp   DateTime @default(now())
+
+  click     Click      @relation(fields: [clickId], references: [id], onDelete: Cascade)
+  shortLink ShortLink  @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
+
+  @@index([shortLinkId, timestamp])
+  @@index([workspaceId, timestamp])
+  @@index([clickId])
+  @@unique([shortLinkId, externalId])
+  @@map("conversions")
 }
 
 // ============================================

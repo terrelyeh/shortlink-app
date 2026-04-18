@@ -53,7 +53,7 @@ export default async function LinksPage({
     prisma.shortLink.findMany({
       where,
       include: {
-        _count: { select: { clicks: true } },
+        _count: { select: { clicks: true, conversions: true } },
         tags: { include: { tag: true } },
       },
       orderBy: { createdAt: "desc" },

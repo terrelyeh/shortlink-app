@@ -21,6 +21,7 @@ import {
   ChevronDown,
   ChevronUp,
   Edit,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -37,6 +38,13 @@ interface UtmCampaignSuggestion {
   lastUsed: string;
 }
 
+interface LinkVariantUI {
+  id: string;
+  url: string;
+  weight: number;
+  label?: string;
+}
+
 interface LinkData {
   id: string;
   code: string;
@@ -48,6 +56,7 @@ interface LinkData {
   expiresAt: string | null;
   maxClicks: number | null;
   allowedCountries: string[];
+  variants: LinkVariantUI[] | null;
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
@@ -85,6 +94,7 @@ export default function EditLinkPage() {
   const [maxClicks, setMaxClicks] = useState("");
   const [allowedCountries, setAllowedCountries] = useState<string[]>([]);
   const [newCountry, setNewCountry] = useState("");
+  const [variants, setVariants] = useState<LinkVariantUI[]>([]);
   const [utmSource, setUtmSource] = useState("");
   const [utmMedium, setUtmMedium] = useState("");
   const [utmCampaign, setUtmCampaign] = useState("");
@@ -146,6 +156,9 @@ export default function EditLinkPage() {
         }
         if (data.maxClicks) setMaxClicks(String(data.maxClicks));
         if (data.allowedCountries?.length) setAllowedCountries(data.allowedCountries);
+        if (Array.isArray(data.variants) && data.variants.length > 0) {
+          setVariants(data.variants);
+        }
 
         // Auto-expand sections if they have values
         if (data.utmSource || data.utmMedium || data.utmContent || data.utmTerm) setShowUTM(true);
@@ -249,6 +262,23 @@ export default function EditLinkPage() {
 
     setSaving(true);
     try {
+      // Drop empty / malformed variants before sending. Weights default to 1.
+      const cleanedVariants = variants
+        .map((v) => ({
+          id: v.id || `v_${Math.random().toString(36).slice(2, 8)}`,
+          url: v.url.trim(),
+          weight: Number.isFinite(v.weight) && v.weight > 0 ? v.weight : 1,
+          ...(v.label && v.label.trim() ? { label: v.label.trim() } : {}),
+        }))
+        .filter((v) => {
+          try {
+            new URL(v.url);
+            return true;
+          } catch {
+            return false;
+          }
+        });
+
       const payload: Record<string, unknown> = {
         originalUrl,
         title: title || null,
@@ -258,6 +288,7 @@ export default function EditLinkPage() {
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
         maxClicks: maxClicks ? parseInt(maxClicks) : null,
         allowedCountries,
+        variants: cleanedVariants,
         utmSource: utmSource || null,
         utmMedium: utmMedium || null,
         utmCampaign: utmCampaign || null,
@@ -521,6 +552,101 @@ export default function EditLinkPage() {
                 />
               </div>
             )}
+          </div>
+
+          {/* A/B Variants */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+            <div className="px-5 py-4 border-b border-slate-200 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-slate-700">A/B variants</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Split traffic across alternate URLs. Leave empty to send all visitors to the primary URL above.
+                  Weights are relative &mdash; e.g. 1 vs 1 = 50/50, 3 vs 1 = 75/25.
+                </p>
+              </div>
+            </div>
+            <div className="p-5 space-y-3">
+              {variants.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">
+                  No variants &mdash; everyone lands on the primary URL.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {variants.map((v, idx) => {
+                    const totalWeight = variants.reduce((s, x) => s + (x.weight || 0), 0) || 1;
+                    const pct = Math.round(((v.weight || 0) / totalWeight) * 100);
+                    return (
+                      <div
+                        key={v.id || idx}
+                        className="flex items-center gap-2 p-3 bg-slate-50/70 border border-slate-200 rounded-lg"
+                      >
+                        <input
+                          type="text"
+                          value={v.label ?? ""}
+                          onChange={(e) =>
+                            setVariants(
+                              variants.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)),
+                            )
+                          }
+                          placeholder="Label (optional)"
+                          className="w-32 px-2 py-1.5 text-sm border border-slate-200 rounded bg-white focus:ring-1 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
+                        />
+                        <input
+                          type="url"
+                          value={v.url}
+                          onChange={(e) =>
+                            setVariants(
+                              variants.map((x, i) => (i === idx ? { ...x, url: e.target.value } : x)),
+                            )
+                          }
+                          placeholder="https://example.com/landing-b"
+                          className="flex-1 min-w-0 px-2 py-1.5 text-sm border border-slate-200 rounded bg-white focus:ring-1 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
+                        />
+                        <input
+                          type="number"
+                          min="1"
+                          value={v.weight}
+                          onChange={(e) =>
+                            setVariants(
+                              variants.map((x, i) =>
+                                i === idx ? { ...x, weight: parseInt(e.target.value, 10) || 1 } : x,
+                              ),
+                            )
+                          }
+                          className="w-16 px-2 py-1.5 text-sm border border-slate-200 rounded bg-white text-center tabular-nums focus:ring-1 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
+                        />
+                        <span className="text-xs text-slate-400 tabular-nums w-10 text-right">{pct}%</span>
+                        <button
+                          type="button"
+                          onClick={() => setVariants(variants.filter((_, i) => i !== idx))}
+                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                          aria-label="Remove variant"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() =>
+                  setVariants([
+                    ...variants,
+                    {
+                      id: `v_${Math.random().toString(36).slice(2, 8)}`,
+                      url: "",
+                      weight: 1,
+                      label: "",
+                    },
+                  ])
+                }
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                + Add variant
+              </button>
+            </div>
           </div>
 
           {/* Advanced Options Toggle */}
