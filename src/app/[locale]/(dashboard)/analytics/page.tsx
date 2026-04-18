@@ -10,7 +10,6 @@ import { useTranslations } from "next-intl";
 import { ClicksChart } from "@/components/analytics/ClicksChart";
 import { PieChartComponent } from "@/components/analytics/PieChartComponent";
 import { ShareModal } from "@/components/analytics/ShareModal";
-import { CampaignLeaderboardSection } from "@/components/analytics/CampaignLeaderboardSection";
 import { MousePointerClick, Users, TrendingUp, Loader2, Link2, ChevronDown, X, Target, Globe, Megaphone, Download, Share2, Tag } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
@@ -716,26 +715,6 @@ export default function AnalyticsPage() {
               </>
             )}
           </div>
-
-          {/* Cross-campaign comparison — the anchor view of this page.
-              Campaign-specific deep-dives live on /campaigns/[name]; this
-              section answers "which campaign is actually winning?" without
-              making the user tab through each one. */}
-          {!selectedCampaign && !selectedLinkId && (
-            <CampaignLeaderboardSection
-              days={
-                range === "24h"
-                  ? 1
-                  : range === "7d"
-                    ? 7
-                    : range === "30d"
-                      ? 30
-                      : range === "90d"
-                        ? 90
-                        : 30
-              }
-            />
-          )}
 
           {/* — Overview — */}
           <SectionDivider title={t("sections.overview")} id="overview" />

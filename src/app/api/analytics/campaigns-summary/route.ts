@@ -76,10 +76,14 @@ export async function GET(request: NextRequest) {
           campaignId: true,
           campaign: {
             select: {
+              id: true,
               name: true,
               displayName: true,
+              description: true,
               status: true,
               goalClicks: true,
+              defaultSource: true,
+              defaultMedium: true,
               startDate: true,
               endDate: true,
             },
@@ -123,10 +127,14 @@ export async function GET(request: NextRequest) {
       // Bucket by campaign name. Links with neither campaignId nor
       // utmCampaign fall into the orphan bucket instead.
       interface Bucket {
+        id: string | null;
         name: string;
         displayName: string | null;
+        description: string | null;
         status: string | null;
         goalClicks: number | null;
+        defaultSource: string | null;
+        defaultMedium: string | null;
         linkCount: number;
         clicks: number;
         conversions: number;
@@ -142,10 +150,14 @@ export async function GET(request: NextRequest) {
         }
         if (!buckets.has(campaignName)) {
           buckets.set(campaignName, {
+            id: link.campaign?.id ?? null,
             name: campaignName,
             displayName: link.campaign?.displayName ?? null,
+            description: link.campaign?.description ?? null,
             status: link.campaign?.status ?? null,
             goalClicks: link.campaign?.goalClicks ?? null,
+            defaultSource: link.campaign?.defaultSource ?? null,
+            defaultMedium: link.campaign?.defaultMedium ?? null,
             linkCount: 0,
             clicks: 0,
             conversions: 0,
@@ -159,9 +171,13 @@ export async function GET(request: NextRequest) {
 
       const campaigns = Array.from(buckets.values())
         .map((b) => ({
+          id: b.id,
           name: b.name,
           displayName: b.displayName,
+          description: b.description,
           status: b.status,
+          defaultSource: b.defaultSource,
+          defaultMedium: b.defaultMedium,
           linkCount: b.linkCount,
           clicks: b.clicks,
           conversions: b.conversions,
