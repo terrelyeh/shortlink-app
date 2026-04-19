@@ -19,7 +19,6 @@ import {
   Download,
   CalendarClock,
   Globe2,
-  Target,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge, StatusDot } from "@/components/ui/Badge";
@@ -269,7 +268,7 @@ export function LinkTableRow({
           </span>
         </td>
 
-        {/* Clicks + 7d trend + conversions */}
+        {/* Clicks + 7d trend */}
         <td className="py-2 pr-3 text-right whitespace-nowrap">
           <span className="text-sm font-medium text-slate-900 tabular-nums">
             {link._count.clicks.toLocaleString()}
@@ -278,23 +277,6 @@ export function LinkTableRow({
             <div className={`flex items-center justify-end gap-0.5 text-[10px] font-medium ${trendPct! > 0 ? "text-emerald-600" : "text-red-500"}`}>
               {trendPct! > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
               {Math.abs(trendPct!)}%
-            </div>
-          )}
-          {/* Conversion count + CVR — shown only when the landing page has
-              actually reported conversions via /track.js, so it doesn't
-              add noise to links that don't use tracking. */}
-          {link._count.conversions !== undefined && link._count.conversions > 0 && (
-            <div
-              className="flex items-center justify-end gap-0.5 text-[10px] font-medium text-emerald-600"
-              title={`${link._count.conversions} conversions / ${link._count.clicks} clicks`}
-            >
-              <Target className="w-3 h-3" />
-              {link._count.conversions.toLocaleString()}
-              {link._count.clicks > 0 && (
-                <span className="text-slate-400">
-                  · {((link._count.conversions / link._count.clicks) * 100).toFixed(1)}%
-                </span>
-              )}
             </div>
           )}
         </td>

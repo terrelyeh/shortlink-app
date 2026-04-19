@@ -254,8 +254,6 @@ export default function CampaignDetailPage() {
   };
 
   const totalClicks = links.reduce((sum, l) => sum + l._count.clicks, 0);
-  const totalConversions = links.reduce((sum, l) => sum + (l._count.conversions ?? 0), 0);
-  const overallCvr = totalClicks > 0 ? (totalConversions / totalClicks) * 100 : 0;
   const activeLinks = links.filter((l) => l.status === "ACTIVE").length;
   const totalCampaignClicks = totalClicks || 1;
 
@@ -317,7 +315,7 @@ export default function CampaignDetailPage() {
       />
 
       {/* KPI Row */}
-      <div className="kpi-row">
+      <div className="kpi-row" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
         <div className="kpi">
           <div className="kpi-label">
             <Link2 size={12} /> Links
@@ -331,21 +329,6 @@ export default function CampaignDetailPage() {
           </div>
           <div className="kpi-value">{totalClicks.toLocaleString()}</div>
           <div className="kpi-sub">all-time</div>
-        </div>
-        <div className="kpi">
-          <div className="kpi-label">
-            <Target size={12} /> Conversions
-          </div>
-          <div className="kpi-value">{totalConversions.toLocaleString()}</div>
-          <div className="kpi-sub">
-            {totalClicks > 0 ? (
-              <>
-                {overallCvr.toFixed(1)}% <span className="muted">CVR</span>
-              </>
-            ) : (
-              "no data yet"
-            )}
-          </div>
         </div>
         <div className="kpi">
           <div className="kpi-label">

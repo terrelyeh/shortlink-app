@@ -10,10 +10,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Loader2,
-  Target,
   MousePointerClick,
-  Megaphone,
-  Trophy,
   LineChart as LineChartIcon,
   X,
   Flag,
@@ -169,8 +166,6 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
     };
     return {
       clicks: best("clicks"),
-      conversions: best("conversions"),
-      cvr: best("cvr"),
       goalPct: best("goalPct"),
     };
   }, [selectedCampaigns]);
@@ -230,26 +225,12 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
         <>
           {/* Winner KPIs */}
           {winners && (
-            <div className="kpi-row">
+            <div className="kpi-row" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
               <WinnerCard
                 icon={<MousePointerClick size={12} />}
                 label="Most clicks"
                 winner={winners.clicks}
                 format={(c) => c.clicks.toLocaleString()}
-              />
-              <WinnerCard
-                icon={<Target size={12} />}
-                label="Most conversions"
-                winner={winners.conversions}
-                format={(c) => c.conversions.toLocaleString()}
-                emptyHint="no conversions recorded"
-              />
-              <WinnerCard
-                icon={<Trophy size={12} />}
-                label="Best CVR"
-                winner={winners.cvr}
-                format={(c) => `${c.cvr.toFixed(1)}%`}
-                emptyHint="no conversions recorded"
               />
               <WinnerCard
                 icon={<Flag size={12} />}
@@ -343,28 +324,10 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                     </button>
                   </div>
 
-                  <div className="compare-metrics">
+                  <div className="compare-metrics" style={{ gridTemplateColumns: "1fr" }}>
                     <div>
-                      <div className="compare-metric-label">Clicks</div>
+                      <div className="compare-metric-label">Clicks · last {days}d</div>
                       <div className="compare-metric-val">{c.clicks.toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div className="compare-metric-label">Conv.</div>
-                      <div
-                        className="compare-metric-val"
-                        style={{ color: c.conversions > 0 ? "var(--data-emerald)" : "var(--ink-500)" }}
-                      >
-                        {c.conversions.toLocaleString()}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="compare-metric-label">CVR</div>
-                      <div
-                        className="compare-metric-val"
-                        style={{ color: c.conversions > 0 ? "var(--ink-100)" : "var(--ink-500)" }}
-                      >
-                        {c.conversions > 0 ? `${c.cvr.toFixed(1)}%` : "—"}
-                      </div>
                     </div>
                   </div>
 

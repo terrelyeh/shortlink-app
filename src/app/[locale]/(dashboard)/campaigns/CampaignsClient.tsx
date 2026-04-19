@@ -16,7 +16,6 @@ import {
   Search,
   Link2,
   Plus,
-  Target,
   Trophy,
   LineChart as LineChartIcon,
   ArrowRight,
@@ -70,7 +69,7 @@ interface SummaryResponse {
 
 const MAX_SELECTION = 4;
 
-type SortKey = "clicks" | "conversions" | "cvr" | "goalPct" | "name";
+type SortKey = "clicks" | "goalPct" | "name";
 
 const windowPresets: { value: string; labelKey: string; days: number }[] = [
   { value: "7d", labelKey: "last7Days", days: 7 },
@@ -154,26 +153,21 @@ export default function CampaignsClient() {
     });
     return [...filtered].sort((a, b) => {
       if (sortKey === "name") return a.name.localeCompare(b.name);
-      if (sortKey === "cvr") return b.cvr - a.cvr;
-      if (sortKey === "conversions") return b.conversions - a.conversions;
       if (sortKey === "goalPct") return (b.goalPct ?? -1) - (a.goalPct ?? -1);
       return b.clicks - a.clicks;
     });
   }, [data, searchQuery, statusFilter, sortKey]);
 
   const totals = useMemo(() => {
-    if (!data) return { clicks: 0, conversions: 0, withGoal: 0, active: 0, drafts: 0, archived: 0 };
+    if (!data) return { clicks: 0, withGoal: 0, active: 0, drafts: 0, archived: 0 };
     return {
       clicks: data.campaigns.reduce((s, c) => s + c.clicks, 0),
-      conversions: data.campaigns.reduce((s, c) => s + c.conversions, 0),
       withGoal: data.campaigns.filter((c) => c.goalClicks).length,
       active: data.campaigns.filter((c) => c.status === "ACTIVE").length,
       drafts: data.campaigns.filter((c) => c.status === "DRAFT").length,
       archived: data.campaigns.filter((c) => c.status === "ARCHIVED").length,
     };
   }, [data]);
-
-  const overallCvr = totals.clicks > 0 ? (totals.conversions / totals.clicks) * 100 : 0;
 
   const overlaySeries = useMemo(() => {
     if (!data?.timeseries || selected.size < 2) return null;
@@ -216,7 +210,7 @@ export default function CampaignsClient() {
       />
 
       {/* KPI row */}
-      <div className="kpi-row">
+      <div className="kpi-row" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
         <div className="kpi">
           <div className="kpi-label">
             <Megaphone size={12} /> Active campaigns
@@ -233,15 +227,6 @@ export default function CampaignsClient() {
           <div className="kpi-value">{data ? totals.clicks.toLocaleString() : "—"}</div>
           <div className="kpi-sub">
             {data && data.campaigns.length > 0 ? `across ${data.campaigns.length} campaigns` : "—"}
-          </div>
-        </div>
-        <div className="kpi">
-          <div className="kpi-label">
-            <Target size={12} /> Conversions · last {data?.meta.days ?? 30}d
-          </div>
-          <div className="kpi-value">{data ? totals.conversions.toLocaleString() : "—"}</div>
-          <div className="kpi-sub">
-            {overallCvr.toFixed(1)}% <span className="muted">CVR</span>
           </div>
         </div>
         <div className="kpi">
@@ -346,7 +331,7 @@ export default function CampaignsClient() {
           </div>
           <div className="tbl-head-tools">
             <span className="sort-label">Sort by</span>
-            {(["clicks", "conversions", "cvr", "goalPct", "name"] as SortKey[]).map((k) => (
+            {(["clicks", "goalPct", "name"] as SortKey[]).map((k) => (
               <button
                 key={k}
                 className={sortKey === k ? "active" : ""}
@@ -354,9 +339,7 @@ export default function CampaignsClient() {
               >
                 {k === "goalPct"
                   ? "Goal %"
-                  : k === "cvr"
-                    ? "CVR"
-                    : k.charAt(0).toUpperCase() + k.slice(1)}
+                  : k.charAt(0).toUpperCase() + k.slice(1)}
               </button>
             ))}
           </div>
@@ -382,8 +365,6 @@ export default function CampaignsClient() {
                 <th>Source / Medium</th>
                 <th className="num" style={{ width: 70 }}>Links</th>
                 <th className="num" style={{ width: 180 }}>Clicks</th>
-                <th className="num" style={{ width: 80 }}>Conv.</th>
-                <th className="num" style={{ width: 80 }}>CVR</th>
                 <th style={{ width: 130 }}>Goal</th>
               </tr>
             </thead>
@@ -464,16 +445,6 @@ export default function CampaignsClient() {
                         <span className="num">{c.clicks.toLocaleString()}</span>
                       </div>
                     </td>
-                    <td className="num">
-                      {c.conversions > 0 ? (
-                        <span style={{ color: "var(--ok-fg)" }}>{c.conversions.toLocaleString()}</span>
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
-                    </td>
-                    <td className="num">
-                      {c.conversions > 0 ? `${c.cvr.toFixed(1)}%` : <span className="muted">—</span>}
-                    </td>
                     <td>
                       {c.goalPct !== null && c.goalClicks ? (
                         <div className="bar-cell">
@@ -532,7 +503,6 @@ export default function CampaignsClient() {
               <tr>
                 <th>Link</th>
                 <th className="num" style={{ width: 120 }}>Clicks</th>
-                <th className="num" style={{ width: 100 }}>Conv.</th>
                 <th style={{ width: 160 }}>Actions</th>
               </tr>
             </thead>
@@ -550,13 +520,6 @@ export default function CampaignsClient() {
                     </div>
                   </td>
                   <td className="num">{o.clicks.toLocaleString()}</td>
-                  <td className="num">
-                    {o.conversions > 0 ? (
-                      <span style={{ color: "var(--ok-fg)" }}>{o.conversions}</span>
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                  </td>
                   <td>
                     <button
                       className="btn btn-ghost"
