@@ -103,6 +103,7 @@ function statusClass(status: string | null): string {
 
 export default function CampaignsClient() {
   const t = useTranslations("campaigns");
+  const tCommon = useTranslations("common");
   const router = useRouter();
 
   const [window, setWindow] = useState<string>("30d");
@@ -199,7 +200,7 @@ export default function CampaignsClient() {
                   )
                 }
               >
-                <SlidersHorizontal size={13} /> Compare {selected.size}
+                <SlidersHorizontal size={13} /> {t("compareN", { n: selected.size })}
               </button>
             )}
             <button className="btn btn-primary" onClick={() => router.push("/links/new")}>
@@ -213,31 +214,33 @@ export default function CampaignsClient() {
       <div className="kpi-row" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
         <div className="kpi">
           <div className="kpi-label">
-            <Megaphone size={12} /> Active campaigns
+            <Megaphone size={12} /> {t("activeCampaigns")}
           </div>
           <div className="kpi-value">{data ? totals.active : "—"}</div>
           <div className="kpi-sub">
-            <strong>{totals.drafts}</strong> drafts · <strong>{totals.archived}</strong> archived
+            <strong>{totals.drafts}</strong> {t("drafts")} · <strong>{totals.archived}</strong> {t("archivedCount")}
           </div>
         </div>
         <div className="kpi">
           <div className="kpi-label">
-            <MousePointerClick size={12} /> Clicks · last {data?.meta.days ?? 30}d
+            <MousePointerClick size={12} /> {t("clicksLastNd", { days: data?.meta.days ?? 30 })}
           </div>
           <div className="kpi-value">{data ? totals.clicks.toLocaleString() : "—"}</div>
           <div className="kpi-sub">
-            {data && data.campaigns.length > 0 ? `across ${data.campaigns.length} campaigns` : "—"}
+            {data && data.campaigns.length > 0
+              ? t("acrossNCampaigns", { n: data.campaigns.length })
+              : "—"}
           </div>
         </div>
         <div className="kpi">
           <div className="kpi-label">
-            <Flag size={12} /> Campaigns with a goal
+            <Flag size={12} /> {t("campaignsWithGoal")}
           </div>
           <div className="kpi-value">
             {data ? `${totals.withGoal} / ${data.campaigns.length}` : "—"}
           </div>
           <div className="kpi-sub muted">
-            {totals.withGoal === 0 ? "set goals to track progress →" : "tracking toward target"}
+            {totals.withGoal === 0 ? t("setGoalsToTrack") : t("trackingTowardTarget")}
           </div>
         </div>
       </div>
@@ -289,9 +292,9 @@ export default function CampaignsClient() {
           <div className="row-between" style={{ marginBottom: 10 }}>
             <div className="section-title">
               <LineChartIcon size={14} style={{ color: "var(--brand-500)" }} />
-              Compare {selected.size} campaigns
+              {t("compareTitle", { n: selected.size })}
               <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
-                · daily clicks, last {data.meta.days}d
+                · {t("dailyClicksSuffix", { days: data.meta.days })}
               </span>
             </div>
             <div className="row" style={{ gap: 6 }}>
@@ -305,10 +308,10 @@ export default function CampaignsClient() {
                   )
                 }
               >
-                Side-by-side details <ArrowRight size={12} />
+                {t("sideBySideDetails")} <ArrowRight size={12} />
               </button>
               <button className="btn btn-ghost" onClick={() => setSelected(new Set())}>
-                Clear
+                {tCommon("clear")}
               </button>
             </div>
           </div>
@@ -321,16 +324,16 @@ export default function CampaignsClient() {
         <div className="tbl-head">
           <div className="tbl-head-title">
             <Trophy size={14} style={{ color: "var(--data-amber)" }} />
-            Leaderboard
-            <span className="muted">· last {data?.meta.days ?? 30}d</span>
+            {t("leaderboard")}
+            <span className="muted">· {t("lastNd", { days: data?.meta.days ?? 30 })}</span>
             {selected.size > 0 && (
               <span style={{ color: "var(--brand-600)", fontSize: 11.5, marginLeft: 4 }}>
-                {selected.size} selected {selected.size < 2 && "(pick 1 more to compare)"}
+                {t("selected", { n: selected.size })} {selected.size < 2 && t("pickMoreHint")}
               </span>
             )}
           </div>
           <div className="tbl-head-tools">
-            <span className="sort-label">Sort by</span>
+            <span className="sort-label">{t("sortBy")}</span>
             {(["clicks", "goalPct", "name"] as SortKey[]).map((k) => (
               <button
                 key={k}
@@ -338,8 +341,10 @@ export default function CampaignsClient() {
                 onClick={() => setSortKey(k)}
               >
                 {k === "goalPct"
-                  ? "Goal %"
-                  : k.charAt(0).toUpperCase() + k.slice(1)}
+                  ? t("sortGoalPct")
+                  : k === "name"
+                    ? t("sortName")
+                    : t("sortClicks")}
               </button>
             ))}
           </div>
@@ -352,21 +357,21 @@ export default function CampaignsClient() {
         ) : campaigns.length === 0 ? (
           <div style={{ padding: 48, textAlign: "center", fontSize: 13, color: "var(--ink-500)" }}>
             {searchQuery || statusFilter
-              ? "No campaigns match your filters."
-              : "No campaigns yet. Create a link with a UTM campaign value and it'll show up here."}
+              ? t("noCampaignsMatch")
+              : t("noCampaignsYet")}
           </div>
         ) : (
           <table className="data">
             <thead>
               <tr>
                 <th style={{ width: 36 }}></th>
-                <th>Campaign</th>
-                <th style={{ width: 110 }}>Status</th>
-                <th className="num" style={{ width: 70 }}>Links</th>
-                <th className="num" style={{ width: 180 }}>Clicks</th>
-                <th style={{ width: 130 }} title="Daily clicks over the last 7 days">7d trend</th>
-                <th style={{ width: 110 }}>Last activity</th>
-                <th style={{ width: 130 }}>Goal</th>
+                <th>{t("title")}</th>
+                <th style={{ width: 110 }}>{t("colStatus")}</th>
+                <th className="num" style={{ width: 70 }}>{t("colLinks")}</th>
+                <th className="num" style={{ width: 180 }}>{t("colClicks")}</th>
+                <th style={{ width: 130 }} title={t("col7dTrendTooltip")}>{t("col7dTrend")}</th>
+                <th style={{ width: 110 }}>{t("colLastActivity")}</th>
+                <th style={{ width: 130 }}>{t("colGoal")}</th>
               </tr>
             </thead>
             <tbody>
@@ -384,13 +389,13 @@ export default function CampaignsClient() {
                         className={`cbx ${isSelected ? "checked" : ""}`}
                         disabled={selectionFull}
                         onClick={() => toggleSelected(c.name)}
-                        aria-label={isSelected ? "Deselect" : "Select"}
+                        aria-label={isSelected ? tCommon("remove") : tCommon("confirm")}
                         title={
                           selectionFull
-                            ? `Max ${MAX_SELECTION} campaigns at once`
+                            ? t("maxSelection", { max: MAX_SELECTION })
                             : isSelected
-                              ? "Remove from comparison"
-                              : "Add to comparison"
+                              ? t("removeFromComparison")
+                              : t("addToComparison")
                         }
                       />
                     </td>
@@ -420,7 +425,7 @@ export default function CampaignsClient() {
                         </span>
                       ) : (
                         <span className="muted" style={{ fontSize: 11, fontStyle: "italic" }}>
-                          utm-only
+                          {t("utmOnly")}
                         </span>
                       )}
                     </td>
@@ -461,7 +466,7 @@ export default function CampaignsClient() {
                           style={{ fontSize: 13, color: "var(--ink-300)" }}
                           title={new Date(c.lastClickAt).toLocaleString()}
                         >
-                          {formatRelativeTime(new Date(c.lastClickAt))}
+                          {formatRelativeTime(new Date(c.lastClickAt), tCommon)}
                         </span>
                       ) : (
                         <span className="muted">—</span>
@@ -487,7 +492,7 @@ export default function CampaignsClient() {
                           </span>
                         </div>
                       ) : (
-                        <span className="placeholder">no goal</span>
+                        <span className="placeholder">{t("noGoal")}</span>
                       )}
                     </td>
                   </tr>
@@ -499,7 +504,7 @@ export default function CampaignsClient() {
       </div>
 
       <p style={{ marginTop: 14, fontSize: 11.5, color: "var(--ink-500)" }}>
-        Tip: select 2 or more campaigns to compare side-by-side.
+        {t("compareTip")}
       </p>
 
       {/* Orphan links */}
@@ -511,23 +516,23 @@ export default function CampaignsClient() {
           <div className="tbl-head" style={{ background: "#FFF7EC", borderColor: "#FCD5B5" }}>
             <div className="tbl-head-title">
               <Link2 size={14} style={{ color: "var(--data-amber)" }} />
-              Orphan links
+              {t("orphanLinks")}
               <span className="muted">
-                · {data.meta.totalOrphans} link{data.meta.totalOrphans === 1 ? "" : "s"} not tied to any campaign
+                {t("orphansNotTied", { n: data.meta.totalOrphans })}
               </span>
             </div>
             <span className="muted" style={{ fontSize: 11.5 }}>
-              Showing top {data.orphans.length} by clicks
+              {t("showingTopN", { n: data.orphans.length })}
             </span>
           </div>
           <table className="data">
             <thead>
               <tr>
-                <th>Link</th>
-                <th>Destination</th>
-                <th className="num" style={{ width: 90 }}>Clicks</th>
-                <th style={{ width: 110 }}>Last click</th>
-                <th style={{ width: 160 }}>Actions</th>
+                <th>{t("detail.colLink")}</th>
+                <th>{t("colDestination")}</th>
+                <th className="num" style={{ width: 90 }}>{t("colClicks")}</th>
+                <th style={{ width: 110 }}>{t("colLastClick")}</th>
+                <th style={{ width: 160 }}>{tCommon("actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -577,7 +582,7 @@ export default function CampaignsClient() {
                         style={{ fontSize: 13, color: "var(--ink-300)" }}
                         title={new Date(o.lastClickAt).toLocaleString()}
                       >
-                        {formatRelativeTime(new Date(o.lastClickAt))}
+                        {formatRelativeTime(new Date(o.lastClickAt), tCommon)}
                       </span>
                     ) : (
                       <span className="muted">—</span>
@@ -589,7 +594,7 @@ export default function CampaignsClient() {
                       style={{ color: "var(--brand-600)", height: 28, padding: "0 8px" }}
                       onClick={() => router.push(`/links/${o.id}`)}
                     >
-                      Assign campaign →
+                      {t("assignCampaign")}
                     </button>
                   </td>
                 </tr>

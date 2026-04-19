@@ -6,6 +6,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "@/i18n/routing";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -67,6 +68,7 @@ function statusClass(status: string | null): string {
 
 export default function CompareClient({ initialNames }: { initialNames: string[] }) {
   const router = useRouter();
+  const t = useTranslations("compare");
 
   const [names, setNames] = useState<string[]>(initialNames);
   const [window, setWindow] = useState<string>("30d");
@@ -176,14 +178,13 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
     return (
       <div style={{ maxWidth: 520, margin: "48px auto", textAlign: "center" }}>
         <h1 className="page-title" style={{ marginBottom: 8 }}>
-          Nothing selected
+          {t("nothingSelected")}
         </h1>
         <p className="page-sub" style={{ marginBottom: 20 }}>
-          Head back to the Campaigns list, tick 2–4 campaigns, then click the
-          &quot;Side-by-side details&quot; button.
+          {t("nothingSelectedHint")}
         </p>
         <Link href="/campaigns" className="btn btn-primary">
-          <ArrowLeft size={13} /> Back to Campaigns
+          <ArrowLeft size={13} /> {t("backToCampaigns")}
         </Link>
       </div>
     );
@@ -194,10 +195,10 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
   return (
     <>
       <PageHeader
-        back="Back to Campaigns"
+        back={t("backToCampaigns")}
         onBack={() => router.push("/campaigns")}
-        title={`Compare ${names.length} campaigns`}
-        description={`Side-by-side breakdown over the last ${days} days.`}
+        title={t("title", { n: names.length })}
+        description={t("subtitle", { days })}
         actions={
           <>
             <SyncButton queryKeys={[[...summaryKey], [...rawKey]]} />
@@ -223,7 +224,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
       ) : selectedCampaigns.length === 0 ? (
         <div className="card card-padded" style={{ textAlign: "center", padding: 32 }}>
           <p className="muted" style={{ fontSize: 13 }}>
-            None of the requested campaigns were found. They may have been deleted.
+            {t("notFound")}
           </p>
         </div>
       ) : (
@@ -233,16 +234,17 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
             <div className="kpi-row" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
               <WinnerCard
                 icon={<MousePointerClick size={12} />}
-                label="Most clicks"
+                label={t("mostClicks")}
                 winner={winners.clicks}
                 format={(c) => c.clicks.toLocaleString()}
+                emptyHint={t("noData")}
               />
               <WinnerCard
                 icon={<Flag size={12} />}
-                label="Closest to goal"
+                label={t("closestToGoal")}
                 winner={winners.goalPct}
                 format={(c) => (c.goalPct !== null ? `${c.goalPct.toFixed(0)}%` : "—")}
-                emptyHint="No goals set"
+                emptyHint={t("noGoalsSet")}
               />
             </div>
           )}
@@ -253,9 +255,9 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
               <div className="row-between" style={{ marginBottom: 10 }}>
                 <div className="section-title">
                   <LineChartIcon size={14} style={{ color: "var(--ink-400)" }} />
-                  Daily clicks
+                  {t("dailyClicks")}
                   <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
-                    · last {days}d
+                    · {t("lastNd", { days })}
                   </span>
                 </div>
                 <div className="row" style={{ gap: 12, fontSize: 11.5 }}>
@@ -314,16 +316,14 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                           </span>
                         )}
                         <span>·</span>
-                        <span>
-                          {c.linkCount} link{c.linkCount !== 1 ? "s" : ""}
-                        </span>
+                        <span>{t("linksCount", { n: c.linkCount })}</span>
                       </div>
                     </div>
                     <button
                       className="btn btn-ghost"
                       style={{ padding: 4 }}
                       onClick={() => removeName(c.name)}
-                      title="Remove from comparison"
+                      title={t("removeFromComparison")}
                     >
                       <X size={14} />
                     </button>
@@ -331,7 +331,9 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
 
                   <div className="compare-metrics" style={{ gridTemplateColumns: "1fr" }}>
                     <div>
-                      <div className="compare-metric-label">Clicks · last {days}d</div>
+                      <div className="compare-metric-label">
+                        {t("clicksLastNd", { days })}
+                      </div>
                       <div className="compare-metric-val">{c.clicks.toLocaleString()}</div>
                     </div>
                   </div>
@@ -340,7 +342,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                     <div className="compare-row">
                       <div className="row-between" style={{ marginBottom: 6 }}>
                         <span className="compare-row-label" style={{ margin: 0 }}>
-                          Goal progress
+                          {t("goalProgress")}
                         </span>
                         <span
                           style={{
@@ -369,36 +371,36 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                       className="compare-row"
                       style={{ textAlign: "center", fontSize: 11.5, color: "var(--ink-500)" }}
                     >
-                      No goal set —{" "}
+                      {t("noGoalSet")}{" "}
                       <Link
                         href={`/campaigns/${encodeURIComponent(c.name)}`}
                         style={{ color: "var(--brand-600)" }}
                       >
-                        add one →
+                        {t("addOne")}
                       </Link>
                     </div>
                   )}
 
                   <div className="compare-row">
-                    <div className="compare-row-label">Top sources</div>
+                    <div className="compare-row-label">{t("topSources")}</div>
                     {breakdown && breakdown.sources.length > 0 ? (
                       <BreakdownList rows={breakdown.sources} total={c.clicks} pillClass="pill-source" />
                     ) : (
-                      <div className="placeholder">No data</div>
+                      <div className="placeholder">{t("noData")}</div>
                     )}
                   </div>
 
                   <div className="compare-row">
-                    <div className="compare-row-label">Top mediums</div>
+                    <div className="compare-row-label">{t("topMediums")}</div>
                     {breakdown && breakdown.mediums.length > 0 ? (
                       <BreakdownList rows={breakdown.mediums} total={c.clicks} pillClass="pill-medium" />
                     ) : (
-                      <div className="placeholder">No data</div>
+                      <div className="placeholder">{t("noData")}</div>
                     )}
                   </div>
 
                   <div className="compare-row">
-                    <div className="compare-row-label">Top links</div>
+                    <div className="compare-row-label">{t("topLinks")}</div>
                     {breakdown && breakdown.topLinks.length > 0 ? (
                       <div className="stack" style={{ gap: 4 }}>
                         {breakdown.topLinks.map((l) => (
@@ -429,7 +431,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                         ))}
                       </div>
                     ) : (
-                      <div className="placeholder">No data</div>
+                      <div className="placeholder">{t("noData")}</div>
                     )}
                   </div>
 
@@ -437,7 +439,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                     href={`/campaigns/${encodeURIComponent(c.name)}`}
                     className="compare-col-foot"
                   >
-                    Open full detail →
+                    {t("openFullDetail")}
                   </Link>
                 </div>
               );
@@ -484,7 +486,7 @@ function WinnerCard({
         <>
           <div className="kpi-value">
             <span className="placeholder" style={{ fontSize: 18 }}>
-              No data
+              {emptyHint ?? "—"}
             </span>
           </div>
           <div className="kpi-sub muted">{emptyHint ?? ""}</div>

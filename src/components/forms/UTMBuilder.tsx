@@ -152,19 +152,25 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
     if (approvedSources.length === 0 || !values.utmSource) return null;
     const s = values.utmSource.trim().toLowerCase();
     if (!approvedSources.includes(s)) {
-      return `"${values.utmSource}" 不在這個 workspace 的核准清單（${approvedSources.join(", ")}）— 儲存時會被擋下。`;
+      return t("sourceGovernanceWarning", {
+        value: values.utmSource,
+        list: approvedSources.join(", "),
+      });
     }
     return null;
-  }, [approvedSources, values.utmSource]);
+  }, [approvedSources, values.utmSource, t]);
 
   const mediumGovernanceWarning = useMemo(() => {
     if (approvedMediums.length === 0 || !values.utmMedium) return null;
     const m = values.utmMedium.trim().toLowerCase();
     if (!approvedMediums.includes(m)) {
-      return `"${values.utmMedium}" 不在這個 workspace 的核准清單（${approvedMediums.join(", ")}）— 儲存時會被擋下。`;
+      return t("mediumGovernanceWarning", {
+        value: values.utmMedium,
+        list: approvedMediums.join(", "),
+      });
     }
     return null;
-  }, [approvedMediums, values.utmMedium]);
+  }, [approvedMediums, values.utmMedium, t]);
 
   // Get available sources (with labels) based on selected medium
   const availableSourceOptions = useMemo(() => {
@@ -284,7 +290,7 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
               disabled={loadingTemplates}
             >
               <option value="">
-                {loadingTemplates ? "Loading templates..." : "Select a template..."}
+                {loadingTemplates ? t("loadingTemplates") : t("templateSelectPlaceholder")}
               </option>
               {templates.map((template) => (
                 <option key={template.id} value={template.id}>
@@ -302,7 +308,7 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
             </div>
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            Select a saved template to auto-fill UTM parameters
+            {t("templateSelectorHint")}
           </p>
         </div>
       )}
@@ -315,20 +321,19 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
             <summary className="flex items-center gap-2 p-3 cursor-pointer list-none">
               <Megaphone className="w-4 h-4 text-violet-500 shrink-0" />
               <span className="text-xs font-medium text-violet-900 flex-1">
-                Campaign 是這條 link 的管理依據
+                {t("campaignCalloutTitle")}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-violet-500 transition-transform group-open:rotate-180 shrink-0" />
             </summary>
             <p className="px-3 pb-3 pl-9 text-xs text-violet-700/80 leading-relaxed">
-              這個值決定 link 之後歸到哪個活動 — 影響 Campaigns
-              列表、目標追蹤、和跨活動比較。留空的 link 只會出現在孤兒區。
+              {t("campaignCalloutBody")}
             </p>
           </details>
           <label className="flex items-center text-sm font-medium text-slate-700 mb-1">
             {t("campaign")}
             {campaignLocked && (
               <span className="ml-1.5 text-[10px] text-violet-500 font-normal bg-violet-50 px-1.5 py-0.5 rounded">
-                from Campaign
+                {t("campaignFromEntity")}
               </span>
             )}
             <FieldHint text={t("campaignTip")} />
@@ -349,19 +354,15 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
             <p className="mt-1 text-xs">
               {existingCampaigns.some((c) => c.name === values.utmCampaign.trim()) ? (
                 <span className="inline-flex items-center gap-1 text-emerald-600">
-                  <Sparkles className="w-3 h-3" /> 歸到現有活動
+                  <Sparkles className="w-3 h-3" /> {t("campaignExisting")}
                 </span>
               ) : (
-                <span className="text-slate-500">
-                  新活動 — 儲存時自動建立
-                </span>
+                <span className="text-slate-500">{t("campaignNewOnSave")}</span>
               )}
             </p>
           )}
           {!campaignLocked && !values.utmCampaign && (
-            <p className="mt-1 text-xs text-slate-400">
-              留空這條 link 不會出現在 Campaigns 列表
-            </p>
+            <p className="mt-1 text-xs text-slate-400">{t("campaignEmptyHint")}</p>
           )}
         </div>
 
@@ -388,7 +389,7 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
               <button
                 type="button"
                 onClick={() => handleChange("utmMedium", "")}
-                aria-label="Clear medium"
+                aria-label={t("clearMedium")}
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
@@ -462,7 +463,7 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
               <button
                 type="button"
                 onClick={() => handleChange("utmSource", "")}
-                aria-label="Clear source"
+                aria-label={t("clearSource")}
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
@@ -594,6 +595,7 @@ function CampaignCombobox({
   readOnly?: boolean;
   placeholder?: string;
 }) {
+  const t = useTranslations("utm");
   const [isOpen, setIsOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -663,8 +665,8 @@ function CampaignCombobox({
           typeof data.error === "string"
             ? data.error
             : Array.isArray(data.error)
-              ? data.error[0]?.message ?? "Invalid name"
-              : "Failed to create campaign";
+              ? data.error[0]?.message ?? t("invalidName")
+              : t("createCampaignFailed");
         throw new Error(msg);
       }
       const created = await res.json();
@@ -747,7 +749,7 @@ function CampaignCombobox({
               setIsOpen(false);
               inputRef.current?.focus();
             }}
-            aria-label="Clear campaign"
+            aria-label={t("clearCampaign")}
             className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
           >
             <X className="w-3.5 h-3.5" />
@@ -783,7 +785,7 @@ function CampaignCombobox({
                   <Plus className="w-3.5 h-3.5 shrink-0" />
                 )}
                 <span>
-                  建立新活動{" "}
+                  {t("comboboxCreateNew")}{" "}
                   <span className="font-mono font-medium">&apos;{trimmed}&apos;</span>
                 </span>
               </button>
@@ -793,7 +795,7 @@ function CampaignCombobox({
                 onClick={() => inputRef.current?.focus()}
               >
                 <Plus className="w-3.5 h-3.5 shrink-0" />
-                <span>輸入活動名稱以建立</span>
+                <span>{t("comboboxTypeToCreate")}</span>
               </div>
             ))}
 
@@ -801,7 +803,7 @@ function CampaignCombobox({
             <>
               {showCreateOption && <div className="my-1 border-t border-slate-100" />}
               <div className="px-3 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                現有活動
+                {t("comboboxExisting")}
               </div>
               {filtered.map((c, i) => {
                 const idx = createIsActionable ? i + 1 : i;
@@ -853,7 +855,7 @@ function CampaignCombobox({
 
           {filtered.length === 0 && !showCreateOption && (
             <div className="px-3 py-4 text-center text-sm text-slate-400">
-              尚無活動
+              {t("comboboxEmpty")}
             </div>
           )}
         </div>

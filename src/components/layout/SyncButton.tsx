@@ -3,25 +3,21 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { formatRelativeTime } from "@/lib/utils/format";
 
 /**
  * SyncButton — page-level "refresh cache" control.
  *
- * Invalidates the provided query keys on click, which causes their next
- * render to refetch. The "Last synced" timestamp is derived from the
- * freshest `dataUpdatedAt` across those keys, so it honestly reflects
- * when the data the user is looking at was last pulled from the server.
- *
- * Pass one key per query this page depends on — e.g. on /campaigns we
- * pass `[["campaigns-summary", window]]`, on Campaign Detail we pass
- * three keys (links, goal, raw analytics).
+ * Invalidates the provided query keys on click. The "Last synced" label
+ * reads the freshest `dataUpdatedAt` across those keys so it honestly
+ * reflects when the on-screen data was last pulled from the server.
  */
 export function SyncButton({ queryKeys }: { queryKeys: readonly unknown[][] }) {
+  const t = useTranslations("common");
   const qc = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
-  // Tick every 30s so the "X min ago" label stays roughly current without
-  // being chatty. Resolution past a minute is good enough for UX copy.
+  // Tick every 30s so the "X min ago" label stays current.
   const [, tick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => tick((n) => n + 1), 30_000);
@@ -57,7 +53,7 @@ export function SyncButton({ queryKeys }: { queryKeys: readonly unknown[][] }) {
           style={{ fontSize: 11.5, color: "var(--ink-500)" }}
           title={lastSyncedAt.toLocaleString()}
         >
-          Last synced {formatRelativeTime(lastSyncedAt)}
+          {t("lastSynced", { time: formatRelativeTime(lastSyncedAt, t) })}
         </span>
       )}
       <button
@@ -65,7 +61,7 @@ export function SyncButton({ queryKeys }: { queryKeys: readonly unknown[][] }) {
         className="btn btn-secondary"
         onClick={handleSync}
         disabled={isSyncing}
-        title="Pull fresh data from the server"
+        title={t("syncTooltip")}
       >
         <RefreshCw
           size={13}
@@ -73,7 +69,7 @@ export function SyncButton({ queryKeys }: { queryKeys: readonly unknown[][] }) {
             animation: isSyncing ? "spin 0.8s linear infinite" : undefined,
           }}
         />
-        Sync
+        {t("sync")}
       </button>
       <style jsx>{`
         @keyframes spin {

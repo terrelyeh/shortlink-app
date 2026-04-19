@@ -396,7 +396,7 @@ export default function TemplatesPage() {
               <div className="flex items-start gap-2 p-3 bg-violet-50/70 border border-violet-100 rounded-lg text-xs text-violet-800/90">
                 <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-violet-500" />
                 <span>
-                  模板不綁定 campaign — 這是「通路預設」，campaign 每次建 link 時再填。
+                  {t("templatesOnlyChannelPreset")}
                 </span>
               </div>
 

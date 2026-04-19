@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useRouter } from "@/i18n/routing";
+import { useTranslations } from "next-intl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Link2,
@@ -56,6 +57,9 @@ export default function CampaignDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { success } = useToast();
+  const t = useTranslations("campaigns.detail");
+  const tCampaigns = useTranslations("campaigns");
+  const tCommon = useTranslations("common");
   const campaignName = decodeURIComponent(params.name as string);
 
   const qc = useQueryClient();
@@ -201,7 +205,7 @@ export default function CampaignDetailPage() {
         qc.setQueryData(goalKey, { goalClicks: parsed });
         qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
         setEditingGoal(false);
-        success("Goal saved!");
+        success(t("goalSaved"));
       }
     } catch (e) {
       console.error(e);
@@ -223,7 +227,7 @@ export default function CampaignDetailPage() {
         qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
         setGoalInput("");
         setEditingGoal(false);
-        success("Goal removed.");
+        success(t("goalRemoved"));
       }
     } catch (e) {
       console.error(e);
@@ -239,7 +243,7 @@ export default function CampaignDetailPage() {
   const copyLink = async (shortUrl: string, id: string) => {
     await navigator.clipboard.writeText(shortUrl);
     setCopiedId(id);
-    success("Copied!");
+    success(tCommon("copied"));
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -247,7 +251,7 @@ export default function CampaignDetailPage() {
     const all = links.map((l) => `${shortBaseUrl}/${l.code}`).join("\n");
     await navigator.clipboard.writeText(all);
     setCopiedAll(true);
-    success("All link URLs copied!");
+    success(t("allLinksCopied"));
     setTimeout(() => setCopiedAll(false), 2000);
   };
 
@@ -260,7 +264,7 @@ export default function CampaignDetailPage() {
   return (
     <>
       <PageHeader
-        back="Back to Campaigns"
+        back={t("backToCampaigns")}
         onBack={() => router.push("/campaigns")}
         title={
           <div className="campaign-hero" style={{ marginBottom: 0 }}>
@@ -268,7 +272,7 @@ export default function CampaignDetailPage() {
               <Megaphone size={20} />
             </div>
             <div>
-              <div className="campaign-kind">UTM Campaign</div>
+              <div className="campaign-kind">{t("utmCampaignBadge")}</div>
               <h1>{campaignName}</h1>
             </div>
           </div>
@@ -282,13 +286,13 @@ export default function CampaignDetailPage() {
               disabled={links.length === 0}
             >
               {copiedAll ? <Check size={13} /> : <Copy size={13} />}
-              {copiedAll ? "Copied!" : "Copy all links"}
+              {copiedAll ? tCommon("copied") : t("copyAllLinks")}
             </button>
             <Link
               href={`/links/new?utmCampaign=${encodeURIComponent(campaignName)}`}
               className="btn btn-primary"
             >
-              <Plus size={13} /> Add link
+              <Plus size={13} /> {t("addLink")}
             </Link>
           </>
         }
@@ -298,26 +302,26 @@ export default function CampaignDetailPage() {
       <div className="kpi-row" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
         <div className="kpi">
           <div className="kpi-label">
-            <Link2 size={12} /> Links
+            <Link2 size={12} /> {t("kpiLinks")}
           </div>
           <div className="kpi-value">{links.length}</div>
-          <div className="kpi-sub pos">● {activeLinks} active</div>
+          <div className="kpi-sub pos">● {t("kpiActive", { n: activeLinks })}</div>
         </div>
         <div className="kpi">
           <div className="kpi-label">
-            <MousePointerClick size={12} /> Total clicks
+            <MousePointerClick size={12} /> {t("kpiTotalClicks")}
           </div>
           <div className="kpi-value">{totalClicks.toLocaleString()}</div>
-          <div className="kpi-sub">all-time</div>
+          <div className="kpi-sub">{t("kpiAllTime")}</div>
         </div>
         <div className="kpi">
           <div className="kpi-label">
-            <BarChart3 size={12} /> Avg clicks
+            <BarChart3 size={12} /> {t("kpiAvgClicks")}
           </div>
           <div className="kpi-value">
             {links.length > 0 ? Math.round(totalClicks / links.length).toLocaleString() : "0"}
           </div>
-          <div className="kpi-sub">per link</div>
+          <div className="kpi-sub">{t("kpiPerLink")}</div>
         </div>
       </div>
 
@@ -327,19 +331,19 @@ export default function CampaignDetailPage() {
           className={activeTab === "overview" ? "active" : ""}
           onClick={() => setActiveTab("overview")}
         >
-          <LineChartIcon size={13} /> Overview
+          <LineChartIcon size={13} /> {t("tabOverview")}
         </button>
         <button
           className={activeTab === "traffic" ? "active" : ""}
           onClick={() => setActiveTab("traffic")}
         >
-          <Users size={13} /> Traffic
+          <Users size={13} /> {t("tabTraffic")}
         </button>
         <button
           className={activeTab === "links" ? "active" : ""}
           onClick={() => setActiveTab("links")}
         >
-          <Link2 size={13} /> Links
+          <Link2 size={13} /> {t("tabLinks")}
         </button>
       </div>
 
@@ -351,7 +355,7 @@ export default function CampaignDetailPage() {
             <div className="goal-head">
               <div className="section-title">
                 <Target size={14} style={{ color: "var(--data-violet)" }} />
-                Click Goal
+                {t("clickGoal")}
                 {goalClicks && (
                   <span className="muted" style={{ fontFamily: "var(--font-mono)", fontWeight: 400, fontSize: 11.5 }}>
                     {totalClicks.toLocaleString()} / {goalClicks.toLocaleString()}
@@ -364,7 +368,7 @@ export default function CampaignDetailPage() {
                     className="btn btn-ghost"
                     style={{ padding: "4px 6px" }}
                     onClick={clearGoal}
-                    title="Remove goal"
+                    title={t("removeGoal")}
                   >
                     <X size={13} />
                   </button>
@@ -376,7 +380,7 @@ export default function CampaignDetailPage() {
                     setEditingGoal(!editingGoal);
                     setGoalInput(goalClicks ? String(goalClicks) : "");
                   }}
-                  title="Edit goal"
+                  title={t("editGoal")}
                 >
                   <Pencil size={13} />
                 </button>
@@ -394,7 +398,7 @@ export default function CampaignDetailPage() {
                     if (e.key === "Enter") saveGoal();
                     if (e.key === "Escape") setEditingGoal(false);
                   }}
-                  placeholder="e.g. 10000"
+                  placeholder={t("goalPlaceholder")}
                   className="input"
                   style={{ flex: 1, height: 32 }}
                   autoFocus
@@ -404,10 +408,10 @@ export default function CampaignDetailPage() {
                   onClick={saveGoal}
                   disabled={!goalInput || goalSaving}
                 >
-                  {goalSaving ? <Loader2 size={13} className="animate-spin" /> : "Save"}
+                  {goalSaving ? <Loader2 size={13} className="animate-spin" /> : tCommon("save")}
                 </button>
                 <button className="btn btn-secondary" onClick={() => setEditingGoal(false)}>
-                  Cancel
+                  {tCommon("cancel")}
                 </button>
               </div>
             ) : goalClicks ? (
@@ -427,10 +431,10 @@ export default function CampaignDetailPage() {
                           color: reached ? "var(--ok-fg)" : "var(--data-violet)",
                         }}
                       >
-                        {reached ? "🎉 Goal reached!" : `${pct.toFixed(1)}% of goal`}
+                        {reached ? t("goalReached") : t("goalPct", { pct: pct.toFixed(1) })}
                       </span>
                       <span className="muted" style={{ fontSize: 11.5 }}>
-                        {(goalClicks - totalClicks).toLocaleString()} clicks remaining
+                        {t("clicksRemaining", { n: (goalClicks - totalClicks).toLocaleString() })}
                       </span>
                     </div>
                   </>
@@ -438,7 +442,7 @@ export default function CampaignDetailPage() {
               })()
             ) : (
               <p className="placeholder" style={{ margin: 0 }}>
-                Set a click goal to track progress toward your target
+                {t("setGoalHint")}
               </p>
             )}
           </div>
@@ -447,9 +451,9 @@ export default function CampaignDetailPage() {
           <div className="card card-padded">
             <div className="section-title" style={{ marginBottom: 10 }}>
               <LineChartIcon size={14} style={{ color: "var(--ink-400)" }} />
-              Clicks
+              {t("clicksTitle")}
               <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
-                last 30 days
+                {t("last30Days")}
               </span>
             </div>
             {rawLoading ? (
@@ -460,7 +464,7 @@ export default function CampaignDetailPage() {
               <ClicksChart data={computed.clicksByDay} />
             ) : (
               <div style={{ height: 300, display: "grid", placeItems: "center", fontSize: 13, color: "var(--ink-500)" }}>
-                No clicks recorded in the last 30 days
+                {t("noClicks30d")}
               </div>
             )}
           </div>
@@ -479,49 +483,55 @@ export default function CampaignDetailPage() {
               className="card"
               style={{ padding: 48, textAlign: "center", fontSize: 13, color: "var(--ink-500)" }}
             >
-              No traffic data for this campaign in the last 30 days.
+              {t("noTraffic30d")}
             </div>
           ) : (
             <>
               <div className="grid-2">
                 <TopList
-                  title="Top sources"
-                  subtitle="where the traffic is coming from"
+                  title={t("topSources")}
+                  subtitle={t("topSourcesHint")}
                   rows={computed.utm.sources}
                   total={computed.summary.totalClicks}
                   pillClass="pill-source"
+                  noDataLabel={t("noData")}
                 />
                 <TopList
-                  title="Top mediums"
-                  subtitle="paid, organic, email, etc."
+                  title={t("topMediums")}
+                  subtitle={t("topMediumsHint")}
                   rows={computed.utm.mediums}
                   total={computed.summary.totalClicks}
                   pillClass="pill-medium"
+                  noDataLabel={t("noData")}
                 />
               </div>
 
               <div className="card card-padded">
-                <div className="section-title" style={{ marginBottom: 14 }}>Audience breakdown</div>
+                <div className="section-title" style={{ marginBottom: 14 }}>
+                  {t("audienceBreakdown")}
+                </div>
                 <div className="grid-3">
-                  <PieChartComponent data={computed.devices} title="Device" />
-                  <PieChartComponent data={computed.browsers} title="Browser" />
-                  <PieChartComponent data={computed.operatingSystems} title="OS" />
+                  <PieChartComponent data={computed.devices} title={t("device")} />
+                  <PieChartComponent data={computed.browsers} title={t("browser")} />
+                  <PieChartComponent data={computed.operatingSystems} title={t("os")} />
                 </div>
               </div>
 
               <div className="grid-2">
                 <TopList
-                  title="Top countries"
+                  title={t("topCountries")}
                   rows={computed.countries.map((c) => ({ name: c.name, clicks: c.value }))}
                   total={computed.summary.totalClicks}
                   pillClass="pill-country"
                   icon={<Globe2 size={14} style={{ color: "var(--ink-400)" }} />}
+                  noDataLabel={t("noData")}
                 />
                 <TopList
-                  title="Top referrers"
+                  title={t("topReferrers")}
                   rows={computed.referrers.map((r) => ({ name: r.name, clicks: r.value }))}
                   total={computed.summary.totalClicks}
                   pillClass="pill-content"
+                  noDataLabel={t("noData")}
                 />
               </div>
             </>
@@ -534,15 +544,15 @@ export default function CampaignDetailPage() {
         <div className="tbl-wrap">
           <div className="tbl-head">
             <div className="tbl-head-title">
-              Links in this campaign
-              <span className="muted">· {links.length} links · sorted by clicks</span>
+              {t("linksInCampaign")}
+              <span className="muted">{t("linksSortedByClicks", { n: links.length })}</span>
             </div>
             <Link
               href={`/links/new?utmCampaign=${encodeURIComponent(campaignName)}`}
               className="btn btn-secondary"
               style={{ height: 28, fontSize: 11.5 }}
             >
-              <Plus size={12} /> Add link
+              <Plus size={12} /> {t("addLink")}
             </Link>
           </div>
 
@@ -553,36 +563,36 @@ export default function CampaignDetailPage() {
           ) : links.length === 0 ? (
             <div style={{ padding: 48, textAlign: "center" }}>
               <p style={{ fontSize: 13, color: "var(--ink-500)", marginBottom: 12 }}>
-                No links found for this campaign
+                {t("noLinksInCampaign")}
               </p>
               <Link
                 href={`/links/new?utmCampaign=${encodeURIComponent(campaignName)}`}
                 className="btn btn-primary"
               >
-                <Plus size={13} /> Create first link
+                <Plus size={13} /> {t("createFirstLink")}
               </Link>
             </div>
           ) : (
             <table className="data">
               <thead>
                 <tr>
-                  <th>Link</th>
-                  <th>Campaign / Source / Medium / Content</th>
-                  <th style={{ width: 100 }}>Status</th>
+                  <th>{t("colLink")}</th>
+                  <th>{t("colCampaignSourceMediumContent")}</th>
+                  <th style={{ width: 100 }}>{tCampaigns("colStatus")}</th>
                   <th className="num" style={{ width: 100 }}>
-                    Clicks
+                    {tCampaigns("colClicks")}
                   </th>
-                  <th className="num" style={{ width: 80 }} title="Distinct visitors (by hashed IP)">
-                    Unique
+                  <th className="num" style={{ width: 80 }} title={t("colUniqueTooltip")}>
+                    {t("colUnique")}
                   </th>
-                  <th className="num" style={{ width: 75 }} title="Share of this campaign's total clicks">
-                    Share
+                  <th className="num" style={{ width: 75 }} title={t("colShareTooltip")}>
+                    {t("colShare")}
                   </th>
-                  <th style={{ width: 120 }} title="Daily clicks over the last 7 days">
-                    7d trend
+                  <th style={{ width: 120 }} title={tCampaigns("col7dTrendTooltip")}>
+                    {t("col7dTrend")}
                   </th>
-                  <th style={{ width: 110 }}>Last click</th>
-                  <th style={{ width: 140 }}>Actions</th>
+                  <th style={{ width: 110 }}>{t("colLastClick")}</th>
+                  <th style={{ width: 140 }}>{tCommon("actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -684,7 +694,7 @@ export default function CampaignDetailPage() {
                             style={{ fontSize: 13, color: "var(--ink-300)" }}
                             title={m.lastClickAt.toLocaleString()}
                           >
-                            {formatRelativeTime(m.lastClickAt)}
+                            {formatRelativeTime(m.lastClickAt, tCommon)}
                           </span>
                         ) : (
                           <span className="muted">—</span>
@@ -703,11 +713,11 @@ export default function CampaignDetailPage() {
                               gap: 4,
                             }}
                           >
-                            Analytics <span style={{ fontSize: 10 }}>→</span>
+                            {t("actionAnalytics")} <span style={{ fontSize: 10 }}>→</span>
                           </Link>
                           <Link
                             href={`/links/${link.id}`}
-                            title="Edit link settings"
+                            title={t("actionEditSettings")}
                             style={{ color: "var(--ink-500)", display: "inline-flex" }}
                           >
                             <Settings2 size={13} />
@@ -716,7 +726,7 @@ export default function CampaignDetailPage() {
                             href={shortUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            title="Open short URL"
+                            title={t("actionOpenShortUrl")}
                             style={{ color: "var(--ink-500)", display: "inline-flex" }}
                           >
                             <ExternalLink size={12} />
@@ -742,6 +752,7 @@ function TopList({
   total,
   pillClass,
   icon,
+  noDataLabel = "No data",
 }: {
   title: string;
   subtitle?: string;
@@ -749,6 +760,7 @@ function TopList({
   total: number;
   pillClass: string;
   icon?: React.ReactNode;
+  noDataLabel?: string;
 }) {
   return (
     <div className="card card-padded">
@@ -759,7 +771,7 @@ function TopList({
       <p className="section-sub">{subtitle || "\u00a0"}</p>
       {rows.length === 0 ? (
         <p className="placeholder" style={{ textAlign: "center", padding: "24px 0" }}>
-          No data
+          {noDataLabel}
         </p>
       ) : (
         <div className="stack" style={{ gap: 10 }}>
