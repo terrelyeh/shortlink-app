@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   UTM_MEDIUMS,
   UTM_MEDIUM_LABELS,
@@ -25,6 +26,7 @@ import {
 import Link from "next/link";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { SyncButton } from "@/components/layout/SyncButton";
 
 interface Template {
   id: string;
@@ -56,29 +58,25 @@ export default function TemplatesPage() {
   const t = useTranslations("utm");
   const tCommon = useTranslations("common");
 
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<TemplateFormData>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchTemplates = async () => {
-    try {
+  const templatesKey = useMemo(() => ["templates"] as const, []);
+  const { data: templatesData, isLoading: loading } = useQuery({
+    queryKey: templatesKey,
+    queryFn: async () => {
       const response = await fetch("/api/templates");
-      const data = await response.json();
-      setTemplates(data);
-    } catch (error) {
-      console.error("Failed to fetch templates:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchTemplates();
-  }, []);
+      if (!response.ok) throw new Error("Failed to fetch templates");
+      return (await response.json()) as Template[];
+    },
+  });
+  const templates = useMemo(() => templatesData ?? [], [templatesData]);
+  const invalidateTemplates = () =>
+    qc.invalidateQueries({ queryKey: templatesKey });
 
   const openCreateForm = () => {
     setFormData(emptyForm);
@@ -120,7 +118,7 @@ export default function TemplatesPage() {
         throw new Error(data.error || "Failed to save template");
       }
 
-      await fetchTemplates();
+      await invalidateTemplates();
       setShowForm(false);
       setFormData(emptyForm);
       setEditingId(null);
@@ -136,7 +134,7 @@ export default function TemplatesPage() {
 
     try {
       await fetch(`/api/templates/${id}`, { method: "DELETE" });
-      setTemplates(templates.filter((t) => t.id !== id));
+      await invalidateTemplates();
     } catch (error) {
       console.error("Failed to delete template:", error);
     }
@@ -166,13 +164,16 @@ export default function TemplatesPage() {
         title={t("templates")}
         description={t("description")}
         actions={
-          <button
-            onClick={openCreateForm}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            {t("createTemplate")}
-          </button>
+          <>
+            <SyncButton queryKeys={[[...templatesKey]]} />
+            <button
+              onClick={openCreateForm}
+              className="btn btn-primary"
+            >
+              <Plus size={13} />
+              {t("createTemplate")}
+            </button>
+          </>
         }
       />
 

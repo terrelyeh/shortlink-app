@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
 import { UTMBuilder } from "./UTMBuilder";
 import { Link2, ChevronDown, ChevronUp, Loader2, Settings2, Target, AlertCircle, CheckCircle, Tag, Check, X as XIcon } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -50,6 +51,7 @@ export function CreateLinkForm() {
   const tErrors = useTranslations("errors");
   const tUtm = useTranslations("utm");
   const toast = useToast();
+  const qc = useQueryClient();
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -176,6 +178,15 @@ export function CreateLinkForm() {
         const data = await response.json();
         throw new Error(data.error || "Failed to create link");
       }
+
+      // Bust every cache touched by creating a link: the campaigns
+      // leaderboard (new campaign possibly auto-created), per-campaign
+      // link lists, the raw analytics dataset, and the utm-campaigns
+      // combobox suggestions.
+      qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
+      qc.invalidateQueries({ queryKey: ["analytics-raw"] });
+      qc.invalidateQueries({ queryKey: ["campaign-links"] });
+      qc.invalidateQueries({ queryKey: ["utm-campaigns"] });
 
       // Use replace to prevent the form page from being in browser history
       // This ensures clean navigation back to links list

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useRouter } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
 import { UTMBuilder } from "@/components/forms/UTMBuilder";
 import { TagInput } from "@/components/tags/TagInput";
 import { useToast } from "@/components/ui/Toast";
@@ -66,6 +67,7 @@ export default function EditLinkPage() {
   const tErrors = useTranslations("errors");
   const tUtm = useTranslations("utm");
   const toast = useToast();
+  const qc = useQueryClient();
 
   const linkId = params.id as string;
 
@@ -241,6 +243,14 @@ export default function EditLinkPage() {
 
       // Toast shows on the /links page after redirect (survives navigation
       // because <ToastProvider> lives in the shared dashboard layout).
+      // Editing a link can change utm_campaign (which moves it between
+      // campaigns), click routing, status, variants — anything shown on
+      // other pages. Bust the shared caches so nav back to Campaigns /
+      // Analytics doesn't show stale numbers.
+      qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
+      qc.invalidateQueries({ queryKey: ["analytics-raw"] });
+      qc.invalidateQueries({ queryKey: ["campaign-links"] });
+      qc.invalidateQueries({ queryKey: ["utm-campaigns"] });
       toast.success(t("updateSuccess"));
       router.push("/links");
     } catch (err) {

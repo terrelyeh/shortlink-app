@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { computeAnalytics, type RawAnalyticsData } from "@/lib/analytics/compute";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { useQuery } from "@tanstack/react-query";
 import { ClicksChart } from "@/components/analytics/ClicksChart";
 import { PieChartComponent } from "@/components/analytics/PieChartComponent";
 import { ShareModal } from "@/components/analytics/ShareModal";
@@ -25,6 +26,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { SyncButton } from "@/components/layout/SyncButton";
 import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
 
 interface ShortLink {
@@ -62,62 +64,49 @@ export default function AnalyticsPage() {
     searchParams.get("linkId") || "",
   );
   const [selectedTagId, setSelectedTagId] = useState<string>("");
-  const [tags, setTags] = useState<TagOption[]>([]);
-  const [links, setLinks] = useState<ShortLink[]>([]);
-  const [loadingLinks, setLoadingLinks] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<string>("performance");
 
-  useEffect(() => {
-    async function fetchTags() {
-      try {
-        const response = await fetch("/api/tags");
-        if (response.ok) {
-          const data = await response.json();
-          setTags(data.tags || []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch tags:", err);
-      }
-    }
-    fetchTags();
-  }, []);
+  const tagsKey = useMemo(() => ["tags"] as const, []);
+  const rawKey = useMemo(() => ["analytics-raw"] as const, []);
 
-  const [raw, setRaw] = useState<RawAnalyticsData | null>(null);
+  const { data: tagsData } = useQuery({
+    queryKey: tagsKey,
+    queryFn: async () => {
+      const response = await fetch("/api/tags");
+      if (!response.ok) throw new Error("Failed to fetch tags");
+      return ((await response.json()).tags || []) as TagOption[];
+    },
+  });
+  const tags = useMemo(() => tagsData ?? [], [tagsData]);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function fetchRaw() {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch("/api/analytics/raw");
-        if (!response.ok) throw new Error("Failed to fetch analytics");
-        const fresh = (await response.json()) as RawAnalyticsData;
-        if (cancelled) return;
-        setRaw(fresh);
-        setLinks(
-          fresh.links.map((l) => ({
+  const {
+    data: raw,
+    isLoading: loading,
+    error: rawError,
+  } = useQuery<RawAnalyticsData>({
+    queryKey: rawKey,
+    queryFn: async () => {
+      const response = await fetch("/api/analytics/raw");
+      if (!response.ok) throw new Error("Failed to fetch analytics");
+      return (await response.json()) as RawAnalyticsData;
+    },
+  });
+  const error = rawError ? (rawError as Error).message : null;
+
+  const links: ShortLink[] = useMemo(
+    () =>
+      raw
+        ? raw.links.map((l) => ({
             id: l.id,
             code: l.code,
             title: l.title,
             originalUrl: l.originalUrl,
-          })),
-        );
-        setLoadingLinks(false);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load data");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    fetchRaw();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+          }))
+        : [],
+    [raw],
+  );
+  const loadingLinks = loading && !raw;
 
   const { rangeStart, rangeEnd } = useMemo(() => {
     const now = new Date();
@@ -211,6 +200,7 @@ export default function AnalyticsPage() {
         description={t("description")}
         actions={
           <>
+            <SyncButton queryKeys={[[...rawKey], [...tagsKey]]} />
             <button className="btn btn-secondary" onClick={() => setShareOpen(true)}>
               <Share2 size={12} /> Share report
             </button>

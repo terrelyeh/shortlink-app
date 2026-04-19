@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/routing";
+import { useQueryClient } from "@tanstack/react-query";
 import { LinkTableRow } from "@/components/links/LinkTableRow";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -26,6 +27,7 @@ import {
 } from "lucide-react";
 import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { SyncButton } from "@/components/layout/SyncButton";
 
 interface LinkTag {
   tag: { id: string; name: string; color?: string | null };
@@ -75,6 +77,19 @@ export default function LinksClient({
   const tCommon = useTranslations("common");
   const { success, error: toastError } = useToast();
   const searchParams = useSearchParams();
+  const qc = useQueryClient();
+
+  // After any mutation on /links, the campaigns summary + the raw analytics
+  // dataset are potentially stale (click counts, lastClickAt, orphan list,
+  // etc.). Invalidating the shared React Query keys makes those pages
+  // re-fetch next time the user navigates, without making them refetch
+  // immediately.
+  const invalidateDerived = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
+    qc.invalidateQueries({ queryKey: ["analytics-raw"] });
+    qc.invalidateQueries({ queryKey: ["campaign-links"] });
+    qc.invalidateQueries({ queryKey: ["utm-campaigns"] });
+  }, [qc]);
 
   const [allLinks, setAllLinks] = useState<ShortLink[]>(initialLinks);
   const [refreshing, setRefreshing] = useState(false);
@@ -122,12 +137,15 @@ export default function LinksClient({
         const data = await response.json();
         setAllLinks(data.links || []);
       }
+      // Always invalidate derived caches on a refresh — if the user
+      // clicked Sync, they want EVERY page to see new data next nav.
+      invalidateDerived();
     } catch (err) {
       console.error("Failed to refresh links:", err);
     } finally {
       setRefreshing(false);
     }
-  }, [loadedCap]);
+  }, [loadedCap, invalidateDerived]);
 
   const links = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -166,6 +184,7 @@ export default function LinksClient({
       const response = await fetch(`/api/links/${id}`, { method: "DELETE" });
       if (response.ok) {
         setAllLinks((prev) => prev.filter((link) => link.id !== id));
+        invalidateDerived();
         success("Link deleted.");
       } else toastError("Failed to delete link.");
     } catch {
@@ -182,6 +201,7 @@ export default function LinksClient({
       });
       if (response.ok) {
         setAllLinks((prev) => prev.map((link) => (link.id === id ? { ...link, status } : link)));
+        invalidateDerived();
         success(
           status === "ACTIVE"
             ? "Link activated."

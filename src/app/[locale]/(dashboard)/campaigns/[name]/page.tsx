@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useRouter } from "@/i18n/routing";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Link2,
   MousePointerClick,
@@ -29,6 +30,7 @@ import { TrendCell, classifyTrend, type TrendState } from "@/components/analytic
 import { formatRelativeTime } from "@/lib/utils/format";
 import { computeAnalytics, type RawAnalyticsData } from "@/lib/analytics/compute";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { SyncButton } from "@/components/layout/SyncButton";
 
 interface CampaignLink {
   id: string;
@@ -56,70 +58,56 @@ export default function CampaignDetailPage() {
   const { success } = useToast();
   const campaignName = decodeURIComponent(params.name as string);
 
-  const [links, setLinks] = useState<CampaignLink[]>([]);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
+
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
 
-  const [goalClicks, setGoalClicks] = useState<number | null>(null);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
   const [goalSaving, setGoalSaving] = useState(false);
 
-  const [raw, setRaw] = useState<RawAnalyticsData | null>(null);
-  const [rawLoading, setRawLoading] = useState(true);
-
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
 
-  const fetchLinks = useCallback(async () => {
-    setLoading(true);
-    try {
+  const linksKey = useMemo(() => ["campaign-links", campaignName] as const, [campaignName]);
+  const goalKey = useMemo(() => ["campaign-goal", campaignName] as const, [campaignName]);
+  // Raw analytics are expensive to fetch (up to 2MB) and used by many
+  // pages — share the same key everywhere so only one network call
+  // happens across /analytics, /campaigns/[name], /campaigns/compare.
+  const rawKey = useMemo(() => ["analytics-raw"] as const, []);
+
+  const { data: linksData, isLoading: loading } = useQuery({
+    queryKey: linksKey,
+    queryFn: async () => {
       const response = await fetch(
         `/api/links?campaign=${encodeURIComponent(campaignName)}&limit=100&sortBy=clicks&sortOrder=desc`,
       );
+      if (!response.ok) throw new Error("Failed to load links");
       const data = await response.json();
-      setLinks(data.links || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [campaignName]);
+      return (data.links || []) as CampaignLink[];
+    },
+  });
+  const links = useMemo(() => linksData ?? [], [linksData]);
 
-  const fetchGoal = useCallback(async () => {
-    try {
+  const { data: goalData } = useQuery({
+    queryKey: goalKey,
+    queryFn: async () => {
       const response = await fetch(`/api/utm-campaigns/${encodeURIComponent(campaignName)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setGoalClicks(data.goalClicks ?? null);
-        setGoalInput(data.goalClicks ? String(data.goalClicks) : "");
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }, [campaignName]);
+      if (!response.ok) return { goalClicks: null as number | null };
+      return (await response.json()) as { goalClicks: number | null };
+    },
+  });
+  const goalClicks = goalData?.goalClicks ?? null;
 
-  const fetchRaw = useCallback(async () => {
-    setRawLoading(true);
-    try {
+  const { data: raw, isLoading: rawLoading } = useQuery<RawAnalyticsData>({
+    queryKey: rawKey,
+    queryFn: async () => {
       const response = await fetch("/api/analytics/raw");
-      if (response.ok) {
-        const data = await response.json();
-        setRaw(data);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setRawLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchLinks();
-    fetchGoal();
-    fetchRaw();
-  }, [fetchLinks, fetchGoal, fetchRaw]);
+      if (!response.ok) throw new Error("Failed to load raw analytics");
+      return (await response.json()) as RawAnalyticsData;
+    },
+  });
 
   const computed = useMemo(() => {
     if (!raw) return null;
@@ -208,7 +196,10 @@ export default function CampaignDetailPage() {
         body: JSON.stringify({ goalClicks: parsed }),
       });
       if (response.ok) {
-        setGoalClicks(parsed);
+        // Optimistic update + invalidate both the goal query and the
+        // Campaigns leaderboard so goal progress % stays consistent.
+        qc.setQueryData(goalKey, { goalClicks: parsed });
+        qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
         setEditingGoal(false);
         success("Goal saved!");
       }
@@ -228,7 +219,8 @@ export default function CampaignDetailPage() {
         body: JSON.stringify({ goalClicks: null }),
       });
       if (response.ok) {
-        setGoalClicks(null);
+        qc.setQueryData(goalKey, { goalClicks: null });
+        qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
         setGoalInput("");
         setEditingGoal(false);
         success("Goal removed.");
@@ -283,6 +275,7 @@ export default function CampaignDetailPage() {
         }
         actions={
           <>
+            <SyncButton queryKeys={[[...linksKey], [...goalKey], [...rawKey]]} />
             <button
               className="btn btn-secondary"
               onClick={copyAllLinks}

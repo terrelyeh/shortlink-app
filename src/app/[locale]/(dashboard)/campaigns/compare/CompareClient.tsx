@@ -4,9 +4,10 @@
  * /campaigns/compare?names=a,b,c — side-by-side deep comparison.
  */
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "@/i18n/routing";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Loader2,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 import { MultiCampaignChart } from "@/components/analytics/MultiCampaignChart";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { SyncButton } from "@/components/layout/SyncButton";
 import { computeAnalytics, type RawAnalyticsData } from "@/lib/analytics/compute";
 
 interface CampaignRow {
@@ -68,30 +70,30 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
 
   const [names, setNames] = useState<string[]>(initialNames);
   const [window, setWindow] = useState<string>("30d");
-  const [summary, setSummary] = useState<SummaryResponse | null>(null);
-  const [raw, setRaw] = useState<RawAnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  const fetchAll = useCallback(async () => {
-    const preset = windowPresets.find((p) => p.value === window) ?? windowPresets[1];
-    setLoading(true);
-    try {
-      const [summaryRes, rawRes] = await Promise.all([
-        fetch(`/api/analytics/campaigns-summary?days=${preset.days}`),
-        fetch(`/api/analytics/raw`),
-      ]);
-      if (summaryRes.ok) setSummary(await summaryRes.json());
-      if (rawRes.ok) setRaw(await rawRes.json());
-    } catch (err) {
-      console.error("compare fetch failed:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [window]);
+  // Share keys with other pages: campaigns-summary + analytics-raw so the
+  // leaderboard and /analytics hit the same cache entries.
+  const summaryKey = useMemo(() => ["campaigns-summary", window] as const, [window]);
+  const rawKey = useMemo(() => ["analytics-raw"] as const, []);
 
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+  const { data: summary, isLoading: summaryLoading } = useQuery<SummaryResponse>({
+    queryKey: summaryKey,
+    queryFn: async () => {
+      const preset = windowPresets.find((p) => p.value === window) ?? windowPresets[1];
+      const res = await fetch(`/api/analytics/campaigns-summary?days=${preset.days}`);
+      if (!res.ok) throw new Error("Failed to load campaigns summary");
+      return (await res.json()) as SummaryResponse;
+    },
+  });
+  const { data: raw } = useQuery<RawAnalyticsData>({
+    queryKey: rawKey,
+    queryFn: async () => {
+      const res = await fetch("/api/analytics/raw");
+      if (!res.ok) throw new Error("Failed to load raw analytics");
+      return (await res.json()) as RawAnalyticsData;
+    },
+  });
+  const loading = summaryLoading;
 
   const removeName = useCallback(
     (name: string) => {
@@ -197,17 +199,20 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
         title={`Compare ${names.length} campaigns`}
         description={`Side-by-side breakdown over the last ${days} days.`}
         actions={
-          <div className="segmented">
-            {windowPresets.map((p) => (
-              <button
-                key={p.value}
-                className={window === p.value ? "active" : ""}
-                onClick={() => setWindow(p.value)}
-              >
-                {p.value}
-              </button>
-            ))}
-          </div>
+          <>
+            <SyncButton queryKeys={[[...summaryKey], [...rawKey]]} />
+            <div className="segmented">
+              {windowPresets.map((p) => (
+                <button
+                  key={p.value}
+                  className={window === p.value ? "active" : ""}
+                  onClick={() => setWindow(p.value)}
+                >
+                  {p.value}
+                </button>
+              ))}
+            </div>
+          </>
         }
       />
 

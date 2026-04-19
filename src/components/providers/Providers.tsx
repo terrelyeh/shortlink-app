@@ -3,7 +3,10 @@
 import { SessionProvider } from "next-auth/react";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { ToastProvider } from "@/components/ui/Toast";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
 import { Session } from "next-auth";
+import { makeQueryClient } from "@/lib/query/client";
 
 interface ProvidersProps {
   children: React.ReactNode;
@@ -11,13 +14,18 @@ interface ProvidersProps {
 }
 
 export function Providers({ children, session }: ProvidersProps) {
+  // One QueryClient per browser tab — lazy-inited via useState so it
+  // survives re-renders but resets on full page reload. Do NOT lift this
+  // to module scope; that'd leak state across users in SSR edge cases.
+  const [queryClient] = useState(() => makeQueryClient());
+
   return (
     <SessionProvider session={session}>
-      <WorkspaceProvider>
-        <ToastProvider>
-          {children}
-        </ToastProvider>
-      </WorkspaceProvider>
+      <QueryClientProvider client={queryClient}>
+        <WorkspaceProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </WorkspaceProvider>
+      </QueryClientProvider>
     </SessionProvider>
   );
 }

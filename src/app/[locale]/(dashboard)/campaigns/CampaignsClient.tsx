@@ -8,9 +8,10 @@
  * daily-clicks chart and jump into /campaigns/compare for side-by-side.
  */
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/routing";
+import { useQuery } from "@tanstack/react-query";
 import {
   Megaphone,
   Search,
@@ -27,6 +28,7 @@ import {
 import { PageHeader } from "@/components/layout/PageHeader";
 import { MultiCampaignChart } from "@/components/analytics/MultiCampaignChart";
 import { TrendCell, type TrendState } from "@/components/analytics/TrendCell";
+import { SyncButton } from "@/components/layout/SyncButton";
 import { formatRelativeTime } from "@/lib/utils/format";
 
 interface CampaignRow {
@@ -103,8 +105,6 @@ export default function CampaignsClient() {
   const t = useTranslations("campaigns");
   const router = useRouter();
 
-  const [data, setData] = useState<SummaryResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [window, setWindow] = useState<string>("30d");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -120,25 +120,17 @@ export default function CampaignsClient() {
     });
   }, []);
 
-  const fetchData = useCallback(async () => {
-    const preset = windowPresets.find((p) => p.value === window) ?? windowPresets[1];
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/analytics/campaigns-summary?days=${preset.days}`);
-      if (res.ok) {
-        const json = (await res.json()) as SummaryResponse;
-        setData(json);
-      }
-    } catch (err) {
-      console.error("campaigns summary fetch failed:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [window]);
+  const queryKey = useMemo(() => ["campaigns-summary", window] as const, [window]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const { data, isLoading: loading } = useQuery<SummaryResponse>({
+    queryKey,
+    queryFn: async () => {
+      const preset = windowPresets.find((p) => p.value === window) ?? windowPresets[1];
+      const res = await fetch(`/api/analytics/campaigns-summary?days=${preset.days}`);
+      if (!res.ok) throw new Error("Failed to fetch campaigns summary");
+      return (await res.json()) as SummaryResponse;
+    },
+  });
 
   const campaigns = useMemo(() => {
     if (!data) return [];
@@ -195,6 +187,7 @@ export default function CampaignsClient() {
         description={t("subtitle")}
         actions={
           <>
+            <SyncButton queryKeys={[[...queryKey]]} />
             {selected.size >= 2 && (
               <button
                 className="btn btn-secondary"

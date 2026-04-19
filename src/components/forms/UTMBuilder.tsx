@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   UTM_MEDIUMS,
   UTM_MEDIUM_LABELS,
@@ -67,93 +68,85 @@ interface UTMBuilderProps {
   campaignLocked?: boolean; // When a Campaign entity is selected, lock the campaign field
 }
 
+type ExistingCampaign = {
+  name: string;
+  displayName: string | null;
+  status: string | null;
+  defaultSource: string | null;
+  defaultMedium: string | null;
+};
+
 export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UTMBuilderProps) {
   const t = useTranslations("utm");
-  const [templates, setTemplates] = useState<UTMTemplate[]>([]);
-  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const qc = useQueryClient();
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
 
-  // Workspace-level UTM governance (whitelist). Empty arrays = no restriction.
-  const [approvedSources, setApprovedSources] = useState<string[]>([]);
-  const [approvedMediums, setApprovedMediums] = useState<string[]>([]);
+  // All three fetches are React Query-backed. Keys are shared with the
+  // Templates page / Settings page / campaign combobox on other routes
+  // so cache hits are instant when the builder mounts after visiting
+  // those pages.
+  const { data: templatesData, isFetching: loadingTemplates } = useQuery({
+    queryKey: ["templates"],
+    queryFn: async () => {
+      const response = await fetch("/api/templates");
+      if (!response.ok) throw new Error("Failed to load templates");
+      return (await response.json()) as UTMTemplate[];
+    },
+  });
+  const templates = useMemo(() => templatesData ?? [], [templatesData]);
 
-  // Existing Campaign row names, used to populate the campaign datalist.
-  // Typing a new value still works and will auto-upsert on save (existing
-  // campaign-autolink behavior), but 99% of the time users should be
-  // picking from here to avoid typo-driven duplicates.
-  const [existingCampaigns, setExistingCampaigns] = useState<
-    {
-      name: string;
-      displayName: string | null;
-      status: string | null;
-      defaultSource: string | null;
-      defaultMedium: string | null;
-    }[]
-  >([]);
+  const { data: utmSettings } = useQuery({
+    queryKey: ["workspace-utm-settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/workspace/utm-settings");
+      if (!res.ok) return { approvedSources: [] as string[], approvedMediums: [] as string[] };
+      return (await res.json()) as { approvedSources: string[]; approvedMediums: string[] };
+    },
+  });
+  const approvedSources = useMemo(
+    () => utmSettings?.approvedSources ?? [],
+    [utmSettings],
+  );
+  const approvedMediums = useMemo(
+    () => utmSettings?.approvedMediums ?? [],
+    [utmSettings],
+  );
 
-  // Fetch templates on mount
-  useEffect(() => {
-    const fetchTemplates = async () => {
-      setLoadingTemplates(true);
-      try {
-        const response = await fetch("/api/templates");
-        if (response.ok) {
-          const data = await response.json();
-          setTemplates(data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch templates:", error);
-      } finally {
-        setLoadingTemplates(false);
-      }
-    };
-    fetchTemplates();
-  }, []);
-
-  // Fetch existing Campaign rows (exclude archived — they'd be noise in
-  // the picker). API is Redis-side-browser-cached for 30s so this is cheap.
-  useEffect(() => {
-    fetch("/api/campaigns")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data?.campaigns) return;
-        type ApiCampaign = {
-          name: string;
-          displayName: string | null;
-          status: string | null;
-          defaultSource: string | null;
-          defaultMedium: string | null;
-        };
-        setExistingCampaigns(
-          (data.campaigns as ApiCampaign[]).map((c) => ({
-            name: c.name,
-            displayName: c.displayName,
-            status: c.status,
-            defaultSource: c.defaultSource,
-            defaultMedium: c.defaultMedium,
-          })),
-        );
-      })
-      .catch(() => {
-        /* silent — picker just degrades to free-text if fetch fails */
-      });
-  }, []);
-
-  // Fetch workspace UTM governance rules once on mount. If the workspace
-  // hasn't configured them (or user isn't in a workspace), both arrays stay
-  // empty and no warnings show.
-  useEffect(() => {
-    fetch("/api/workspace/utm-settings")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data) return;
-        setApprovedSources(data.approvedSources || []);
-        setApprovedMediums(data.approvedMediums || []);
-      })
-      .catch(() => {
-        /* silent — governance is optional */
-      });
-  }, []);
+  const { data: campaignsData } = useQuery({
+    queryKey: ["utm-campaigns"],
+    queryFn: async () => {
+      const res = await fetch("/api/campaigns");
+      if (!res.ok) return { campaigns: [] as ExistingCampaign[] };
+      return (await res.json()) as { campaigns: ExistingCampaign[] };
+    },
+  });
+  // Local overlay for newly-created campaigns so the combobox shows them
+  // immediately — onCreated also invalidates the "utm-campaigns" key so
+  // the server truth takes over on the next fetch.
+  const [newlyCreated, setNewlyCreated] = useState<ExistingCampaign[]>([]);
+  const existingCampaigns = useMemo(() => {
+    const fromServer: ExistingCampaign[] = (campaignsData?.campaigns ?? []).map((c) => ({
+      name: c.name,
+      displayName: c.displayName,
+      status: c.status,
+      defaultSource: c.defaultSource,
+      defaultMedium: c.defaultMedium,
+    }));
+    const names = new Set(fromServer.map((c) => c.name));
+    for (const c of newlyCreated) if (!names.has(c.name)) fromServer.unshift(c);
+    return fromServer;
+  }, [campaignsData, newlyCreated]);
+  const setExistingCampaigns = (
+    updater: (prev: ExistingCampaign[]) => ExistingCampaign[],
+  ) => {
+    setNewlyCreated((prev) => {
+      const next = updater([...prev]);
+      const serverNames = new Set(
+        (campaignsData?.campaigns ?? []).map((c) => c.name),
+      );
+      return next.filter((c) => !serverNames.has(c.name));
+    });
+  };
 
   const sourceGovernanceWarning = useMemo(() => {
     if (approvedSources.length === 0 || !values.utmSource) return null;
@@ -344,7 +337,11 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
             value={values.utmCampaign}
             onChange={(v) => handleChange("utmCampaign", v)}
             existingCampaigns={existingCampaigns}
-            onCreated={(c) => setExistingCampaigns((prev) => [c, ...prev.filter((x) => x.name !== c.name)])}
+            onCreated={(c) => {
+              setExistingCampaigns((prev) => [c, ...prev.filter((x) => x.name !== c.name)]);
+              qc.invalidateQueries({ queryKey: ["utm-campaigns"] });
+              qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
+            }}
             readOnly={campaignLocked}
             placeholder={t("campaignPlaceholder")}
           />
