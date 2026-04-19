@@ -27,6 +27,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { resolveWorkspaceScope } from "@/lib/workspace";
 import { cached, cacheKey } from "@/lib/cache";
+import { classifyTrend, type TrendState } from "@/components/analytics/TrendCell";
 
 const DEFAULT_DAYS = 30;
 const MAX_DAYS = 90;
@@ -99,7 +100,7 @@ export async function GET(request: NextRequest) {
       // overlay chart on /campaigns. Raw SQL because Prisma groupBy
       // can't bucket by day. The breakdown stays small (links × days ≤
       // 90 ≈ a few thousand rows max) so in-memory reshaping is cheap.
-      const [windowClicks, windowConversions, dailyRaw] = linkIds.length > 0
+      const [windowClicks, windowConversions, dailyRaw, lastClicks] = linkIds.length > 0
         ? await Promise.all([
             prisma.click.groupBy({
               by: ["shortLinkId"],
@@ -123,8 +124,17 @@ export async function GET(request: NextRequest) {
               GROUP BY short_link_id, day
               ORDER BY day
             `),
+            // MAX(timestamp) for each link — NOT windowed, because the
+            // leaderboard's "last activity" column is supposed to answer
+            // "is this campaign still alive?" — a 60-day-old click is
+            // the most interesting data point when the window is 30d.
+            prisma.click.groupBy({
+              by: ["shortLinkId"],
+              where: { shortLinkId: { in: linkIds } },
+              _max: { timestamp: true },
+            }),
           ])
-        : [[], [], []];
+        : [[], [], [], []];
 
       const windowClicksMap = new Map(
         (windowClicks as { shortLinkId: string; _count: { _all: number } }[]).map((r) => [
@@ -136,6 +146,12 @@ export async function GET(request: NextRequest) {
         (windowConversions as { shortLinkId: string; _count: { _all: number } }[]).map((r) => [
           r.shortLinkId,
           r._count._all,
+        ]),
+      );
+      const lastClickMap = new Map(
+        (lastClicks as { shortLinkId: string; _max: { timestamp: Date | null } }[]).map((r) => [
+          r.shortLinkId,
+          r._max.timestamp?.toISOString() ?? null,
         ]),
       );
 
@@ -153,6 +169,9 @@ export async function GET(request: NextRequest) {
         linkCount: number;
         clicks: number;
         conversions: number;
+        // Max-of-max across this campaign's links — used for the "Last
+        // activity" column. Null when no link has ever been clicked.
+        lastClickAt: string | null;
       }
       const buckets = new Map<string, Bucket>();
       const orphanLinks: typeof links = [];
@@ -176,12 +195,17 @@ export async function GET(request: NextRequest) {
             linkCount: 0,
             clicks: 0,
             conversions: 0,
+            lastClickAt: null,
           });
         }
         const b = buckets.get(campaignName)!;
         b.linkCount += 1;
         b.clicks += windowClicksMap.get(link.id) ?? 0;
         b.conversions += windowConversionsMap.get(link.id) ?? 0;
+        const linkLast = lastClickMap.get(link.id);
+        if (linkLast && (!b.lastClickAt || linkLast > b.lastClickAt)) {
+          b.lastClickAt = linkLast;
+        }
       }
 
       const campaigns = Array.from(buckets.values())
@@ -206,6 +230,7 @@ export async function GET(request: NextRequest) {
             b.goalClicks && b.goalClicks > 0
               ? Math.min((b.clicks / b.goalClicks) * 100, 100)
               : null,
+          lastClickAt: b.lastClickAt,
         }))
         .sort((a, b) => b.clicks - a.clicks);
 
@@ -219,6 +244,7 @@ export async function GET(request: NextRequest) {
           originalUrl: l.originalUrl,
           clicks: windowClicksMap.get(l.id) ?? 0,
           conversions: windowConversionsMap.get(l.id) ?? 0,
+          lastClickAt: lastClickMap.get(l.id) ?? null,
         }))
         .sort((a, b) => b.clicks - a.clicks)
         .slice(0, ORPHAN_LIMIT);
@@ -257,13 +283,35 @@ export async function GET(request: NextRequest) {
         perCampaign[campaignName][idx] += Number(row.clicks);
       }
 
+      // Derive per-campaign 7d sparkline + trend from the same
+      // time-series data. Sparkline is the last 7 days of daily clicks;
+      // trend compares last7d vs prev7d. If the requested window is
+      // shorter than 14 days we don't have a prev-7d tail — trendState
+      // falls back to "new" / "none" accordingly via classifyTrend.
+      const campaignsWithTrend = campaigns.map((c) => {
+        const series = perCampaign[c.name] ?? [];
+        const sparkline = series.slice(-7);
+        const last7d = sparkline.reduce((s, v) => s + v, 0);
+        const prev7d =
+          series.length >= 14
+            ? series.slice(-14, -7).reduce((s, v) => s + v, 0)
+            : 0;
+        const { trendState, trendPct } = classifyTrend(last7d, prev7d);
+        return {
+          ...c,
+          sparkline,
+          trendState: trendState as TrendState,
+          trendPct,
+        };
+      });
+
       return {
-        campaigns,
+        campaigns: campaignsWithTrend,
         orphans,
         timeseries: { dates: dateAxis, perCampaign },
         meta: {
           days,
-          totalCampaigns: campaigns.length,
+          totalCampaigns: campaignsWithTrend.length,
           totalOrphans: orphanLinks.length,
           since: since.toISOString(),
         },

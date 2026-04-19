@@ -26,6 +26,8 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { MultiCampaignChart } from "@/components/analytics/MultiCampaignChart";
+import { TrendCell, type TrendState } from "@/components/analytics/TrendCell";
+import { formatRelativeTime } from "@/lib/utils/format";
 
 interface CampaignRow {
   id: string | null;
@@ -41,6 +43,10 @@ interface CampaignRow {
   cvr: number;
   goalClicks: number | null;
   goalPct: number | null;
+  lastClickAt: string | null;
+  sparkline: number[];
+  trendState: TrendState;
+  trendPct: number | null;
 }
 
 interface OrphanRow {
@@ -50,6 +56,7 @@ interface OrphanRow {
   originalUrl: string;
   clicks: number;
   conversions: number;
+  lastClickAt: string | null;
 }
 
 interface SummaryResponse {
@@ -362,9 +369,10 @@ export default function CampaignsClient() {
                 <th style={{ width: 36 }}></th>
                 <th>Campaign</th>
                 <th style={{ width: 110 }}>Status</th>
-                <th>Source / Medium</th>
                 <th className="num" style={{ width: 70 }}>Links</th>
                 <th className="num" style={{ width: 180 }}>Clicks</th>
+                <th style={{ width: 130 }} title="Daily clicks over the last 7 days">7d trend</th>
+                <th style={{ width: 110 }}>Last activity</th>
                 <th style={{ width: 130 }}>Goal</th>
               </tr>
             </thead>
@@ -423,16 +431,6 @@ export default function CampaignsClient() {
                         </span>
                       )}
                     </td>
-                    <td>
-                      {c.defaultSource || c.defaultMedium ? (
-                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                          {c.defaultSource && <span className="pill pill-source">{c.defaultSource}</span>}
-                          {c.defaultMedium && <span className="pill pill-medium">{c.defaultMedium}</span>}
-                        </div>
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
-                    </td>
                     <td className="num">{c.linkCount}</td>
                     <td className="num">
                       <div className="bar-cell">
@@ -444,6 +442,29 @@ export default function CampaignsClient() {
                         </div>
                         <span className="num">{c.clicks.toLocaleString()}</span>
                       </div>
+                    </td>
+                    <td>
+                      {c.sparkline.some((v) => v > 0) || c.trendState !== "none" ? (
+                        <TrendCell
+                          sparkline={c.sparkline}
+                          trendPct={c.trendPct}
+                          trendState={c.trendState}
+                        />
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td>
+                      {c.lastClickAt ? (
+                        <span
+                          style={{ fontSize: 13, color: "var(--ink-300)" }}
+                          title={new Date(c.lastClickAt).toLocaleString()}
+                        >
+                          {formatRelativeTime(new Date(c.lastClickAt))}
+                        </span>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
                     </td>
                     <td>
                       {c.goalPct !== null && c.goalClicks ? (
@@ -502,7 +523,9 @@ export default function CampaignsClient() {
             <thead>
               <tr>
                 <th>Link</th>
-                <th className="num" style={{ width: 120 }}>Clicks</th>
+                <th>Destination</th>
+                <th className="num" style={{ width: 90 }}>Clicks</th>
+                <th style={{ width: 110 }}>Last click</th>
                 <th style={{ width: 160 }}>Actions</th>
               </tr>
             </thead>
@@ -511,7 +534,18 @@ export default function CampaignsClient() {
                 <tr key={o.id}>
                   <td>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, fontWeight: 500, color: "var(--ink-100)" }}>
+                      <div
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 12.5,
+                          fontWeight: 500,
+                          color: "var(--ink-100)",
+                          maxWidth: 200,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {o.title || `/${o.code}`}
                       </div>
                       <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--brand-600)" }}>
@@ -519,7 +553,35 @@ export default function CampaignsClient() {
                       </div>
                     </div>
                   </td>
+                  <td>
+                    <span
+                      title={o.originalUrl}
+                      style={{
+                        fontSize: 12,
+                        color: "var(--ink-400)",
+                        maxWidth: 340,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        display: "inline-block",
+                      }}
+                    >
+                      {o.originalUrl.replace(/^https?:\/\//, "")}
+                    </span>
+                  </td>
                   <td className="num">{o.clicks.toLocaleString()}</td>
+                  <td>
+                    {o.lastClickAt ? (
+                      <span
+                        style={{ fontSize: 13, color: "var(--ink-300)" }}
+                        title={new Date(o.lastClickAt).toLocaleString()}
+                      >
+                        {formatRelativeTime(new Date(o.lastClickAt))}
+                      </span>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
                   <td>
                     <button
                       className="btn btn-ghost"

@@ -20,14 +20,13 @@ import {
   LineChart as LineChartIcon,
   Users,
   Globe2,
-  TrendingUp,
-  TrendingDown,
-  Minus,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
 import { ClicksChart } from "@/components/analytics/ClicksChart";
 import { PieChartComponent } from "@/components/analytics/PieChartComponent";
+import { TrendCell, classifyTrend, type TrendState } from "@/components/analytics/TrendCell";
+import { formatRelativeTime } from "@/lib/utils/format";
 import { computeAnalytics, type RawAnalyticsData } from "@/lib/analytics/compute";
 import { PageHeader } from "@/components/layout/PageHeader";
 
@@ -181,24 +180,12 @@ export default function CampaignDetailPage() {
         uniqueClicks: number;
         lastClickAt: Date | null;
         trendPct: number | null;
-        trendState: "up" | "down" | "flat" | "new" | "dead" | "none";
+        trendState: TrendState;
         sparkline: number[];
       }
     >();
     for (const [id, m] of acc) {
-      let trendPct: number | null = null;
-      let trendState: "up" | "down" | "flat" | "new" | "dead" | "none" = "none";
-      if (m.prev7d === 0 && m.last7d === 0) {
-        trendState = "none";
-      } else if (m.prev7d === 0 && m.last7d > 0) {
-        trendState = "new";
-      } else if (m.prev7d > 0 && m.last7d === 0) {
-        trendState = "dead";
-        trendPct = -100;
-      } else {
-        trendPct = ((m.last7d - m.prev7d) / m.prev7d) * 100;
-        trendState = trendPct > 2 ? "up" : trendPct < -2 ? "down" : "flat";
-      }
+      const { trendState, trendPct } = classifyTrend(m.last7d, m.prev7d);
       out.set(id, {
         uniqueClicks: m.uniques.size,
         lastClickAt: m.lastClickAt,
@@ -752,97 +739,6 @@ export default function CampaignDetailPage() {
         </div>
       )}
     </>
-  );
-}
-
-function formatRelativeTime(date: Date): string {
-  const diffMs = Date.now() - date.getTime();
-  const s = Math.floor(diffMs / 1000);
-  if (s < 60) return "just now";
-  const min = Math.floor(s / 60);
-  if (min < 60) return `${min}m ago`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 30) return `${d}d ago`;
-  const mo = Math.floor(d / 30);
-  return `${mo}mo ago`;
-}
-
-function TrendCell({
-  sparkline,
-  trendPct,
-  trendState,
-}: {
-  sparkline: number[];
-  trendPct: number | null;
-  trendState: "up" | "down" | "flat" | "new" | "dead" | "none";
-}) {
-  const w = 60;
-  const h = 20;
-  const max = Math.max(1, ...sparkline);
-  const step = sparkline.length > 1 ? w / (sparkline.length - 1) : 0;
-  const points = sparkline
-    .map((v, i) => `${i * step},${h - (v / max) * h}`)
-    .join(" ");
-
-  const color =
-    trendState === "up" || trendState === "new"
-      ? "var(--data-emerald)"
-      : trendState === "down" || trendState === "dead"
-        ? "var(--err-fg)"
-        : "var(--ink-400)";
-
-  const Icon =
-    trendState === "up" || trendState === "new"
-      ? TrendingUp
-      : trendState === "down" || trendState === "dead"
-        ? TrendingDown
-        : Minus;
-
-  const label =
-    trendState === "new"
-      ? "NEW"
-      : trendState === "dead"
-        ? "—100%"
-        : trendPct === null
-          ? "—"
-          : `${trendPct > 0 ? "+" : ""}${trendPct.toFixed(0)}%`;
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <svg
-        width={w}
-        height={h}
-        viewBox={`0 0 ${w} ${h}`}
-        style={{ display: "block", overflow: "visible" }}
-        aria-hidden="true"
-      >
-        <polyline
-          points={points}
-          fill="none"
-          stroke={color}
-          strokeWidth={1.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <span
-        title={trendPct !== null ? `${trendPct.toFixed(1)}% vs prev 7d` : "last 7d vs prev 7d"}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 2,
-          fontSize: 11,
-          fontWeight: 600,
-          color,
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        <Icon size={10} />
-        {label}
-      </span>
-    </div>
   );
 }
 
