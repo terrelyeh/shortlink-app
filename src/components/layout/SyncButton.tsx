@@ -58,7 +58,7 @@ export function SyncButton({ queryKeys }: { queryKeys: readonly unknown[][] }) {
       )}
       <button
         type="button"
-        className="btn btn-secondary"
+        className="btn btn-sync"
         onClick={handleSync}
         disabled={isSyncing}
         title={t("syncTooltip")}

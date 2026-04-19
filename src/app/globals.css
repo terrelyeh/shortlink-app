@@ -323,6 +323,13 @@ body {
   box-shadow: var(--shadow-xs);
 }
 .btn-secondary:hover { background: var(--bg-subtle); border-color: var(--ink-500); }
+.btn-sync {
+  background: var(--brand-50);
+  color: var(--brand-700);
+  border-color: var(--brand-100);
+  box-shadow: var(--shadow-xs);
+}
+.btn-sync:hover:not(:disabled) { background: var(--brand-100); border-color: var(--brand-500); }
 .btn-ghost { color: var(--ink-300); }
 .btn-ghost:hover { background: var(--bg-subtle); }
 .btn-danger { background: #DC2626; color: #fff; }
