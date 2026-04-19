@@ -9,9 +9,9 @@
 | 功能 | 說明 |
 |------|------|
 | **短網址管理** | 建立、編輯、刪除短連結，支援自訂代碼或自動生成 7 位 Base62 代碼 |
-| **UTM 參數建構器** | 內建 UTM 參數編輯器，預設常用來源（Facebook、Instagram、Google Ads 等） |
+| **UTM 參數建構器** | 內建 UTM 參數編輯器，預設常用來源（Facebook、Instagram、Google Ads 等）；Campaign 欄位是自訂 combobox — 輸入時下拉既有活動，找不到符合的就可以「➕ 建立新活動 'xxx'」inline 直接建立 |
 | **UTM 白名單 Governance** | Workspace 層級設定核准的 source / medium；違反時伺服器拒絕 + UI 即時警告 |
-| **UTM 模板系統** | 儲存常用 UTM 組合為模板，快速套用 |
+| **UTM 模板系統** | 儲存常用 UTM 組合為模板（通路級預設，如「EDM 週報」「FB 付費廣告」）；快速套用到新連結。**不綁定 campaign** — 同一個模板可橫跨多個活動 |
 | **批次建立（固定 URL + 多 content）** | 一次建立多個短網址變體（如多位 KOL 的追蹤連結） |
 | **CSV 匯入批次建立** | 每 row 獨立 URL / UTM / tags / 排程 / 地區限制，上限 500 row |
 | **OG 縮圖自動抓取** | 建連結後背景抓目標頁的 `og:image` / `og:title` 作為預覽縮圖 |
@@ -30,12 +30,12 @@
 | **Campaign 自動綁定** | 建連結時填 `utm_campaign` 自動建 Campaign row；填同名就綁同一個 — 使用者不用額外「建 Campaign」 |
 | **活動狀態生命週期** | Draft → Active → Completed → Archived 四階段管理 |
 | **KPI 目標追蹤** | 每個 Campaign 可設 `goalClicks` 目標，Detail 頁顯示進度條 + 達標慶祝 |
-| **活動排行榜** | Campaigns 列表顯示每個活動的 clicks / conversions / CVR / goal%，可排序 |
+| **活動排行榜** | Campaigns 列表顯示每個活動的 clicks / 7 天趨勢（sparkline + ±%）/ 最後活動時間 / goal 達成率，可排序 |
 | **多 Campaign 比較** | 列表勾選 2-4 個 → 上方顯示 daily clicks overlay 折線；進 `/campaigns/compare` 看 side-by-side 深度比較（winner cards + 每活動 top source/medium/link） |
-| **Campaign Detail 三 tabs** | Overview（KPI + 30d 趨勢）/ Traffic（來源/裝置/地區拆解）/ Links（活動內連結含 CVR） |
+| **Campaign Detail 三 tabs** | Overview（KPI + 30d 趨勢）/ Traffic（來源/裝置/地區拆解）/ Links（活動內每條連結 + 獨立訪客數 + 佔比 + 7 天趨勢 + 最後點擊） |
 | **活動標籤** | 為活動加上標籤分類，方便搜尋篩選 |
 | **跨頁面 Campaign 篩選** | 在連結、分析頁面皆可依 Campaign 篩選 |
-| **Orphan Links 提醒** | Campaigns 頁自動列出有流量但沒綁 Campaign 的連結，一鍵跳去補綁 |
+| **Orphan Links 提醒** | Campaigns 頁自動列出沒綁 Campaign 的連結（含目的網址 + 最後點擊時間），一鍵跳去補綁 |
 
 ### 數據分析
 
@@ -69,7 +69,8 @@
 
 ### 其他特色
 
-- **國際化 (i18n)** - 支援英文與繁體中文
+- **國際化 (i18n)** - 支援英文與繁體中文；UTM 參數名（`utm_source` 等）與產業縮寫（CVR / CTR / QR）刻意保留英文，對齊 GA / 外部工具
+- **切頁瞬間完成** - 所有 dashboard 頁面走 React Query client cache，第一次進站後切換 tabs 零網路延遲；每頁右上角「Sync」按鈕手動強制重抓 + 顯示「最後同步時間」
 - **響應式設計** - 適配桌面與行動裝置
 - **軟刪除** - 已刪除連結保留於資料庫，可供稽核
 - **連結生命週期** - 排程啟用（`startsAt`）/ 到期（`expiresAt`）/ 最大點擊次數（`maxClicks`）
@@ -85,19 +86,22 @@
 |------|------|
 | **框架** | Next.js 16 (App Router) + React 19 |
 | **資料庫** | PostgreSQL + Prisma 6 ORM |
-| **快取**（選配）| Upstash Redis（REST API）|
+| **Client cache** | @tanstack/react-query v5（dashboard 全面採用） |
+| **Server cache**（選配）| Upstash Redis（REST API）|
 | **認證** | NextAuth.js v5 (Google OAuth) + Email 白名單 |
-| **樣式** | Tailwind CSS 4 |
-| **圖表** | Recharts |
+| **樣式** | Tailwind CSS 4 + 自訂設計系統（Inter + JetBrains Mono） |
+| **圖表** | Recharts + 自製 SVG sparkline |
 | **國際化** | next-intl（英文 / 繁體中文）|
 | **驗證** | Zod |
 
 ### 效能架構
 
-- **Server Components + Client-side filter** — 列表頁（連結 / 活動 / 分析）由 Server Component 預先載入資料，Client Component 以 `useMemo` 做過濾、排序、聚合，切 filter 零延遲
-- **兩層快取** — 瀏覽器 `Cache-Control` + Upstash Redis（60s TTL）
+- **React Query client cache** — 所有 dashboard 頁面透過 `useQuery` 共用 in-memory cache（staleTime 5min / gcTime 30min），切頁瞬間完成；auto-refetch 全關，使用者透過「Sync」按鈕手動強制重抓
+- **Mutation 自動失效** — 建 / 改 / 刪 link、改 goal 等操作會 `invalidateQueries` 相關 keys，其他頁下次進入才重抓
+- **Client-side filter** — 列表頁以 `useMemo` 做過濾、排序、聚合，切 filter 零網路
+- **伺服器快取**（選配）— Upstash Redis 60s TTL，無 env vars 自動 no-op
 - **載入骨架** — 每個路由有 `loading.tsx`，導航當下立即顯示 skeleton
-- **Analytics raw 端點** — `/api/analytics/raw` 回傳 90 天原始點擊（上限 10,000 筆），前端用 `lib/analytics/compute.ts` 聚合
+- **Analytics raw 端點** — `/api/analytics/raw` 回傳 90 天原始點擊（上限 10,000 筆），前端用 `lib/analytics/compute.ts` 聚合；這個 payload 的 query key 在 `/analytics`、Campaign Detail、Compare 三頁共用，整 session 只抓一次
 
 ---
 
