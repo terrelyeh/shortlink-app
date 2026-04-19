@@ -15,6 +15,8 @@ import {
   X,
   Zap,
   Megaphone,
+  BookOpen,
+  ExternalLink,
 } from "lucide-react";
 import { useState } from "react";
 import { WorkspaceSwitcher } from "../workspace/WorkspaceSwitcher";
@@ -94,6 +96,17 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       })}
 
       <div className="sidebar-foot">
+        <a
+          href="https://terrelyeh.github.io/comms-docs/utm-parameters-guide.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="nav-item"
+          onClick={() => setMobileOpen(false)}
+        >
+          <BookOpen size={14} />
+          <span style={{ flex: 1 }}>{t("utmGuide")}</span>
+          <ExternalLink size={12} style={{ opacity: 0.5 }} />
+        </a>
         <div className="user-card">
           {userImage ? (
             <img
