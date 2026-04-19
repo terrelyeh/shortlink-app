@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/routing";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinkTableRow } from "@/components/links/LinkTableRow";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -59,31 +59,81 @@ interface ShortLink {
 }
 
 interface LinksClientProps {
-  initialLinks: ShortLink[];
-  initialTags: TagOption[];
   initialCampaign?: string;
-  totalLinks: number;
-  loadedCap: number;
 }
 
-export default function LinksClient({
-  initialLinks,
-  initialTags,
-  initialCampaign = "",
-  totalLinks,
-  loadedCap,
-}: LinksClientProps) {
+const LINK_CAP = 500;
+
+interface LinksPayload {
+  links: ShortLink[];
+  pagination: { total: number };
+}
+
+export default function LinksClient({ initialCampaign = "" }: LinksClientProps) {
   const t = useTranslations("links");
   const tCommon = useTranslations("common");
   const { success, error: toastError } = useToast();
   const searchParams = useSearchParams();
   const qc = useQueryClient();
 
-  // After any mutation on /links, the campaigns summary + the raw analytics
-  // dataset are potentially stale (click counts, lastClickAt, orphan list,
-  // etc.). Invalidating the shared React Query keys makes those pages
-  // re-fetch next time the user navigates, without making them refetch
-  // immediately.
+  const linksKey = useMemo(() => ["links", LINK_CAP] as const, []);
+  const tagsKey = useMemo(() => ["tags"] as const, []);
+
+  const { data: linksData, isLoading: linksLoading, isFetching: refreshing } =
+    useQuery<LinksPayload>({
+      queryKey: linksKey,
+      queryFn: async () => {
+        const response = await fetch(`/api/links?limit=${LINK_CAP}`);
+        if (!response.ok) throw new Error("Failed to load links");
+        return (await response.json()) as LinksPayload;
+      },
+    });
+  const allLinks = useMemo(() => linksData?.links ?? [], [linksData]);
+  const totalLinks = linksData?.pagination.total ?? 0;
+  const loadedCap = LINK_CAP;
+
+  const { data: tagsData } = useQuery<TagOption[]>({
+    queryKey: tagsKey,
+    queryFn: async () => {
+      const response = await fetch("/api/tags");
+      if (!response.ok) throw new Error("Failed to load tags");
+      return ((await response.json()).tags || []) as TagOption[];
+    },
+  });
+  const allTags = useMemo(() => tagsData ?? [], [tagsData]);
+
+  // Optimistic mutation helpers against the React Query cache. Avoids a
+  // second source of truth in local state — every mutation below edits
+  // the cached `LinksPayload` directly.
+  const patchLink = useCallback(
+    (id: string, patch: Partial<ShortLink>) => {
+      qc.setQueryData<LinksPayload>(linksKey, (old) =>
+        old
+          ? {
+              ...old,
+              links: old.links.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+            }
+          : old,
+      );
+    },
+    [qc, linksKey],
+  );
+  const removeLink = useCallback(
+    (id: string) => {
+      qc.setQueryData<LinksPayload>(linksKey, (old) =>
+        old
+          ? {
+              ...old,
+              links: old.links.filter((l) => l.id !== id),
+              pagination: { ...old.pagination, total: Math.max(0, old.pagination.total - 1) },
+            }
+          : old,
+      );
+    },
+    [qc, linksKey],
+  );
+
+  // After mutations, other pages' caches may be stale.
   const invalidateDerived = useCallback(() => {
     qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
     qc.invalidateQueries({ queryKey: ["analytics-raw"] });
@@ -91,12 +141,16 @@ export default function LinksClient({
     qc.invalidateQueries({ queryKey: ["utm-campaigns"] });
   }, [qc]);
 
-  const [allLinks, setAllLinks] = useState<ShortLink[]>(initialLinks);
-  const [refreshing, setRefreshing] = useState(false);
+  // Pulls fresh data for this page AND busts derived caches.
+  const refreshLinks = useCallback(async () => {
+    await qc.invalidateQueries({ queryKey: linksKey });
+    await qc.invalidateQueries({ queryKey: tagsKey });
+    invalidateDerived();
+  }, [qc, linksKey, tagsKey, invalidateDerived]);
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [tagFilter, setTagFilter] = useState("");
-  const [allTags, setAllTags] = useState<TagOption[]>(initialTags);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
   const [sortBy, setSortBy] = useState("createdAt");
@@ -111,41 +165,7 @@ export default function LinksClient({
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [batchTagLoading, setBatchTagLoading] = useState(false);
 
-  useEffect(() => {
-    async function refreshTags() {
-      try {
-        const response = await fetch("/api/tags");
-        if (response.ok) {
-          const data = await response.json();
-          setAllTags(data.tags || []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch tags:", err);
-      }
-    }
-    const tt = setTimeout(refreshTags, 500);
-    return () => clearTimeout(tt);
-  }, []);
-
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
-
-  const refreshLinks = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      const response = await fetch(`/api/links?limit=${loadedCap}`);
-      if (response.ok) {
-        const data = await response.json();
-        setAllLinks(data.links || []);
-      }
-      // Always invalidate derived caches on a refresh — if the user
-      // clicked Sync, they want EVERY page to see new data next nav.
-      invalidateDerived();
-    } catch (err) {
-      console.error("Failed to refresh links:", err);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [loadedCap, invalidateDerived]);
 
   const links = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -183,7 +203,7 @@ export default function LinksClient({
     try {
       const response = await fetch(`/api/links/${id}`, { method: "DELETE" });
       if (response.ok) {
-        setAllLinks((prev) => prev.filter((link) => link.id !== id));
+        removeLink(id);
         invalidateDerived();
         success("Link deleted.");
       } else toastError("Failed to delete link.");
@@ -200,7 +220,7 @@ export default function LinksClient({
         body: JSON.stringify({ status }),
       });
       if (response.ok) {
-        setAllLinks((prev) => prev.map((link) => (link.id === id ? { ...link, status } : link)));
+        patchLink(id, { status });
         invalidateDerived();
         success(
           status === "ACTIVE"
@@ -354,6 +374,7 @@ export default function LinksClient({
         }
         actions={
           <>
+            <SyncButton queryKeys={[[...linksKey], [...tagsKey]]} />
             <a
               href={`/api/export/links${statusFilter ? `?status=${statusFilter}` : ""}`}
               className="btn btn-secondary"
@@ -606,7 +627,11 @@ export default function LinksClient({
       )}
 
       {/* Table */}
-      {links.length === 0 ? (
+      {linksLoading && !linksData ? (
+        <div className="card" style={{ padding: 48, textAlign: "center" }}>
+          <Loader2 size={20} className="animate-spin" style={{ color: "var(--ink-500)" }} />
+        </div>
+      ) : links.length === 0 ? (
         <div className="card">
           <EmptyState
             icon={<Link2 className="w-10 h-10" />}
