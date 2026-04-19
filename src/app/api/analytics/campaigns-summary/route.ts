@@ -47,8 +47,12 @@ export async function GET(request: NextRequest) {
     const rawDays = parseInt(searchParams.get("days") || String(DEFAULT_DAYS), 10);
     const days = Math.min(Math.max(Number.isFinite(rawDays) ? rawDays : DEFAULT_DAYS, 1), MAX_DAYS);
 
+    // v2 suffix: payload shape gained sparkline / trendState / trendPct /
+    // lastClickAt fields on each campaign and orphan. Bumping the key
+    // invalidates any stale v1 payloads still cached in Redis — without
+    // it the client crashes trying to .some() on an undefined sparkline.
     const key = cacheKey(
-      "campaigns-summary",
+      "campaigns-summary-v2",
       session.user.id,
       scope.workspaceId ?? "_",
       days,

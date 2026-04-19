@@ -444,15 +444,23 @@ export default function CampaignsClient() {
                       </div>
                     </td>
                     <td>
-                      {c.sparkline.some((v) => v > 0) || c.trendState !== "none" ? (
-                        <TrendCell
-                          sparkline={c.sparkline}
-                          trendPct={c.trendPct}
-                          trendState={c.trendState}
-                        />
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
+                      {(() => {
+                        // Defensive: cached payloads from before these
+                        // fields existed may still be served by Redis on
+                        // first request after a deploy.
+                        const sparkline = c.sparkline ?? [];
+                        const trendState = c.trendState ?? "none";
+                        const trendPct = c.trendPct ?? null;
+                        return sparkline.some((v) => v > 0) || trendState !== "none" ? (
+                          <TrendCell
+                            sparkline={sparkline}
+                            trendPct={trendPct}
+                            trendState={trendState}
+                          />
+                        ) : (
+                          <span className="muted">—</span>
+                        );
+                      })()}
                     </td>
                     <td>
                       {c.lastClickAt ? (
