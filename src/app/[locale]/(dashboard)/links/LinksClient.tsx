@@ -138,16 +138,19 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
 
   // After mutations, other pages' caches may be stale.
   const invalidateDerived = useCallback(() => {
-    qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
-    qc.invalidateQueries({ queryKey: ["analytics-raw"] });
-    qc.invalidateQueries({ queryKey: ["campaign-links"] });
+    qc.invalidateQueries({ queryKey: ["campaigns-summary"], refetchType: "all" });
+    qc.invalidateQueries({ queryKey: ["analytics-raw"], refetchType: "all" });
+    qc.invalidateQueries({ queryKey: ["campaign-links"], refetchType: "all" });
     qc.invalidateQueries({ queryKey: ["utm-campaigns"] });
   }, [qc]);
 
-  // Pulls fresh data for this page AND busts derived caches.
+  // Pulls fresh data for this page AND busts derived caches. Uses
+  // `refetchType: "all"` so the refetch fires even when the observer
+  // briefly detaches — otherwise the default `refetchOnMount: false`
+  // can swallow the update and the page appears frozen.
   const refreshLinks = useCallback(async () => {
-    await qc.invalidateQueries({ queryKey: linksKey });
-    await qc.invalidateQueries({ queryKey: tagsKey });
+    await qc.invalidateQueries({ queryKey: linksKey, refetchType: "all" });
+    await qc.invalidateQueries({ queryKey: tagsKey, refetchType: "all" });
     invalidateDerived();
   }, [qc, linksKey, tagsKey, invalidateDerived]);
 
