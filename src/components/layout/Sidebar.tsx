@@ -17,6 +17,7 @@ import {
   Megaphone,
   BookOpen,
   ExternalLink,
+  HelpCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { WorkspaceSwitcher } from "../workspace/WorkspaceSwitcher";
@@ -96,6 +97,10 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       })}
 
       <div className="sidebar-foot">
+        <div className="menu-label" style={{ display: "inline-flex", alignItems: "center", gap: 4, paddingTop: 0 }}>
+          <HelpCircle size={11} style={{ opacity: 0.7 }} />
+          {t("guides")}
+        </div>
         <a
           href="https://terrelyeh.github.io/comms-docs/shortlink-tool-guide.html"
           target="_blank"
@@ -118,7 +123,7 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
           <span style={{ flex: 1 }}>{t("utmGuide")}</span>
           <ExternalLink size={12} style={{ opacity: 0.5 }} />
         </a>
-        <div className="user-card">
+        <div className="user-card" style={{ marginTop: 12 }}>
           {userImage ? (
             <img
               src={userImage}

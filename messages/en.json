@@ -56,7 +56,8 @@
     "signOut": "Sign Out",
     "menu": "Menu",
     "utmGuide": "UTM Guide",
-    "toolGuide": "Tool Guide"
+    "toolGuide": "Tool Guide",
+    "guides": "Guides"
   },
   "dashboard": {
     "title": "Dashboard",
