@@ -39,6 +39,8 @@ interface LinkTableRowProps {
     startsAt?: string | null;
     allowedCountries?: string[];
     utmCampaign?: string | null;
+    utmMedium?: string | null;
+    utmSource?: string | null;
     clicksLast7d?: number;
     trendPct?: number | null;
     ogImage?: string | null;
@@ -228,6 +230,24 @@ export function LinkTableRow({
           )}
         </td>
 
+        {/* Medium */}
+        <td className="py-2.5 pr-3">
+          {link.utmMedium ? (
+            <code className="text-[11px] text-slate-600 font-medium">{link.utmMedium}</code>
+          ) : (
+            <span className="text-[11px] text-slate-300">—</span>
+          )}
+        </td>
+
+        {/* Source */}
+        <td className="py-2.5 pr-3">
+          {link.utmSource ? (
+            <code className="text-[11px] text-slate-600 font-medium">{link.utmSource}</code>
+          ) : (
+            <span className="text-[11px] text-slate-300">—</span>
+          )}
+        </td>
+
         {/* Short URL + Copy */}
         <td className="py-2 pr-3 whitespace-nowrap">
           <div className="flex items-center gap-1">
@@ -355,7 +375,7 @@ export function LinkTableRow({
       {/* QR Code expandable row */}
       {showQR && (
         <tr className="border-b border-slate-50 bg-slate-50/30">
-          <td colSpan={9} className="px-4 py-4">
+          <td colSpan={11} className="px-4 py-4">
             <div className="flex items-center gap-4">
               <div className="p-2 bg-white rounded-lg border border-slate-200">
                 <QRCodeCanvas

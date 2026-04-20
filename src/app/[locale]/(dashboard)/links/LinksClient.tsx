@@ -50,6 +50,8 @@ interface ShortLink {
   startsAt?: string | null;
   allowedCountries?: string[];
   utmCampaign?: string | null;
+  utmMedium?: string | null;
+  utmSource?: string | null;
   clicksLast7d?: number;
   trendPct?: number | null;
   ogImage?: string | null;
@@ -71,6 +73,7 @@ interface LinksPayload {
 
 export default function LinksClient({ initialCampaign = "" }: LinksClientProps) {
   const t = useTranslations("links");
+  const tUtm = useTranslations("utm");
   const tCommon = useTranslations("common");
   const { success, error: toastError } = useToast();
   const searchParams = useSearchParams();
@@ -654,6 +657,8 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
                 </th>
                 <th>{t("title")}</th>
                 <th style={{ width: 160 }}>Campaign</th>
+                <th style={{ width: 100 }}>{tUtm("medium")}</th>
+                <th style={{ width: 110 }}>{tUtm("source")}</th>
                 <th style={{ width: 140 }}>{t("shortUrl")}</th>
                 <th style={{ width: 120 }}>{t("tags")}</th>
                 <th style={{ width: 100 }}>{t("status")}</th>

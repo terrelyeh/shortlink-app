@@ -179,13 +179,14 @@ export function CreateLinkForm() {
         throw new Error(data.error || "Failed to create link");
       }
 
-      // Bust every cache touched by creating a link: the campaigns
-      // leaderboard (new campaign possibly auto-created), per-campaign
-      // link lists, the raw analytics dataset, and the utm-campaigns
-      // combobox suggestions.
-      qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
-      qc.invalidateQueries({ queryKey: ["analytics-raw"] });
-      qc.invalidateQueries({ queryKey: ["campaign-links"] });
+      // Bust every cache touched by creating a link. `refetchType: "all"`
+      // forces refetch of inactive queries too, so when the user lands on
+      // /links right after, the list already has the new row (otherwise
+      // our `refetchOnMount: false` default serves stale cache).
+      qc.invalidateQueries({ queryKey: ["links"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["campaigns-summary"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["analytics-raw"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["campaign-links"], refetchType: "all" });
       qc.invalidateQueries({ queryKey: ["utm-campaigns"] });
 
       // Use replace to prevent the form page from being in browser history
