@@ -24,6 +24,7 @@ import {
   MousePointerClick,
   Flag,
   SlidersHorizontal,
+  X,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { MultiCampaignChart } from "@/components/analytics/MultiCampaignChart";
@@ -265,6 +266,17 @@ export default function CampaignsClient() {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("searchPlaceholder")}
           />
+          {searchQuery && (
+            <button
+              type="button"
+              className="search-clear"
+              onClick={() => setSearchQuery("")}
+              aria-label={tCommon("clear")}
+              title={tCommon("clear")}
+            >
+              <X size={12} />
+            </button>
+          )}
         </div>
         <div style={{ flex: 1 }} />
         <div className="chip-row">

@@ -24,6 +24,7 @@ import {
   ArrowUpDown,
   ChevronDown,
   FileSpreadsheet,
+  X,
 } from "lucide-react";
 import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -409,6 +410,17 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
             onChange={(e) => setSearch(e.target.value)}
             placeholder={tCommon("search")}
           />
+          {search && (
+            <button
+              type="button"
+              className="search-clear"
+              onClick={() => setSearch("")}
+              aria-label={tCommon("clear")}
+              title={tCommon("clear")}
+            >
+              <X size={12} />
+            </button>
+          )}
         </div>
         <CampaignFilter value={campaignFilter} onChange={setCampaignFilter} showNoCampaign />
         <div className="chip-row">
