@@ -91,7 +91,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   color: var(--ink-200);
   background: var(--bg-app);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.55;
 }
 
@@ -336,14 +336,20 @@ body {
 .btn-danger:hover { background: #B91C1C; }
 .btn-lg { height: 42px; padding: 0 22px; font-size: 14px; }
 
-/* ---------- Cards ---------- */
+/* ---------- Cards ----------
+   Stronger block presence: deeper border + stacked shadow so cards pop
+   against --bg-app. Bumped padding gives tighter content more breathing
+   room, which is the real complaint when the list looks "糊糊的".
+*/
 .card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-xs);
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.04),
+    0 4px 12px rgba(16, 24, 40, 0.035);
 }
-.card-padded { padding: 18px 20px; }
+.card-padded { padding: 24px 28px; }
 
 /* ---------- KPI tiles ---------- */
 .kpi-row {
@@ -368,7 +374,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--ink-400);
   text-transform: uppercase;
@@ -377,7 +383,7 @@ body {
 }
 .kpi-label svg { opacity: 0.8; }
 .kpi-value {
-  font-size: 30px;
+  font-size: 36px;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--ink-100);
@@ -390,7 +396,7 @@ body {
   align-items: center;
   gap: 6px;
   margin-top: 8px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--ink-400);
 }
 .kpi-sub strong { color: var(--ink-200); font-weight: 500; }
@@ -565,23 +571,23 @@ body {
 table.data {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 14.5px;
 }
 table.data thead th {
   text-align: left;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--ink-500);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  padding: 12px 18px;
+  padding: 14px 18px;
   background: #FAFBFC;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 table.data thead th.num { text-align: right; }
 table.data tbody td {
-  padding: 14px 18px;
+  padding: 16px 18px;
   border-bottom: 1px solid var(--border);
   color: var(--ink-200);
   vertical-align: middle;
@@ -593,7 +599,7 @@ table.data td.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
   font-family: var(--font-mono);
-  font-size: 13.5px;
+  font-size: 14px;
 }
 table.data td.muted { color: var(--ink-500); }
 .campaign-name {
