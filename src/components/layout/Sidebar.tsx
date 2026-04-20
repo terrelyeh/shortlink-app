@@ -97,6 +97,17 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
 
       <div className="sidebar-foot">
         <a
+          href="https://terrelyeh.github.io/comms-docs/shortlink-tool-guide.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="nav-item"
+          onClick={() => setMobileOpen(false)}
+        >
+          <BookOpen size={14} />
+          <span style={{ flex: 1 }}>{t("toolGuide")}</span>
+          <ExternalLink size={12} style={{ opacity: 0.5 }} />
+        </a>
+        <a
           href="https://terrelyeh.github.io/comms-docs/utm-parameters-guide.html"
           target="_blank"
           rel="noopener noreferrer"

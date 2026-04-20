@@ -55,7 +55,8 @@
     "auditLog": "Audit Log",
     "signOut": "Sign Out",
     "menu": "Menu",
-    "utmGuide": "UTM Guide"
+    "utmGuide": "UTM Guide",
+    "toolGuide": "Tool Guide"
   },
   "dashboard": {
     "title": "Dashboard",

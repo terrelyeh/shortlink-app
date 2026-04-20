@@ -56,7 +56,8 @@
     "auditLog": "操作紀錄",
     "signOut": "登出",
     "menu": "選單",
-    "utmGuide": "UTM 使用指南"
+    "utmGuide": "UTM 使用指南",
+    "toolGuide": "工具操作指南"
   },
   "dashboard": {
     "title": "儀表板",
