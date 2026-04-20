@@ -152,9 +152,10 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
           target="_blank"
           rel="noopener noreferrer"
           className="nav-item"
+          style={{ fontSize: 13, padding: "7px 12px" }}
           onClick={() => setMobileOpen(false)}
         >
-          <BookOpen size={14} />
+          <BookOpen size={13} />
           <span style={{ flex: 1 }}>{t("toolGuide")}</span>
           <ExternalLink size={12} style={{ opacity: 0.5 }} />
         </a>
@@ -163,9 +164,10 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
           target="_blank"
           rel="noopener noreferrer"
           className="nav-item"
+          style={{ fontSize: 13, padding: "7px 12px" }}
           onClick={() => setMobileOpen(false)}
         >
-          <BookOpen size={14} />
+          <BookOpen size={13} />
           <span style={{ flex: 1 }}>{t("utmGuide")}</span>
           <ExternalLink size={12} style={{ opacity: 0.5 }} />
         </a>
