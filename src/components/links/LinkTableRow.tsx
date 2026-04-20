@@ -233,7 +233,7 @@ export function LinkTableRow({
         {/* Medium */}
         <td className="py-2.5 pr-3">
           {link.utmMedium ? (
-            <code className="text-[11px] text-slate-600 font-medium">{link.utmMedium}</code>
+            <span className="pill pill-medium">{link.utmMedium}</span>
           ) : (
             <span className="text-[11px] text-slate-300">—</span>
           )}
@@ -242,7 +242,7 @@ export function LinkTableRow({
         {/* Source */}
         <td className="py-2.5 pr-3">
           {link.utmSource ? (
-            <code className="text-[11px] text-slate-600 font-medium">{link.utmSource}</code>
+            <span className="pill pill-source">{link.utmSource}</span>
           ) : (
             <span className="text-[11px] text-slate-300">—</span>
           )}

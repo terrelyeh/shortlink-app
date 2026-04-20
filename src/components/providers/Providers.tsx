@@ -7,6 +7,13 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { Session } from "next-auth";
 import { makeQueryClient } from "@/lib/query/client";
+import { installWorkspaceFetch } from "@/lib/fetch-workspace";
+
+// Patch window.fetch to inject the current workspace id header on
+// same-origin /api/* calls. Run at module load (top of the client
+// bundle) so it's in place before any provider's mount effect fires
+// its first request.
+installWorkspaceFetch();
 
 interface ProvidersProps {
   children: React.ReactNode;
