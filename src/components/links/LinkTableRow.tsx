@@ -185,10 +185,10 @@ export function LinkTableRow({
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-900 truncate" title={link.ogTitle ?? undefined}>
+              <p className="text-[15px] font-semibold text-slate-900 truncate" title={link.ogTitle ?? undefined}>
                 {link.title || `/${link.code}`}
               </p>
-              <p className="text-[11px] text-slate-400 truncate" title={link.originalUrl}>
+              <p className="text-[12.5px] text-slate-400 truncate" title={link.originalUrl}>
                 {link.originalUrl.replace(/^https?:\/\/(www\.)?/, "").substring(0, 50)}
               </p>
               {/* Schedule / geo indicators — these affect whether the link
@@ -197,7 +197,7 @@ export function LinkTableRow({
                 <div className="flex items-center gap-2 mt-1">
                   {link.startsAt && new Date(link.startsAt) > new Date() && (
                     <span
-                      className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-100"
+                      className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-100"
                       title={`Starts ${new Date(link.startsAt).toLocaleString()}`}
                     >
                       <CalendarClock className="w-2.5 h-2.5" />
@@ -206,7 +206,7 @@ export function LinkTableRow({
                   )}
                   {link.allowedCountries && link.allowedCountries.length > 0 && (
                     <span
-                      className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-100"
+                      className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-100"
                       title={`Restricted to: ${link.allowedCountries.join(", ")}`}
                     >
                       <Globe2 className="w-2.5 h-2.5" />
@@ -226,7 +226,7 @@ export function LinkTableRow({
           {link.utmCampaign ? (
             <Badge label={link.utmCampaign} variant="campaign" />
           ) : (
-            <span className="text-[11px] text-slate-300">—</span>
+            <span className="text-[13px] text-slate-300">—</span>
           )}
         </td>
 
@@ -235,7 +235,7 @@ export function LinkTableRow({
           {link.utmMedium ? (
             <span className="pill pill-medium">{link.utmMedium}</span>
           ) : (
-            <span className="text-[11px] text-slate-300">—</span>
+            <span className="text-[13px] text-slate-300">—</span>
           )}
         </td>
 
@@ -244,14 +244,14 @@ export function LinkTableRow({
           {link.utmSource ? (
             <span className="pill pill-source">{link.utmSource}</span>
           ) : (
-            <span className="text-[11px] text-slate-300">—</span>
+            <span className="text-[13px] text-slate-300">—</span>
           )}
         </td>
 
         {/* Short URL + Copy */}
         <td className="py-2 pr-3 whitespace-nowrap">
           <div className="flex items-center gap-1">
-            <code className="text-[11px] text-[#03A9F4] font-medium">/{link.code}</code>
+            <code className="text-[13px] text-[#03A9F4] font-medium">/{link.code}</code>
             <button
               onClick={copyToClipboard}
               className="p-1 rounded hover:bg-slate-100 transition-colors"
@@ -274,7 +274,7 @@ export function LinkTableRow({
                 <Badge key={tag.id} label={tag.name} variant="tag" color={tag.color} />
               ))}
               {link.tags.length > 2 && (
-                <span className="text-[10px] text-slate-400">+{link.tags.length - 2}</span>
+                <span className="text-[11px] text-slate-400">+{link.tags.length - 2}</span>
               )}
             </div>
           )}
@@ -282,7 +282,7 @@ export function LinkTableRow({
 
         {/* Status */}
         <td className="py-2 pr-3 whitespace-nowrap">
-          <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+          <span className="inline-flex items-center gap-1.5 text-[13px] text-slate-500">
             <StatusDot status={link.status} />
             {statusLabel}
           </span>
@@ -290,11 +290,11 @@ export function LinkTableRow({
 
         {/* Clicks + 7d trend */}
         <td className="py-2 pr-3 text-right whitespace-nowrap">
-          <span className="text-sm font-medium text-slate-900 tabular-nums">
+          <span className="text-[15px] font-medium text-slate-900 tabular-nums">
             {link._count.clicks.toLocaleString()}
           </span>
           {hasTrend && trendPct !== 0 && (
-            <div className={`flex items-center justify-end gap-0.5 text-[10px] font-medium ${trendPct! > 0 ? "text-emerald-600" : "text-red-500"}`}>
+            <div className={`flex items-center justify-end gap-0.5 text-[11px] font-medium ${trendPct! > 0 ? "text-emerald-600" : "text-red-500"}`}>
               {trendPct! > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
               {Math.abs(trendPct!)}%
             </div>
