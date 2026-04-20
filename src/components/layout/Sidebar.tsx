@@ -97,33 +97,7 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       })}
 
       <div className="sidebar-foot">
-        <div className="menu-label" style={{ display: "inline-flex", alignItems: "center", gap: 4, paddingTop: 0 }}>
-          <HelpCircle size={11} style={{ opacity: 0.7 }} />
-          {t("guides")}
-        </div>
-        <a
-          href="https://terrelyeh.github.io/comms-docs/shortlink-tool-guide.html"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="nav-item"
-          onClick={() => setMobileOpen(false)}
-        >
-          <BookOpen size={14} />
-          <span style={{ flex: 1 }}>{t("toolGuide")}</span>
-          <ExternalLink size={12} style={{ opacity: 0.5 }} />
-        </a>
-        <a
-          href="https://terrelyeh.github.io/comms-docs/utm-parameters-guide.html"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="nav-item"
-          onClick={() => setMobileOpen(false)}
-        >
-          <BookOpen size={14} />
-          <span style={{ flex: 1 }}>{t("utmGuide")}</span>
-          <ExternalLink size={12} style={{ opacity: 0.5 }} />
-        </a>
-        <div className="user-card" style={{ marginTop: 12 }}>
+        <div className="user-card">
           {userImage ? (
             <img
               src={userImage}
@@ -158,6 +132,43 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
           <LogOut size={14} />
           <span>{t("signOut")}</span>
         </button>
+
+        <div
+          className="menu-label"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: "1px solid var(--border-dark)",
+          }}
+        >
+          <HelpCircle size={11} style={{ opacity: 0.7 }} />
+          {t("guides")}
+        </div>
+        <a
+          href="https://terrelyeh.github.io/comms-docs/shortlink-tool-guide.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="nav-item"
+          onClick={() => setMobileOpen(false)}
+        >
+          <BookOpen size={14} />
+          <span style={{ flex: 1 }}>{t("toolGuide")}</span>
+          <ExternalLink size={12} style={{ opacity: 0.5 }} />
+        </a>
+        <a
+          href="https://terrelyeh.github.io/comms-docs/utm-parameters-guide.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="nav-item"
+          onClick={() => setMobileOpen(false)}
+        >
+          <BookOpen size={14} />
+          <span style={{ flex: 1 }}>{t("utmGuide")}</span>
+          <ExternalLink size={12} style={{ opacity: 0.5 }} />
+        </a>
       </div>
     </aside>
   );
