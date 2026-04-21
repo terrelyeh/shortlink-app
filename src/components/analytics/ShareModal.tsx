@@ -1,17 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { X, Link2, Copy, Check, Eye, EyeOff, Loader2, Share2 } from "lucide-react";
+import { X, Link2, Copy, Check, Eye, EyeOff, Loader2, Share2, AlertCircle } from "lucide-react";
 
 interface ShareModalProps {
     isOpen: boolean;
     onClose: () => void;
+    /** Required — backend only supports per-link share tokens today. If
+     *  missing, the modal shows an inline warning and disables the
+     *  generate button. (campaignFilter / dateRange kept in the props
+     *  shape for future expansion, not wired to the API yet.) */
     linkId?: string;
     campaignFilter?: string;
     dateRange?: string;
 }
 
-export function ShareModal({ isOpen, onClose, linkId, campaignFilter, dateRange }: ShareModalProps) {
+export function ShareModal({ isOpen, onClose, linkId }: ShareModalProps) {
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [expiresInDays, setExpiresInDays] = useState("7");
@@ -19,20 +23,24 @@ export function ShareModal({ isOpen, onClose, linkId, campaignFilter, dateRange 
     const [loading, setLoading] = useState(false);
     const [shareUrl, setShareUrl] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     const handleCreate = async () => {
+        if (!linkId) {
+            setErrorMsg("Please select a specific link on the Analytics filter first — per-campaign / date-range share is not supported yet.");
+            return;
+        }
+        setErrorMsg(null);
         setLoading(true);
         try {
             const expiresAt = new Date();
             expiresAt.setDate(expiresAt.getDate() + parseInt(expiresInDays || "7"));
 
             const body: Record<string, unknown> = {
+                shortLinkId: linkId,
                 expiresAt: expiresAt.toISOString(),
                 ...(password && { password }),
                 ...(maxViews && { maxViews: parseInt(maxViews) }),
-                ...(linkId && { linkId }),
-                ...(campaignFilter && { campaign: campaignFilter }),
-                ...(dateRange && { dateRange }),
             };
 
             const res = await fetch("/api/share", {
@@ -45,9 +53,17 @@ export function ShareModal({ isOpen, onClose, linkId, campaignFilter, dateRange 
                 const data = await res.json();
                 const baseUrl = window.location.origin;
                 setShareUrl(`${baseUrl}/share/${data.token}`);
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                setErrorMsg(
+                    typeof errData.error === "string"
+                        ? errData.error
+                        : `Failed to create share link (HTTP ${res.status}).`
+                );
             }
         } catch (err) {
             console.error("Failed to create share link:", err);
+            setErrorMsg("Network error — please try again.");
         } finally {
             setLoading(false);
         }
@@ -65,6 +81,7 @@ export function ShareModal({ isOpen, onClose, linkId, campaignFilter, dateRange 
         setPassword("");
         setMaxViews("");
         setExpiresInDays("7");
+        setErrorMsg(null);
         onClose();
     };
 
@@ -158,10 +175,26 @@ export function ShareModal({ isOpen, onClose, linkId, campaignFilter, dateRange 
                             />
                         </div>
 
+                        {errorMsg && (
+                            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-100 rounded-lg">
+                                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                                <p className="text-xs text-red-700 leading-relaxed">{errorMsg}</p>
+                            </div>
+                        )}
+
+                        {!linkId && (
+                            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-lg">
+                                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <p className="text-xs text-amber-700 leading-relaxed">
+                                    Select a specific link from the Analytics filter first — share tokens are per-link today.
+                                </p>
+                            </div>
+                        )}
+
                         <button
                             onClick={handleCreate}
-                            disabled={loading}
-                            className="w-full py-2.5 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                            disabled={loading || !linkId}
+                            className="w-full py-2.5 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
                             Generate Share Link
