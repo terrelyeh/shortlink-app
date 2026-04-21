@@ -62,7 +62,13 @@ export async function GET(
           gt: new Date(),
         },
       },
-      include: {
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        token: true, // client uses this to build the /invite/<token> URL
+        createdAt: true,
+        expiresAt: true,
         invitedBy: {
           select: {
             id: true,
@@ -207,9 +213,13 @@ export async function POST(
       },
     });
 
-    // TODO: Send invitation email
-    // For now, just return the invitation with the invite URL
-    const inviteUrl = `${process.env.NEXTAUTH_URL || ""}/invite/${token}`;
+    // We don't run our own email server — the inviter copies this URL
+    // and sends it via their preferred channel (Slack / email / etc.).
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXTAUTH_URL ||
+      new URL(request.url).origin;
+    const inviteUrl = `${baseUrl}/invite/${token}`;
 
     return NextResponse.json(
       {

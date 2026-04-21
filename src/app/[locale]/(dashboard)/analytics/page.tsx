@@ -638,9 +638,17 @@ export default function AnalyticsPage() {
                       <Users size={12} /> {t("uniqueClicks")}
                     </div>
                     <div className="kpi-value">{data.summary.uniqueVisitors.toLocaleString()}</div>
-                    <div className="kpi-sub">
-                      {data.summary.uniqueVisitors} unique visitors
-                    </div>
+                    {data.summary.totalClicks > 0 && (
+                      <div className="kpi-sub">
+                        {t("ofTotalClicks", {
+                          pct: (
+                            (data.summary.uniqueVisitors /
+                              data.summary.totalClicks) *
+                            100
+                          ).toFixed(1),
+                        })}
+                      </div>
+                    )}
                   </div>
                   <div className="kpi">
                     <div className="kpi-label">
@@ -651,7 +659,6 @@ export default function AnalyticsPage() {
                         ? `${((data.summary.uniqueVisitors / data.summary.totalClicks) * 100).toFixed(1)}%`
                         : "0%"}
                     </div>
-                    <div className="kpi-sub">above average</div>
                   </div>
                 </div>
                 <div className="card card-padded">

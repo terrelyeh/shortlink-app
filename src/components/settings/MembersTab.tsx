@@ -39,6 +39,7 @@ interface Invitation {
   id: string;
   email: string;
   role: WorkspaceRole;
+  token: string; // used to build /invite/<token>
   createdAt: string;
   expiresAt: string;
   invitedBy: {
@@ -149,7 +150,19 @@ export function MembersTab() {
         throw new Error(data.error || "Failed to send invitation");
       }
 
-      setInviteSuccess(t("invitationSent", { email: inviteEmail }));
+      // We don't send emails — copy the generated invite URL to the
+      // clipboard so the inviter can share it via their channel of choice.
+      const generatedUrl: string | undefined = data?.invitation?.inviteUrl;
+      if (generatedUrl) {
+        try {
+          await navigator.clipboard.writeText(generatedUrl);
+        } catch {
+          /* clipboard may be blocked; the link is still visible in the
+             pending-invitations table below for manual copy. */
+        }
+      }
+
+      setInviteSuccess(t("invitationLinkCopied", { email: inviteEmail }));
       setInviteEmail("");
       setInviteRole("MEMBER");
 
@@ -162,7 +175,7 @@ export function MembersTab() {
       setTimeout(() => {
         setInviteSuccess(null);
         setShowInviteForm(false);
-      }, 2000);
+      }, 3500);
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : "Failed to send invitation");
     } finally {
@@ -236,10 +249,10 @@ export function MembersTab() {
     }
   };
 
-  const copyInviteLink = (invitationId: string) => {
-    const inviteUrl = `${window.location.origin}/invite/${invitationId}`;
+  const copyInviteLink = (invitation: { id: string; token: string }) => {
+    const inviteUrl = `${window.location.origin}/invite/${invitation.token}`;
     navigator.clipboard.writeText(inviteUrl);
-    setCopiedInviteLink(invitationId);
+    setCopiedInviteLink(invitation.id);
     setTimeout(() => setCopiedInviteLink(null), 2000);
   };
 
@@ -391,7 +404,7 @@ export function MembersTab() {
                           {t(`roles.${invitation.role}`)}
                         </span>
                         <span>
-                          Invited by {invitation.invitedBy.name || invitation.invitedBy.email}
+                          {t("invitedBy", { name: invitation.invitedBy.name || invitation.invitedBy.email })}
                         </span>
                       </div>
                     </div>
@@ -399,7 +412,7 @@ export function MembersTab() {
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => copyInviteLink(invitation.id)}
+                      onClick={() => copyInviteLink(invitation)}
                       className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
                       title={t("copyInviteLink")}
                     >

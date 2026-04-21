@@ -8,7 +8,6 @@ import {
   FileText,
   BarChart3,
   Settings,
-  Users,
   ClipboardList,
   LogOut,
   Menu,
@@ -45,7 +44,6 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
     { href: "/links", labelKey: "links", icon: <Link2 size={15} /> },
     { href: "/analytics", labelKey: "analytics", icon: <BarChart3 size={15} /> },
     { href: "/templates", labelKey: "templates", icon: <FileText size={15} /> },
-    { href: "/users", labelKey: "users", icon: <Users size={15} />, roles: ["ADMIN"] },
     {
       href: "/audit-log",
       labelKey: "auditLog",
