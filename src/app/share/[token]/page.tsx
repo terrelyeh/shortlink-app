@@ -16,18 +16,58 @@ import {
 } from "recharts";
 import { Lock, Loader2, AlertCircle, BarChart3 } from "lucide-react";
 
+interface ScopeDescriptor {
+  type: "link" | "campaign" | "range";
+  shortLinkCode: string | null;
+  shortLinkTitle: string | null;
+  shortLinkCreatedAt: string | null;
+  campaignName: string | null;
+  rangeWindow: string | null;
+}
+
 interface AnalyticsData {
+  scope?: ScopeDescriptor;
   link: {
     code: string;
     title: string | null;
     createdAt: string;
-  };
+  } | null;
   analytics: {
     totalClicks: number;
     clicksByDay: { date: string; clicks: number }[];
     devices: { name: string; value: number }[];
     browsers: { name: string; value: number }[];
     countries: { name: string; value: number }[];
+  };
+}
+
+function describeScope(scope?: ScopeDescriptor, fallback?: AnalyticsData["link"]) {
+  if (!scope) {
+    return {
+      title: fallback?.title || (fallback ? `/${fallback.code}` : "Shared Report"),
+      subtitle: "Analytics Report — Last 30 Days",
+    };
+  }
+
+  const rangeLabel = scope.rangeWindow
+    ? `Last ${scope.rangeWindow.replace("d", " days")}`
+    : "All time";
+
+  if (scope.type === "link") {
+    return {
+      title: scope.shortLinkTitle || `/${scope.shortLinkCode ?? ""}`,
+      subtitle: `Link Analytics — ${rangeLabel === "All time" ? "Last 30 Days" : rangeLabel}`,
+    };
+  }
+  if (scope.type === "campaign") {
+    return {
+      title: scope.campaignName ?? "Campaign",
+      subtitle: `Campaign Analytics — ${rangeLabel}`,
+    };
+  }
+  return {
+    title: "Workspace Overview",
+    subtitle: `Workspace Analytics — ${rangeLabel}`,
   };
 }
 
@@ -158,15 +198,18 @@ export default function SharedReportPage({
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center gap-3 mb-2">
-            <BarChart3 className="w-6 h-6 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">
-              {data.link.title || `/${data.link.code}`}
-            </h1>
-          </div>
-          <p className="text-gray-500">
-            Analytics Report - Last 30 Days
-          </p>
+          {(() => {
+            const desc = describeScope(data.scope, data.link);
+            return (
+              <>
+                <div className="flex items-center gap-3 mb-2">
+                  <BarChart3 className="w-6 h-6 text-blue-600" />
+                  <h1 className="text-2xl font-bold text-gray-900">{desc.title}</h1>
+                </div>
+                <p className="text-gray-500">{desc.subtitle}</p>
+              </>
+            );
+          })()}
         </div>
 
         {/* Total Clicks */}

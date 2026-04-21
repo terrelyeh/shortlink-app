@@ -122,6 +122,7 @@ model Workspace {
   templates   UTMTemplate[]
   tags        Tag[]
   campaignTags CampaignTag[]
+  shareTokens ShareToken[]
 
   @@map("workspaces")
 }
@@ -475,18 +476,35 @@ model UTMTemplate {
 
 model ShareToken {
   id          String    @id @default(cuid())
-  shortLinkId String    @map("short_link_id")
   token       String    @unique
+
+  // Scope — at least one of these defines what the share token exposes:
+  //   - shortLinkId only   → single link analytics
+  //   - campaignName only  → whole-campaign dashboard (within workspace)
+  //   - rangeWindow only   → workspace-wide dashboard for a rolling window
+  //   - combinations also allowed (e.g. "this campaign, last 30 days")
+  shortLinkId   String?   @map("short_link_id")
+  campaignName  String?   @map("campaign_name")
+  rangeWindow   String?   @map("range_window") // "7d" | "14d" | "30d" | "90d"
+
+  // Workspace boundary — required for campaign / range scope so cross-
+  // workspace data never leaks. For link scope we derive it from the
+  // link, but denormalise here for cheaper lookups.
+  workspaceId   String?   @map("workspace_id")
+
   password    String?   // Optional bcrypt hashed password
   expiresAt   DateTime?
   maxViews    Int?
   viewCount   Int       @default(0)
   createdAt   DateTime  @default(now())
+  createdById String?   @map("created_by_id")
 
-  shortLink ShortLink @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
+  shortLink ShortLink? @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([token])
   @@index([shortLinkId])
+  @@index([workspaceId])
   @@map("share_tokens")
 }
 

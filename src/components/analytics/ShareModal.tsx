@@ -6,16 +6,17 @@ import { X, Link2, Copy, Check, Eye, EyeOff, Loader2, Share2, AlertCircle } from
 interface ShareModalProps {
     isOpen: boolean;
     onClose: () => void;
-    /** Required — backend only supports per-link share tokens today. If
-     *  missing, the modal shows an inline warning and disables the
-     *  generate button. (campaignFilter / dateRange kept in the props
-     *  shape for future expansion, not wired to the API yet.) */
+    /** Scope selectors — pass at least one. */
     linkId?: string;
     campaignFilter?: string;
+    /** Range window string like "7d" / "30d". */
     dateRange?: string;
 }
 
-export function ShareModal({ isOpen, onClose, linkId }: ShareModalProps) {
+/** Whitelist accepted by the backend so typos don't silently 400. */
+const ALLOWED_RANGE_WINDOWS = new Set(["7d", "14d", "30d", "90d"]);
+
+export function ShareModal({ isOpen, onClose, linkId, campaignFilter, dateRange }: ShareModalProps) {
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [expiresInDays, setExpiresInDays] = useState("7");
@@ -25,9 +26,20 @@ export function ShareModal({ isOpen, onClose, linkId }: ShareModalProps) {
     const [copied, setCopied] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+    const normalisedRange = dateRange && ALLOWED_RANGE_WINDOWS.has(dateRange) ? dateRange : undefined;
+    const hasScope = Boolean(linkId || campaignFilter || normalisedRange);
+
+    const scopeLabel = linkId
+        ? "this specific link"
+        : campaignFilter
+            ? `campaign "${campaignFilter}"`
+            : normalisedRange
+                ? `last ${normalisedRange}`
+                : "—";
+
     const handleCreate = async () => {
-        if (!linkId) {
-            setErrorMsg("Please select a specific link on the Analytics filter first — per-campaign / date-range share is not supported yet.");
+        if (!hasScope) {
+            setErrorMsg("Select a link, a campaign, or a date range before generating the share link.");
             return;
         }
         setErrorMsg(null);
@@ -37,8 +49,10 @@ export function ShareModal({ isOpen, onClose, linkId }: ShareModalProps) {
             expiresAt.setDate(expiresAt.getDate() + parseInt(expiresInDays || "7"));
 
             const body: Record<string, unknown> = {
-                shortLinkId: linkId,
                 expiresAt: expiresAt.toISOString(),
+                ...(linkId && { shortLinkId: linkId }),
+                ...(campaignFilter && { campaignName: campaignFilter }),
+                ...(normalisedRange && { rangeWindow: normalisedRange }),
                 ...(password && { password }),
                 ...(maxViews && { maxViews: parseInt(maxViews) }),
             };
@@ -182,18 +196,25 @@ export function ShareModal({ isOpen, onClose, linkId }: ShareModalProps) {
                             </div>
                         )}
 
-                        {!linkId && (
+                        {hasScope ? (
+                            <div className="flex items-start gap-2 p-3 bg-sky-50 border border-sky-100 rounded-lg">
+                                <AlertCircle className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+                                <p className="text-xs text-sky-700 leading-relaxed">
+                                    Sharing: <span className="font-semibold">{scopeLabel}</span>
+                                </p>
+                            </div>
+                        ) : (
                             <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-lg">
                                 <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                                 <p className="text-xs text-amber-700 leading-relaxed">
-                                    Select a specific link from the Analytics filter first — share tokens are per-link today.
+                                    Apply a link / campaign / date-range filter before generating a share token.
                                 </p>
                             </div>
                         )}
 
                         <button
                             onClick={handleCreate}
-                            disabled={loading || !linkId}
+                            disabled={loading || !hasScope}
                             className="w-full py-2.5 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
