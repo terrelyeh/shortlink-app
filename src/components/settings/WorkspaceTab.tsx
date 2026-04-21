@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslations } from "next-intl";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
   Loader2,
@@ -30,12 +31,29 @@ export function WorkspaceTab() {
   const workspaceId = currentWorkspace?.id;
   const t = useTranslations("workspace");
   const tCommon = useTranslations("common");
+  const qc = useQueryClient();
 
-  const [workspace, setWorkspace] = useState<WorkspaceData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const workspaceKey = useMemo(
+    () => ["workspace-details", workspaceId] as const,
+    [workspaceId],
+  );
 
-  // Form state
+  const workspaceQuery = useQuery<{ workspace: WorkspaceData }, Error>({
+    queryKey: workspaceKey,
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${workspaceId}`);
+      if (!res.ok) throw new Error("Failed to load workspace");
+      return res.json();
+    },
+  });
+
+  const workspace = workspaceQuery.data?.workspace ?? null;
+  const isLoading = workspaceQuery.isLoading;
+  const error = workspaceQuery.error?.message ?? null;
+
+  // Form state — seeded from the query result once it lands. Separate
+  // from the query cache because the user edits it in place.
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
@@ -43,34 +61,15 @@ export function WorkspaceTab() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const canEdit = hasPermission("manage");
-
-  const fetchWorkspace = useCallback(async () => {
-    if (!workspaceId) return;
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const response = await fetch(`/api/workspaces/${workspaceId}`);
-      if (!response.ok) {
-        throw new Error("Failed to load workspace");
-      }
-
-      const data = await response.json();
-      setWorkspace(data.workspace);
-      setName(data.workspace.name);
-      setSlug(data.workspace.slug);
-      setDescription(data.workspace.description || "");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load workspace");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [workspaceId]);
-
   useEffect(() => {
-    fetchWorkspace();
-  }, [fetchWorkspace]);
+    if (workspace) {
+      setName(workspace.name);
+      setSlug(workspace.slug);
+      setDescription(workspace.description || "");
+    }
+  }, [workspace]);
+
+  const canEdit = hasPermission("manage");
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,7 +105,13 @@ export function WorkspaceTab() {
       }
 
       const data = await response.json();
-      setWorkspace(prev => prev ? { ...prev, ...data.workspace } : null);
+      // Patch the React Query cache so the in-place form reflects the
+      // saved values + the rest of the app sees the updated name/slug
+      // on next read.
+      qc.setQueryData<{ workspace: WorkspaceData }>(workspaceKey, (prev) =>
+        prev ? { workspace: { ...prev.workspace, ...data.workspace } } : prev,
+      );
+      qc.invalidateQueries({ queryKey: workspaceKey, refetchType: "all" });
       setSaveSuccess(true);
       await refreshWorkspaces();
 

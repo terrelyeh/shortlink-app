@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
   Users,
@@ -68,11 +69,56 @@ export function MembersTab() {
   const workspaceId = currentWorkspace?.id;
   const t = useTranslations("workspace");
   const tCommon = useTranslations("common");
+  const qc = useQueryClient();
 
-  const [members, setMembers] = useState<Member[]>([]);
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Shared query keys — every mutation in this tab should invalidate
+  // the matching one so the next render sees fresh data, and so cross-
+  // tab consumers (e.g. workspace-details count) stay aligned.
+  const membersKey = useMemo(
+    () => ["workspace-members", workspaceId] as const,
+    [workspaceId],
+  );
+  const invitationsKey = useMemo(
+    () => ["workspace-invitations", workspaceId] as const,
+    [workspaceId],
+  );
+
+  const membersQuery = useQuery<{ members: Member[] }, Error>({
+    queryKey: membersKey,
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${workspaceId}/members`);
+      if (!res.ok) throw new Error("Failed to load members");
+      return res.json();
+    },
+  });
+
+  const invitationsQuery = useQuery<{ invitations: Invitation[] }, Error>({
+    queryKey: invitationsKey,
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${workspaceId}/invitations`);
+      if (!res.ok) throw new Error("Failed to load invitations");
+      return res.json();
+    },
+  });
+
+  const members = membersQuery.data?.members ?? [];
+  const invitations = invitationsQuery.data?.invitations ?? [];
+  const isLoading = membersQuery.isLoading || invitationsQuery.isLoading;
+  const error = membersQuery.error?.message || invitationsQuery.error?.message || null;
+
+  const invalidateMembers = () => {
+    qc.invalidateQueries({ queryKey: membersKey, refetchType: "all" });
+    // Member add/remove changes workspace _count.members shown in
+    // WorkspaceTab's stats tiles — keep them in sync.
+    qc.invalidateQueries({
+      queryKey: ["workspace-details", workspaceId],
+      refetchType: "all",
+    });
+  };
+  const invalidateInvitations = () =>
+    qc.invalidateQueries({ queryKey: invitationsKey, refetchType: "all" });
 
   // Invite form state
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -90,37 +136,6 @@ export function MembersTab() {
 
   const canManage = hasPermission("manage");
   const isOwner = currentWorkspace?.role === "OWNER";
-
-  const fetchData = useCallback(async () => {
-    if (!workspaceId) return;
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const [membersRes, invitationsRes] = await Promise.all([
-        fetch(`/api/workspaces/${workspaceId}/members`),
-        fetch(`/api/workspaces/${workspaceId}/invitations`),
-      ]);
-
-      if (membersRes.ok) {
-        const membersData = await membersRes.json();
-        setMembers(membersData.members);
-      }
-
-      if (invitationsRes.ok) {
-        const invitationsData = await invitationsRes.json();
-        setInvitations(invitationsData.invitations);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load data");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [workspaceId]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,11 +181,7 @@ export function MembersTab() {
       setInviteEmail("");
       setInviteRole("MEMBER");
 
-      const invitationsRes = await fetch(`/api/workspaces/${workspaceId}/invitations`);
-      if (invitationsRes.ok) {
-        const invitationsData = await invitationsRes.json();
-        setInvitations(invitationsData.invitations);
-      }
+      await invalidateInvitations();
 
       setTimeout(() => {
         setInviteSuccess(null);
@@ -197,9 +208,19 @@ export function MembersTab() {
         throw new Error(data.error || "Failed to change role");
       }
 
-      setMembers(members.map(m =>
-        m.id === memberId ? { ...m, role: newRole } : m
-      ));
+      // Optimistically patch the cache so the UI updates without a
+      // round-trip; background invalidate keeps it honest.
+      qc.setQueryData<{ members: Member[] }>(membersKey, (prev) =>
+        prev
+          ? {
+              ...prev,
+              members: prev.members.map((m) =>
+                m.id === memberId ? { ...m, role: newRole } : m,
+              ),
+            }
+          : prev,
+      );
+      invalidateMembers();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to change role");
     } finally {
@@ -223,7 +244,10 @@ export function MembersTab() {
         throw new Error(data.error || "Failed to remove member");
       }
 
-      setMembers(members.filter(m => m.id !== memberId));
+      qc.setQueryData<{ members: Member[] }>(membersKey, (prev) =>
+        prev ? { ...prev, members: prev.members.filter((m) => m.id !== memberId) } : prev,
+      );
+      invalidateMembers();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to remove member");
     } finally {
@@ -243,7 +267,12 @@ export function MembersTab() {
         throw new Error("Failed to cancel invitation");
       }
 
-      setInvitations(invitations.filter(inv => inv.id !== invitationId));
+      qc.setQueryData<{ invitations: Invitation[] }>(invitationsKey, (prev) =>
+        prev
+          ? { ...prev, invitations: prev.invitations.filter((inv) => inv.id !== invitationId) }
+          : prev,
+      );
+      invalidateInvitations();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to cancel invitation");
     }
