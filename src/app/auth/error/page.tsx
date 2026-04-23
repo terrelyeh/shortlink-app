@@ -6,7 +6,8 @@ import { Suspense } from "react";
 
 const errorMessages: Record<string, string> = {
   Configuration: "There is a problem with the server configuration.",
-  AccessDenied: "You do not have permission to sign in.",
+  AccessDenied:
+    "Your Google account isn't on the invitation list. Ask a workspace owner or admin to send you an invite link, then sign in again.",
   Verification: "The verification link has expired or has already been used.",
   Default: "An error occurred during authentication.",
 };

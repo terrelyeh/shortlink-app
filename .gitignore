@@ -41,3 +41,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .claude/
+
+# Supabase CLI (local link cache — not for commit)
+supabase/.temp/
