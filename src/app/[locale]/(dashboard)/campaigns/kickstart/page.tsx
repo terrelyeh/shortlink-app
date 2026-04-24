@@ -28,6 +28,8 @@ import {
   Info,
   ArrowRight,
   Layers,
+  Copy as CopyIcon,
+  Plus,
 } from "lucide-react";
 import {
   PLAYBOOKS,
@@ -105,7 +107,7 @@ export default function KickstartPage() {
     setRows(
       p.channels.map((c) => ({
         ...c,
-        include: true,
+        include: c.defaultInclude ?? true,
         title: channelText(p.id, c.id, "label", c.label),
       })),
     );
@@ -118,6 +120,63 @@ export default function KickstartPage() {
 
   const removeRow = (id: string) => {
     setRows((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  /**
+   * Duplicate a row and insert it just after the source. Useful when
+   * you need more than the playbook's default count — e.g. 3 EDMs
+   * instead of 2. Appends a suffix to utm_content + title so the new
+   * row starts distinct (user can edit freely).
+   */
+  const duplicateRow = (id: string) => {
+    setRows((prev) => {
+      const idx = prev.findIndex((r) => r.id === id);
+      if (idx === -1) return prev;
+      const src = prev[idx];
+      const siblings = prev.filter(
+        (r) =>
+          r.utmSource === src.utmSource && r.utmMedium === src.utmMedium,
+      );
+      const nextIndex = siblings.length + 1;
+      const suffix = `_v${nextIndex}`;
+      const clone: PlanRow = {
+        ...src,
+        id: `${src.id}_${crypto.randomUUID().slice(0, 8)}`,
+        include: true,
+        // Only append suffix if content doesn't already end in _vN, so
+        // repeated dupes don't stack up (_v2_v2_v2).
+        utmContent: /_v\d+$/.test(src.utmContent)
+          ? src.utmContent.replace(/_v\d+$/, suffix)
+          : `${src.utmContent}${suffix}`,
+        title: `${src.title} (copy)`,
+        hint: undefined,
+      };
+      const next = [...prev];
+      next.splice(idx + 1, 0, clone);
+      return next;
+    });
+  };
+
+  /**
+   * Blank row for channels that aren't in the playbook (e.g. adding
+   * an unexpected Twitter/X post). User fills every field.
+   */
+  const addBlankRow = () => {
+    if (!selected) return;
+    const id = `custom_${crypto.randomUUID().slice(0, 8)}`;
+    setRows((prev) => [
+      ...prev,
+      {
+        id,
+        label: "",
+        utmSource: "",
+        utmMedium: "",
+        utmContent: "",
+        include: true,
+        title: "",
+        hint: undefined,
+      },
+    ]);
   };
 
   const canonicalCampaign = utmCampaign
@@ -546,7 +605,7 @@ export default function KickstartPage() {
                       helpBody={t("kickstartContentHelpBody")}
                     />
                   </th>
-                  <th style={{ width: 40 }}></th>
+                  <th style={{ width: 72 }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -665,20 +724,40 @@ export default function KickstartPage() {
                         onChange={(v) => updateRow(row.id, { utmContent: v })}
                       />
                       <td>
-                        <button
-                          onClick={() => removeRow(row.id)}
-                          className="btn btn-ghost"
-                          title="Remove"
-                          style={{ padding: "4px 6px", height: 30 }}
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                        <div style={{ display: "flex", gap: 2 }}>
+                          <button
+                            onClick={() => duplicateRow(row.id)}
+                            className="btn btn-ghost"
+                            title={t("kickstartRowDuplicate")}
+                            style={{ padding: "4px 6px", height: 30 }}
+                          >
+                            <CopyIcon size={12} />
+                          </button>
+                          <button
+                            onClick={() => removeRow(row.id)}
+                            className="btn btn-ghost"
+                            title={t("kickstartRowRemove")}
+                            style={{ padding: "4px 6px", height: 30 }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+
+            <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-start" }}>
+              <button
+                className="btn btn-secondary"
+                onClick={addBlankRow}
+                title={t("kickstartAddBlankRowHint")}
+              >
+                <Plus size={13} /> {t("kickstartAddBlankRow")}
+              </button>
+            </div>
           </div>
 
           {!allSuccess && (

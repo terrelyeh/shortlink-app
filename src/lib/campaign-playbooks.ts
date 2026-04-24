@@ -18,6 +18,12 @@ export interface PlaybookChannel {
   utmContent: string;
   /** Optional inline hint (e.g. "A/B variant"). */
   hint?: string;
+  /**
+   * Whether the row starts checked in the wizard. Defaults to true.
+   * Set false for paid-media rows (LinkedIn Ads / Google Ads) — those
+   * tend to be set up separately and are not part of every launch.
+   */
+  defaultInclude?: boolean;
 }
 
 export interface Playbook {
@@ -107,6 +113,7 @@ const PRODUCT_LAUNCH: Playbook = {
       utmSource: "linkedin",
       utmMedium: "cpc",
       utmContent: "li_ads",
+      defaultInclude: false,
     },
     {
       id: "google_ads",
@@ -114,6 +121,7 @@ const PRODUCT_LAUNCH: Playbook = {
       utmSource: "google",
       utmMedium: "cpc",
       utmContent: "google_ads",
+      defaultInclude: false,
     },
   ],
 };
@@ -191,6 +199,7 @@ const EXHIBITION_EVENT: Playbook = {
       utmSource: "linkedin",
       utmMedium: "cpc",
       utmContent: "li_ads",
+      defaultInclude: false,
     },
     {
       id: "google_ads_event",
@@ -198,6 +207,7 @@ const EXHIBITION_EVENT: Playbook = {
       utmSource: "google",
       utmMedium: "cpc",
       utmContent: "google_ads",
+      defaultInclude: false,
     },
   ],
 };
