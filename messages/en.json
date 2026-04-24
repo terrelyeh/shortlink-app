@@ -363,6 +363,7 @@
     },
     "howItWorks": "Campaigns are created automatically when you add UTM campaign parameters to a link. Create a link with UTM parameters to start tracking.",
     "createLinkWithUTM": "Create link with UTM",
+    "kickstart": "Kickstart",
     "searchPlaceholder": "Search campaigns...",
     "allStatuses": "All Statuses",
     "allTags": "All Tags",

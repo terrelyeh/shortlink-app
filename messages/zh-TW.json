@@ -364,6 +364,7 @@
     },
     "howItWorks": "當您在連結中加入 UTM 活動參數時，系統會自動建立行銷活動。建立帶有 UTM 參數的連結即可開始追蹤。",
     "createLinkWithUTM": "建立帶有 UTM 的連結",
+    "kickstart": "活動啟動器",
     "searchPlaceholder": "搜尋活動...",
     "allStatuses": "所有狀態",
     "allTags": "所有標籤",

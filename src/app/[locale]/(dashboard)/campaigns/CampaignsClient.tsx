@@ -25,6 +25,7 @@ import {
   Flag,
   SlidersHorizontal,
   X,
+  Rocket,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { MultiCampaignChart } from "@/components/analytics/MultiCampaignChart";
@@ -204,6 +205,13 @@ export default function CampaignsClient() {
                 <SlidersHorizontal size={13} /> {t("compareN", { n: selected.size })}
               </button>
             )}
+            <button
+              className="btn btn-secondary"
+              onClick={() => router.push("/campaigns/kickstart")}
+              title="Spin up a full campaign's worth of tracked links from a playbook"
+            >
+              <Rocket size={13} /> {t("kickstart")}
+            </button>
             <button className="btn btn-primary" onClick={() => router.push("/links/new")}>
               <Plus size={13} /> {t("createLinkWithUTM")}
             </button>
