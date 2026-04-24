@@ -393,7 +393,7 @@
     "kickstartStep3Help": "Each row becomes one short link. Short codes are auto-generated. Source / medium / content values have specific meanings — see the ? icons on the column headers for examples.",
     "kickstartStep3Selected": "{included} of {total} selected",
     "kickstartStep3SelectedWithExisting": "{included} of {total} selected · {existing} already exist",
-    "kickstartColChannel": "Channel",
+    "kickstartColChannel": "Title",
     "kickstartSourceHelpTitle": "Who sent them.",
     "kickstartSourceHelpBody": "The specific platform or mailing list — e.g. facebook, google, newsletter, intercom.",
     "kickstartMediumHelpTitle": "How they got here.",
