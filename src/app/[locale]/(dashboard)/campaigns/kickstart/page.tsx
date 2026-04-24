@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/routing";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -51,6 +52,7 @@ const UTM_GUIDE_URL =
   "https://terrelyeh.github.io/comms-docs/utm-parameters-guide.html";
 
 export default function KickstartPage() {
+  const t = useTranslations("campaigns");
   const router = useRouter();
   const qc = useQueryClient();
 
@@ -67,13 +69,44 @@ export default function KickstartPage() {
   const [creating, setCreating] = useState(false);
   const [results, setResults] = useState<RowResult[] | null>(null);
 
+  // Resolve localized label / hint for a playbook channel. Falls back
+  // to the English default baked into campaign-playbooks.ts if the
+  // i18n key doesn't exist (next-intl doesn't have built-in defaults).
+  const channelText = (
+    playbookId: string,
+    channelId: string,
+    field: "label" | "hint",
+    fallback: string,
+  ): string => {
+    try {
+      const v = t(
+        `kickstartPlaybooks.${playbookId}.channels.${channelId}.${field}` as never,
+      );
+      return v || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const playbookText = (
+    playbookId: string,
+    field: "name" | "description",
+    fallback: string,
+  ): string => {
+    try {
+      return t(`kickstartPlaybooks.${playbookId}.${field}` as never) || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
   const pickPlaybook = (p: Playbook) => {
     setSelectedId(p.id);
     setRows(
       p.channels.map((c) => ({
         ...c,
         include: true,
-        title: c.label,
+        title: channelText(p.id, c.id, "label", c.label),
       })),
     );
     setResults(null);
@@ -93,11 +126,6 @@ export default function KickstartPage() {
     .replace(/[^a-z0-9_\-]/g, "_")
     .replace(/_+/g, "_");
 
-  // --- Existing-campaign detection ---------------------------------
-  // If the user types a utm_campaign value that already exists in the
-  // workspace, we look up its current links so we can show which
-  // channels are done vs missing. This turns Kickstart into an
-  // "extend existing campaign" flow, not just a new-campaign wizard.
   const existingLinksQuery = useQuery<{
     links: Array<{
       id: string;
@@ -118,7 +146,6 @@ export default function KickstartPage() {
     },
   });
 
-  // Map of "source|medium|content" → existing short code for O(1) lookup.
   const existingCombo = useMemo(() => {
     const map = new Map<string, string>();
     for (const l of existingLinksQuery.data?.links ?? []) {
@@ -131,9 +158,6 @@ export default function KickstartPage() {
   const existingLinkCount = existingLinksQuery.data?.links.length ?? 0;
   const isExtending = existingLinkCount > 0;
 
-  // Auto-uncheck rows whose UTM combo already exists — but only once
-  // per (selected playbook × canonicalCampaign) pair, so we don't
-  // stomp on the user's manual re-check mid-edit.
   const autoUncheckedKeyRef = useRef<string>("");
   useEffect(() => {
     const key = `${selectedId ?? ""}|${canonicalCampaign}`;
@@ -175,8 +199,6 @@ export default function KickstartPage() {
     setCreating(true);
     const batch: RowResult[] = [];
 
-    // Sequential — simpler, and avoids racing the short-code uniqueness
-    // generator on the server side.
     for (const row of includedRows) {
       try {
         const res = await fetch("/api/links", {
@@ -226,8 +248,8 @@ export default function KickstartPage() {
   return (
     <div className="stack" style={{ gap: 24 }}>
       <PageHeader
-        title="Campaign Kickstart"
-        description="Pick a playbook, fill the basics, and spin up every channel's tracked link in one go."
+        title={t("kickstartTitle")}
+        description={t("kickstartDescription")}
         actions={
           <>
             <a
@@ -236,29 +258,28 @@ export default function KickstartPage() {
               rel="noopener noreferrer"
               className="btn btn-secondary"
             >
-              <BookOpen size={13} /> UTM Guide
+              <BookOpen size={13} /> {t("kickstartUtmGuide")}
             </a>
             <button
               className="btn btn-secondary"
               onClick={() => router.push("/campaigns")}
             >
-              <ChevronLeft size={13} /> Back
+              <ChevronLeft size={13} /> {t("kickstartBack")}
             </button>
           </>
         }
       />
 
-      {/* Orientation — first-time users land here and need to know why
-          this page exists and when NOT to use it. */}
-      <Orientation />
+      <Orientation t={t} />
 
-      {/* Step 1 — playbook picker */}
       <div className="card card-padded">
         <SectionHead
           number="1"
-          title="Pick a playbook"
-          helpTitle="A playbook is the typical channel mix for a campaign type."
-          help="Every row in the playbook becomes one short link — all of them share your landing URL + utm_campaign, but each has its own source / medium / content so you can later compare which channel drove the most traffic."
+          title={t("kickstartStep1Title")}
+          helpTitle={t("kickstartStep1HelpTitle")}
+          help={t("kickstartStep1Help")}
+          whyShow={t("kickstartWhyShow")}
+          whyHide={t("kickstartWhyHide")}
         />
 
         <div
@@ -298,7 +319,7 @@ export default function KickstartPage() {
                       color: active ? "var(--brand-700)" : "var(--ink-100)",
                     }}
                   >
-                    {p.name}
+                    {playbookText(p.id, "name", p.name)}
                   </div>
                 </div>
                 <p
@@ -309,7 +330,7 @@ export default function KickstartPage() {
                     lineHeight: 1.55,
                   }}
                 >
-                  {p.description}
+                  {playbookText(p.id, "description", p.description)}
                 </p>
                 <div
                   style={{
@@ -318,16 +339,10 @@ export default function KickstartPage() {
                     color: "var(--ink-500)",
                   }}
                 >
-                  {p.channels.length} channels · hint:{" "}
-                  <code
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 11.5,
-                      color: "var(--ink-300)",
-                    }}
-                  >
-                    {p.campaignHint}
-                  </code>
+                  {t("kickstartPlaybookChannels", {
+                    count: p.channels.length,
+                    hint: p.campaignHint,
+                  })}
                 </div>
               </button>
             );
@@ -337,21 +352,14 @@ export default function KickstartPage() {
 
       {selected && (
         <>
-          {/* Step 2 — basics */}
           <div className="card card-padded">
             <SectionHead
               number="2"
-              title="Campaign basics"
-              helpTitle="These two fields apply to every link in this campaign."
-              help={
-                <>
-                  <strong>utm_campaign</strong> is the id that groups all
-                  links under one campaign in your Analytics — keep it
-                  short, lowercase, underscored (we auto-normalize). The
-                  <strong> landing URL</strong> is the page all these
-                  links will redirect to.
-                </>
-              }
+              title={t("kickstartStep2Title")}
+              helpTitle={t("kickstartStep2HelpTitle")}
+              help={t("kickstartStep2Help")}
+              whyShow={t("kickstartWhyShow")}
+              whyHide={t("kickstartWhyHide")}
             />
 
             <div
@@ -372,7 +380,8 @@ export default function KickstartPage() {
                     marginBottom: 6,
                   }}
                 >
-                  utm_campaign <span style={{ color: "var(--err-fg)" }}>*</span>
+                  {t("kickstartStep2UtmCampaignLabel")}{" "}
+                  <span style={{ color: "var(--err-fg)" }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -394,7 +403,7 @@ export default function KickstartPage() {
                       color: "var(--ink-500)",
                     }}
                   >
-                    Saved as{" "}
+                    {t("kickstartStep2SavedAs")}{" "}
                     <code
                       style={{
                         fontFamily: "var(--font-mono)",
@@ -410,12 +419,13 @@ export default function KickstartPage() {
                     style={{
                       marginTop: 6,
                       fontSize: 11.5,
-                      color: "var(--data-violet, #7C3AED)",
+                      color: "#7C3AED",
                       fontWeight: 500,
                     }}
                   >
-                    This campaign already exists ({existingLinkCount} link
-                    {existingLinkCount === 1 ? "" : "s"}) — see banner below.
+                    {t("kickstartStep2AlreadyExists", {
+                      count: existingLinkCount,
+                    })}
                   </p>
                 )}
               </div>
@@ -430,7 +440,8 @@ export default function KickstartPage() {
                     marginBottom: 6,
                   }}
                 >
-                  Landing URL <span style={{ color: "var(--err-fg)" }}>*</span>
+                  {t("kickstartStep2LandingLabel")}{" "}
+                  <span style={{ color: "var(--err-fg)" }}>*</span>
                 </label>
                 <input
                   type="url"
@@ -444,13 +455,12 @@ export default function KickstartPage() {
             </div>
           </div>
 
-          {/* Extending-existing banner */}
           {isExtending && (
             <div
               className="card card-padded"
               style={{
-                background: "var(--violet-50, #F5F3FF)",
-                borderColor: "var(--data-violet, #7C3AED)",
+                background: "#F5F3FF",
+                borderColor: "#7C3AED",
               }}
             >
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
@@ -464,7 +474,7 @@ export default function KickstartPage() {
                       color: "#5B21B6",
                     }}
                   >
-                    Extending an existing campaign
+                    {t("kickstartExtendingHeading")}
                   </h3>
                   <p
                     style={{
@@ -474,93 +484,66 @@ export default function KickstartPage() {
                       lineHeight: 1.65,
                     }}
                   >
-                    <code
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        color: "#5B21B6",
-                      }}
-                    >
-                      {canonicalCampaign}
-                    </code>{" "}
-                    already has <strong>{existingLinkCount}</strong> link
-                    {existingLinkCount === 1 ? "" : "s"}. Rows matching an
-                    existing channel have been unchecked — they already
-                    exist. Only the checked rows will be added.
+                    {t.rich("kickstartExtendingBody", {
+                      campaign: canonicalCampaign,
+                      count: existingLinkCount,
+                    })}
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 3 — channel table */}
           <div className="card card-padded">
             <div className="row-between" style={{ alignItems: "flex-start" }}>
               <SectionHead
                 number="3"
-                title="Channel plan"
-                helpTitle="Uncheck rows you don't need, or tweak the UTM values per row."
-                help={
-                  <>
-                    Each row becomes one short link. Short codes are
-                    auto-generated. Source / medium / content values
-                    have specific meanings — see the{" "}
-                    <em>?</em> icons on the column headers for examples.
-                  </>
-                }
+                title={t("kickstartStep3Title")}
+                helpTitle={t("kickstartStep3HelpTitle")}
+                help={t("kickstartStep3Help")}
+                whyShow={t("kickstartWhyShow")}
+                whyHide={t("kickstartWhyHide")}
               />
               <span
                 style={{ fontSize: 11.5, color: "var(--ink-500)", marginTop: 4 }}
               >
-                {includedRows.length} of {rows.length} selected
-                {isExtending && ` · ${existingLinkCount} already exist`}
+                {isExtending
+                  ? t("kickstartStep3SelectedWithExisting", {
+                      included: includedRows.length,
+                      total: rows.length,
+                      existing: existingLinkCount,
+                    })
+                  : t("kickstartStep3Selected", {
+                      included: includedRows.length,
+                      total: rows.length,
+                    })}
               </span>
             </div>
 
-            <table
-              className="data"
-              style={{ fontSize: 13, marginTop: 16 }}
-            >
+            <table className="data" style={{ fontSize: 13, marginTop: 16 }}>
               <thead>
                 <tr>
                   <th style={{ width: 40 }}></th>
-                  <th style={{ minWidth: 180 }}>Channel</th>
+                  <th style={{ minWidth: 180 }}>{t("kickstartColChannel")}</th>
                   <th>
                     <HeaderWithHelp
                       label="source"
-                      help={
-                        <>
-                          <strong>Who sent them.</strong> The specific
-                          platform or mailing list — e.g. <code>facebook</code>,{" "}
-                          <code>google</code>, <code>newsletter</code>,{" "}
-                          <code>intercom</code>.
-                        </>
-                      }
+                      helpTitle={t("kickstartSourceHelpTitle")}
+                      helpBody={t("kickstartSourceHelpBody")}
                     />
                   </th>
                   <th>
                     <HeaderWithHelp
                       label="medium"
-                      help={
-                        <>
-                          <strong>How they got here.</strong> The traffic
-                          type — e.g. <code>email</code>, <code>social</code>,{" "}
-                          <code>cpc</code> (paid), <code>referral</code>.
-                        </>
-                      }
+                      helpTitle={t("kickstartMediumHelpTitle")}
+                      helpBody={t("kickstartMediumHelpBody")}
                     />
                   </th>
                   <th>
                     <HeaderWithHelp
                       label="content"
-                      help={
-                        <>
-                          <strong>Which creative.</strong> Distinguishes
-                          different posts / emails / ads within the same
-                          source+medium — e.g.{" "}
-                          <code>edm_headline_a</code>,{" "}
-                          <code>fb_organic_v1</code>.
-                        </>
-                      }
+                      helpTitle={t("kickstartContentHelpTitle")}
+                      helpBody={t("kickstartContentHelpBody")}
                     />
                   </th>
                   <th style={{ width: 40 }}></th>
@@ -571,11 +554,12 @@ export default function KickstartPage() {
                   const rowResult = results?.find((r) => r.rowId === row.id);
                   const comboKey = `${row.utmSource}|${row.utmMedium}|${row.utmContent}`;
                   const existingCode = existingCombo.get(comboKey);
+                  const localizedHint =
+                    selected && row.hint
+                      ? channelText(selected.id, row.id, "hint", row.hint)
+                      : "";
                   return (
-                    <tr
-                      key={row.id}
-                      style={{ opacity: row.include ? 1 : 0.55 }}
-                    >
+                    <tr key={row.id} style={{ opacity: row.include ? 1 : 0.55 }}>
                       <td>
                         <input
                           type="checkbox"
@@ -602,7 +586,7 @@ export default function KickstartPage() {
                           }}
                           disabled={!row.include}
                         />
-                        {row.hint && !existingCode && (
+                        {localizedHint && !existingCode && (
                           <div
                             style={{
                               fontSize: 11,
@@ -610,7 +594,7 @@ export default function KickstartPage() {
                               marginTop: 2,
                             }}
                           >
-                            {row.hint}
+                            {localizedHint}
                           </div>
                         )}
                         {existingCode && !rowResult && (
@@ -626,7 +610,7 @@ export default function KickstartPage() {
                             }}
                           >
                             <Layers size={11} />
-                            Already exists ·{" "}
+                            {t("kickstartRowExists")} ·{" "}
                             <code
                               style={{
                                 fontFamily: "var(--font-mono)",
@@ -653,7 +637,8 @@ export default function KickstartPage() {
                             {rowResult.ok ? (
                               <>
                                 <CheckCircle2 size={11} />
-                                Created · /{rowResult.shortCode}
+                                {t("kickstartRowCreated")} · /
+                                {rowResult.shortCode}
                               </>
                             ) : (
                               <>
@@ -696,7 +681,6 @@ export default function KickstartPage() {
             </table>
           </div>
 
-          {/* Sticky submit bar */}
           {!allSuccess && (
             <div
               className="card card-padded"
@@ -710,26 +694,12 @@ export default function KickstartPage() {
               }}
             >
               <div style={{ fontSize: 13, color: "var(--ink-400)" }}>
-                {canCreate ? (
-                  <>
-                    Will create{" "}
-                    <strong style={{ color: "var(--ink-100)" }}>
-                      {includedRows.length} link
-                      {includedRows.length === 1 ? "" : "s"}
-                    </strong>{" "}
-                    under campaign{" "}
-                    <code
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--brand-700)",
-                      }}
-                    >
-                      {canonicalCampaign}
-                    </code>
-                  </>
-                ) : (
-                  "Fill in a utm_campaign id (≥ 3 chars) and a landing URL (https://…) to continue."
-                )}
+                {canCreate
+                  ? t.rich("kickstartSubmitWillCreate", {
+                      count: includedRows.length,
+                      campaign: canonicalCampaign,
+                    })
+                  : t("kickstartSubmitNeedFields")}
               </div>
               <button
                 className="btn btn-primary"
@@ -738,22 +708,22 @@ export default function KickstartPage() {
               >
                 {creating ? (
                   <>
-                    <Loader2 size={13} className="animate-spin" /> Creating…
+                    <Loader2 size={13} className="animate-spin" />{" "}
+                    {t("kickstartSubmitCreating")}
                   </>
                 ) : (
                   <>
-                    <Rocket size={13} /> Create {includedRows.length} link
-                    {includedRows.length === 1 ? "" : "s"}
+                    <Rocket size={13} />{" "}
+                    {t("kickstartSubmitCreate", { count: includedRows.length })}
                   </>
                 )}
               </button>
             </div>
           )}
 
-          {/* Post-create success guidance — new hires land here and
-              need to know what comes next, not just "success ✓". */}
           {allSuccess && (
             <NextSteps
+              t={t}
               campaign={canonicalCampaign}
               count={successCount}
               onOpenCampaign={() =>
@@ -780,14 +750,10 @@ export default function KickstartPage() {
                 }}
               >
                 <AlertCircle size={14} />
-                {failedCount} row{failedCount === 1 ? "" : "s"} failed
+                {t("kickstartErrorsHeading", { count: failedCount })}
               </div>
-              <p
-                style={{ fontSize: 13, color: "var(--ink-400)", margin: 0 }}
-              >
-                Check the errors inline above. Successful rows are already
-                saved — you can fix the failing rows and click Create
-                again.
+              <p style={{ fontSize: 13, color: "var(--ink-400)", margin: 0 }}>
+                {t("kickstartErrorsBody")}
               </p>
             </div>
           )}
@@ -799,7 +765,7 @@ export default function KickstartPage() {
 
 // ---------- subcomponents ----------
 
-function Orientation() {
+function Orientation({ t }: { t: ReturnType<typeof useTranslations> }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <div
@@ -820,7 +786,7 @@ function Orientation() {
               color: "var(--brand-700)",
             }}
           >
-            New to this tool? Read me first.
+            {t("kickstartOrientationHeading")}
           </h3>
           <p
             style={{
@@ -830,11 +796,7 @@ function Orientation() {
               lineHeight: 1.65,
             }}
           >
-            Kickstart creates 8–10 tracked short links in one shot, each
-            with the right UTM parameters for a specific marketing channel.
-            Use this whenever you launch something with a full channel
-            mix — it saves you from hand-building each link and making
-            typos in UTM values.
+            {t("kickstartOrientationIntro")}
           </p>
           {expanded && (
             <div
@@ -846,27 +808,24 @@ function Orientation() {
               }}
             >
               <p style={{ margin: "0 0 8px" }}>
-                <strong>When to use:</strong> new product launches,
-                exhibition events, webinars, big campaigns with multiple
-                channels.
+                <strong>{t("kickstartOrientationWhenLabel")}</strong>{" "}
+                {t("kickstartOrientationWhenBody")}
               </p>
               <p style={{ margin: "0 0 8px" }}>
-                <strong>When NOT to use:</strong> one-off links (use{" "}
-                <em>Links → Create link</em>), CSV imports of 50+ links
-                (use <em>Links → Import CSV</em>).
+                <strong>{t("kickstartOrientationWhenNotLabel")}</strong>{" "}
+                {t("kickstartOrientationWhenNotBody")}
               </p>
               <p style={{ margin: 0 }}>
-                <strong>Never heard of UTM?</strong> Read the{" "}
+                <strong>{t("kickstartOrientationNewLabel")}</strong>{" "}
+                {t("kickstartOrientationNewBody")}{" "}
                 <a
                   href={UTM_GUIDE_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ color: "var(--brand-700)", fontWeight: 600 }}
                 >
-                  UTM Parameters Guide
-                </a>{" "}
-                first (5 min read). It explains what source / medium /
-                content actually mean.
+                  {t("kickstartUtmGuide")} ↗
+                </a>
               </p>
             </div>
           )}
@@ -883,7 +842,9 @@ function Orientation() {
               cursor: "pointer",
             }}
           >
-            {expanded ? "Hide details ↑" : "Show when to / when not to use ↓"}
+            {expanded
+              ? t("kickstartOrientationCollapse")
+              : t("kickstartOrientationExpand")}
           </button>
         </div>
       </div>
@@ -896,11 +857,15 @@ function SectionHead({
   title,
   helpTitle,
   help,
+  whyShow,
+  whyHide,
 }: {
   number: string;
   title: string;
   helpTitle: string;
   help: React.ReactNode;
+  whyShow: string;
+  whyHide: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -922,13 +887,7 @@ function SectionHead({
         >
           {number}
         </span>
-        <div
-          style={{
-            fontSize: 16,
-            fontWeight: 600,
-            color: "var(--ink-100)",
-          }}
-        >
+        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ink-100)" }}>
           {title}
         </div>
       </div>
@@ -953,7 +912,7 @@ function SectionHead({
             cursor: "pointer",
           }}
         >
-          {expanded ? "Hide why" : "Why?"}
+          {expanded ? whyHide : whyShow}
         </button>
       </p>
       {expanded && (
@@ -977,14 +936,23 @@ function SectionHead({
 
 function HeaderWithHelp({
   label,
-  help,
+  helpTitle,
+  helpBody,
 }: {
   label: string;
-  help: React.ReactNode;
+  helpTitle: string;
+  helpBody: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <span style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 4 }}>
+    <span
+      style={{
+        position: "relative",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+      }}
+    >
       {label}
       <button
         onClick={() => setOpen((v) => !v)}
@@ -999,7 +967,7 @@ function HeaderWithHelp({
           alignItems: "center",
           marginLeft: 2,
         }}
-        aria-label={`What is ${label}?`}
+        aria-label={helpTitle}
       >
         <Info size={11} />
       </button>
@@ -1024,7 +992,10 @@ function HeaderWithHelp({
             fontWeight: 400,
           }}
         >
-          {help}
+          <strong style={{ display: "block", marginBottom: 4 }}>
+            {helpTitle}
+          </strong>
+          {helpBody}
         </span>
       )}
     </span>
@@ -1061,10 +1032,12 @@ function MonoCell({
 }
 
 function NextSteps({
+  t,
   campaign,
   count,
   onOpenCampaign,
 }: {
+  t: ReturnType<typeof useTranslations>;
   campaign: string;
   count: number;
   onOpenCampaign: () => void;
@@ -1077,40 +1050,48 @@ function NextSteps({
         borderColor: "rgba(22,163,74,0.35)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 10,
+        }}
+      >
         <CheckCircle2 size={18} style={{ color: "var(--ok-fg)" }} />
-        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#166534" }}>
-          {count} link{count === 1 ? "" : "s"} created under {campaign}
+        <h3
+          style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#166534" }}
+        >
+          {t("kickstartNextStepsHeading", { count, campaign })}
         </h3>
       </div>
-      <p style={{ margin: "0 0 14px", fontSize: 13.5, color: "#166534", lineHeight: 1.65 }}>
-        Here's what to do next — in order:
+      <p
+        style={{
+          margin: "0 0 14px",
+          fontSize: 13.5,
+          color: "#166534",
+          lineHeight: 1.65,
+        }}
+      >
+        {t("kickstartNextStepsIntro")}
       </p>
-      <ol style={{ margin: 0, paddingLeft: 20, color: "#166534", lineHeight: 1.9, fontSize: 13.5 }}>
-        <li>
-          <strong>Open the Campaign dashboard</strong> to see all the
-          links you just created and their short URLs. Copy each one to
-          the corresponding channel (EDM tool, FB post, etc.).
-        </li>
-        <li>
-          <strong>Set a goal</strong> (optional) on the Campaign page so
-          the Leaderboard shows your progress toward target clicks.
-        </li>
-        <li>
-          <strong>After launch, check Analytics daily</strong> for the
-          first week. Filter by this campaign to see which channel is
-          pulling the most weight.
-        </li>
-        <li>
-          <strong>Need to add a channel later?</strong> Don't run
-          Kickstart again — use Links → Create link with the same
-          utm_campaign value; it'll automatically attach to this
-          campaign.
-        </li>
+      <ol
+        style={{
+          margin: 0,
+          paddingLeft: 20,
+          color: "#166534",
+          lineHeight: 1.9,
+          fontSize: 13.5,
+        }}
+      >
+        <li>{t("kickstartNextStep1")}</li>
+        <li>{t("kickstartNextStep2")}</li>
+        <li>{t("kickstartNextStep3")}</li>
+        <li>{t("kickstartNextStep4")}</li>
       </ol>
       <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
         <button className="btn btn-primary" onClick={onOpenCampaign}>
-          Open {campaign} <ArrowRight size={13} />
+          {t("kickstartOpenCampaign", { campaign })} <ArrowRight size={13} />
         </button>
       </div>
     </div>
