@@ -410,6 +410,7 @@
     "kickstartAddBlankRowHint": "Add a channel that isn't in the playbook (e.g. Twitter/X)",
     "kickstartSubmitWillCreate": "Will create {count} link{count, plural, one {} other {s}} under campaign {campaign}",
     "kickstartSubmitNeedFields": "Fill in a utm_campaign id (≥ 3 chars) and a landing URL (https://…) to continue.",
+    "kickstartSubmitIncompleteRow": "One or more checked rows is missing source / medium / content — fill them in or uncheck the row.",
     "kickstartSubmitCreating": "Creating…",
     "kickstartSubmitCreate": "Create {count} link{count, plural, one {} other {s}}",
     "kickstartWhyShow": "Why?",

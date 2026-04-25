@@ -246,11 +246,19 @@ export default function KickstartPage() {
   const failedCount = results?.filter((r) => !r.ok).length ?? 0;
   const allSuccess = results !== null && failedCount === 0 && successCount > 0;
 
+  // Every included row must carry its three UTM identifiers. Blank-row
+  // adds can otherwise leak through and create links that Analytics
+  // can't bucket by channel. (P1 from Codex review.)
+  const hasIncompleteRow = includedRows.some(
+    (r) => !r.utmSource.trim() || !r.utmMedium.trim() || !r.utmContent.trim(),
+  );
+
   const canCreate =
     Boolean(selected) &&
     canonicalCampaign.length >= 3 &&
     /^https?:\/\//i.test(landingUrl.trim()) &&
     includedRows.length > 0 &&
+    !hasIncompleteRow &&
     !creating;
 
   const handleCreateAll = async () => {
@@ -298,10 +306,27 @@ export default function KickstartPage() {
     setResults(batch);
     setCreating(false);
 
+    // Uncheck successfully-created rows so partial-failure retries
+    // can't resubmit already-saved channels and duplicate them in the
+    // campaign. (P0 from Codex review.)
+    const createdIds = new Set(batch.filter((b) => b.ok).map((b) => b.rowId));
+    if (createdIds.size > 0) {
+      setRows((prev) =>
+        prev.map((r) => (createdIds.has(r.id) ? { ...r, include: false } : r)),
+      );
+    }
+
+    // Invalidate every cache that could reasonably show these new
+    // links. Without `campaign-links` the Campaign Detail Links tab
+    // keeps stale data until the next SyncButton click. (P0.)
     qc.invalidateQueries({ queryKey: ["links"], refetchType: "all" });
     qc.invalidateQueries({ queryKey: ["campaigns-summary"], refetchType: "all" });
     qc.invalidateQueries({ queryKey: ["analytics-raw"], refetchType: "all" });
     qc.invalidateQueries({ queryKey: ["utm-campaigns"], refetchType: "all" });
+    qc.invalidateQueries({
+      queryKey: ["campaign-links", canonicalCampaign],
+      refetchType: "all",
+    });
   };
 
   return (
@@ -778,7 +803,9 @@ export default function KickstartPage() {
                       count: includedRows.length,
                       campaign: canonicalCampaign,
                     })
-                  : t("kickstartSubmitNeedFields")}
+                  : hasIncompleteRow
+                    ? t("kickstartSubmitIncompleteRow")
+                    : t("kickstartSubmitNeedFields")}
               </div>
               <button
                 className="btn btn-primary"

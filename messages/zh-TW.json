@@ -411,6 +411,7 @@
     "kickstartAddBlankRowHint": "加入範本沒有的管道（例如 Twitter/X）",
     "kickstartSubmitWillCreate": "將在活動 {campaign} 下建立 {count} 條連結",
     "kickstartSubmitNeedFields": "請填入 utm_campaign（至少 3 字元）和 landing URL（https://…）才能繼續。",
+    "kickstartSubmitIncompleteRow": "有勾選的列缺 source / medium / content — 請補齊或取消勾選。",
     "kickstartSubmitCreating": "建立中…",
     "kickstartSubmitCreate": "建立 {count} 條連結",
     "kickstartWhyShow": "為什麼？",
