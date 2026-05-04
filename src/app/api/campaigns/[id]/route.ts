@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { canUserActOnResource } from "@/lib/workspace";
 import { z } from "zod";
 
 const updateCampaignSchema = z.object({
@@ -62,8 +63,7 @@ export async function GET(
       return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
     }
 
-    // Check access
-    if (session.user.role === "MEMBER" && campaign.createdById !== session.user.id) {
+    if (!(await canUserActOnResource(session.user.id, campaign))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -106,7 +106,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
     }
 
-    if (session.user.role === "MEMBER" && existing.createdById !== session.user.id) {
+    if (!(await canUserActOnResource(session.user.id, existing))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -247,7 +247,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
     }
 
-    if (session.user.role === "MEMBER" && campaign.createdById !== session.user.id) {
+    if (!(await canUserActOnResource(session.user.id, campaign))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

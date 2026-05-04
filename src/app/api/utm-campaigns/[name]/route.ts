@@ -43,12 +43,12 @@ export async function GET(
       },
     });
 
-    // Compute total clicks for all links with this utmCampaign
+    // Compute total clicks for all links with this utmCampaign.
+    // Workspace context fully controls visibility — within a workspace,
+    // every member sees all links regardless of who created them.
     const ownerFilter: Record<string, unknown> = workspaceId
       ? { workspaceId }
-      : session.user.role === "MEMBER"
-      ? { createdById: session.user.id }
-      : {};
+      : { createdById: session.user.id };
 
     const linksWithCampaign = await prisma.shortLink.findMany({
       where: {

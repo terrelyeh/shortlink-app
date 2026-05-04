@@ -7,6 +7,7 @@ import {
   validateUtmAgainstGovernance,
 } from "@/lib/utm-governance";
 import { upsertCampaignForUtm } from "@/lib/campaign-autolink";
+import { canUserActOnResource } from "@/lib/workspace";
 import { z } from "zod";
 
 const variantSchema = z.object({
@@ -62,8 +63,7 @@ export async function GET(
       return NextResponse.json({ error: "Link not found" }, { status: 404 });
     }
 
-    // Check access
-    if (session.user.role === "MEMBER" && link.createdById !== session.user.id) {
+    if (!(await canUserActOnResource(session.user.id, link))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -98,11 +98,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Link not found" }, { status: 404 });
     }
 
-    // Check permission
-    if (
-      session.user.role === "MEMBER" &&
-      existingLink.createdById !== session.user.id
-    ) {
+    if (!(await canUserActOnResource(session.user.id, existingLink))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -273,11 +269,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Link not found" }, { status: 404 });
     }
 
-    // Check permission
-    if (
-      session.user.role === "MEMBER" &&
-      existingLink.createdById !== session.user.id
-    ) {
+    if (!(await canUserActOnResource(session.user.id, existingLink))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { resolveWorkspaceScope } from "@/lib/workspace";
+import { resolveWorkspaceScope, canUserActOnResource } from "@/lib/workspace";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       if (!link) {
         return NextResponse.json({ error: "Link not found" }, { status: 404 });
       }
-      if (session.user.role === "MEMBER" && link.createdById !== session.user.id) {
+      if (!(await canUserActOnResource(session.user.id, link))) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
       }
       workspaceId = link.workspaceId ?? workspaceId;

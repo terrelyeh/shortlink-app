@@ -85,3 +85,38 @@ export async function resolveWorkspaceScope(
   }
   return { workspaceId: null, where: {} };
 }
+
+/**
+ * Whether `userId` is allowed to mutate (edit / delete / clone / share)
+ * a resource. Three tiers:
+ *   - Creator → always yes
+ *   - OWNER / ADMIN of the resource's workspace → yes (admin override)
+ *   - Anyone else → no
+ *
+ * Orphan resources (workspaceId === null) only the original creator
+ * can touch — there's no workspace context to delegate authority.
+ *
+ * Use this everywhere instead of `session.user.role === "MEMBER"` —
+ * that legacy check looked at the global User.role field, which is
+ * orthogonal to the workspace role system that actually drives the
+ * permission model now.
+ */
+export async function canUserActOnResource(
+  userId: string,
+  resource: { createdById: string | null; workspaceId: string | null },
+): Promise<boolean> {
+  if (resource.createdById && resource.createdById === userId) return true;
+  if (!resource.workspaceId) return false;
+
+  const member = await prisma.workspaceMember.findUnique({
+    where: {
+      workspaceId_userId: {
+        workspaceId: resource.workspaceId,
+        userId,
+      },
+    },
+    select: { role: true },
+  });
+
+  return member?.role === "OWNER" || member?.role === "ADMIN";
+}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { canUserActOnResource } from "@/lib/workspace";
 
 // GET - Check destination URL and return metadata
 export async function GET(
@@ -17,14 +18,14 @@ export async function GET(
 
     const link = await prisma.shortLink.findUnique({
       where: { id },
-      select: { originalUrl: true, createdById: true },
+      select: { originalUrl: true, createdById: true, workspaceId: true },
     });
 
     if (!link) {
       return NextResponse.json({ error: "Link not found" }, { status: 404 });
     }
 
-    if (session.user.role === "MEMBER" && link.createdById !== session.user.id) {
+    if (!(await canUserActOnResource(session.user.id, link))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

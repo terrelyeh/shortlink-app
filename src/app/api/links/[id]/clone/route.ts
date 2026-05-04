@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createShortCode } from "@/lib/utils/shortcode";
 import { bumpLinksCache } from "@/lib/cache-scopes";
+import { canUserActOnResource } from "@/lib/workspace";
 
 // POST - Clone an existing link
 export async function POST(
@@ -27,8 +28,7 @@ export async function POST(
       return NextResponse.json({ error: "Link not found" }, { status: 404 });
     }
 
-    // Check permission
-    if (session.user.role === "MEMBER" && sourceLink.createdById !== session.user.id) {
+    if (!(await canUserActOnResource(session.user.id, sourceLink))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

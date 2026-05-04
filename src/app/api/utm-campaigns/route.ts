@@ -36,9 +36,11 @@ export async function GET(request: NextRequest) {
     const scope = await resolveWorkspaceScope(request, session);
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const workspaceId = scope.workspaceId;
-    const isMember = session.user.role === "MEMBER";
-    const userId = session.user.id;
 
+    // Workspace scope handles all per-user / per-workspace filtering;
+    // we don't add another User.role-based filter on top — that legacy
+    // check used the global User.role which is orthogonal to workspace
+    // membership.
     const ownerFilter = scope.where;
 
     // Get aggregated campaign data using groupBy
@@ -78,7 +80,7 @@ export async function GET(request: NextRequest) {
         shortLink: {
           utmCampaign: { in: campaignNames },
           deletedAt: null,
-          ...(session.user.role === "MEMBER" ? { createdById: session.user.id } : {}),
+          ...ownerFilter,
         },
       },
       _count: {
@@ -91,7 +93,7 @@ export async function GET(request: NextRequest) {
       where: {
         utmCampaign: { in: campaignNames },
         deletedAt: null,
-        ...(session.user.role === "MEMBER" ? { createdById: session.user.id } : {}),
+        ...ownerFilter,
       },
       select: {
         id: true,
