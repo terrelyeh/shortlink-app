@@ -43,6 +43,13 @@ function isAllowedOnShortDomain(path: string): boolean {
   return SHORT_DOMAIN_ALLOWED.some((re) => re.test(path));
 }
 
+// A bare-code path on the short domain — the user-facing form of every
+// short link, e.g. `go.engenius.ai/1HbucTM`. The redirect handler lives
+// at `/s/[code]`, but we don't want to expose that prefix in shared
+// URLs, so we internally rewrite. Matches the same alphabet that the
+// shortcode generator uses (Base62 + the `-_` we accept on custom codes).
+const SHORT_CODE_PATH = /^\/[a-zA-Z0-9_-]{3,50}$/;
+
 export default function middleware(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
   const path = request.nextUrl.pathname;
@@ -57,10 +64,23 @@ export default function middleware(request: NextRequest) {
   const splitDomains = appHost && shortHost && appHost !== shortHost;
 
   if (splitDomains && host === shortHost) {
-    if (!isAllowedOnShortDomain(path)) {
-      return NextResponse.redirect(BRAND_SITE, 302);
+    // Allowlisted infra paths — pass straight through to the route.
+    if (isAllowedOnShortDomain(path)) {
+      return NextResponse.next();
     }
-    return NextResponse.next();
+
+    // Short-code path: rewrite to /s/<code> so the existing redirect
+    // handler at `src/app/s/[code]/route.ts` does the lookup. Has to
+    // come AFTER the allowlist check so /link-expired and friends
+    // don't accidentally match this regex.
+    if (SHORT_CODE_PATH.test(path)) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/s${path}`;
+      return NextResponse.rewrite(url);
+    }
+
+    // Anything else on the short domain → bounce to the brand site.
+    return NextResponse.redirect(BRAND_SITE, 302);
   }
 
   // Main app domain: run intl only on the routes it owns.
