@@ -22,6 +22,8 @@ import {
   LineChart as LineChartIcon,
   Users,
   Globe2,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
@@ -71,6 +73,13 @@ export default function CampaignDetailPage() {
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
   const [goalSaving, setGoalSaving] = useState(false);
+
+  // Delete dialog: two outcomes — `unlink` keeps short URLs functional,
+  // `pauseAll` stops every link in this campaign at once. Defaults to
+  // unlink so a stray confirm-click can't break a live campaign.
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [pauseLinksOnDelete, setPauseLinksOnDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
 
@@ -247,6 +256,40 @@ export default function CampaignDetailPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(
+        `/api/utm-campaigns/${encodeURIComponent(campaignName)}?pauseLinks=${pauseLinksOnDelete}`,
+        { method: "DELETE" },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === "string" ? data.error : `HTTP ${res.status}`,
+        );
+      }
+
+      success(
+        pauseLinksOnDelete
+          ? t("deleteSuccessWithPause", { count: data.pausedCount ?? 0 })
+          : t("deleteSuccess"),
+      );
+
+      // Bust the caches that surface this campaign so it doesn't
+      // ghost-show in lists after we navigate back.
+      qc.invalidateQueries({ queryKey: ["campaigns-summary"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["analytics-raw"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["utm-campaigns"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["links"], refetchType: "all" });
+
+      router.push("/campaigns");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete");
+      setDeleting(false);
+    }
+  };
+
   const copyAllLinks = async () => {
     const all = links.map((l) => `${shortBaseUrl}/${l.code}`).join("\n");
     await navigator.clipboard.writeText(all);
@@ -294,9 +337,83 @@ export default function CampaignDetailPage() {
             >
               <Plus size={13} /> {t("addLink")}
             </Link>
+            <button
+              className="btn btn-ghost"
+              onClick={() => {
+                setPauseLinksOnDelete(false);
+                setDeleteOpen(true);
+              }}
+              title={t("deleteCampaign")}
+              style={{ color: "var(--err-fg)" }}
+            >
+              <Trash2 size={13} />
+            </button>
           </>
         }
       />
+
+      {deleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => !deleting && setDeleteOpen(false)}
+          />
+          <div className="relative bg-white rounded-2xl shadow-xl border border-slate-200 p-6 max-w-md w-full mx-4 z-10">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 bg-red-100">
+              <AlertTriangle className="w-5 h-5 text-red-600" />
+            </div>
+            <h3 className="text-base font-semibold text-slate-900 mb-1">
+              {t("deleteDialogTitle", { name: campaignName })}
+            </h3>
+            <p className="text-sm text-slate-500 mb-4">
+              {t("deleteDialogBody", { count: links.length })}
+            </p>
+
+            <label
+              className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                pauseLinksOnDelete
+                  ? "border-red-300 bg-red-50"
+                  : "border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={pauseLinksOnDelete}
+                onChange={(e) => setPauseLinksOnDelete(e.target.checked)}
+                className="mt-0.5"
+              />
+              <div>
+                <div className="text-sm font-medium text-slate-900">
+                  {t("deleteAlsoPauseLabel")}
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  {t("deleteAlsoPauseHelp")}
+                </div>
+              </div>
+            </label>
+
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => setDeleteOpen(false)}
+                disabled={deleting}
+                className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                {tCommon("cancel")}
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60 inline-flex items-center justify-center gap-2"
+              >
+                {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {pauseLinksOnDelete
+                  ? t("deleteAndPauseConfirm")
+                  : t("deleteConfirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* KPI Row */}
       <div className="kpi-row" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>

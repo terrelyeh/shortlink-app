@@ -251,13 +251,29 @@ export async function DELETE(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Unlink all links from this campaign (don't delete the links)
-    await prisma.shortLink.updateMany({
-      where: { campaignId: id },
-      data: { campaignId: null },
-    });
+    // Optional: also pause every link that was attached to this Campaign,
+    // so the short URLs go to the "link-inactive" page instead of still
+    // working under a campaign that no longer exists. Used for retiring
+    // a whole project at once. Default behavior (pauseLinks=false) just
+    // unlinks them, leaving the URLs functional.
+    const url = new URL(request.url);
+    const pauseLinks = url.searchParams.get("pauseLinks") === "true";
 
-    // Delete the campaign
+    let pausedCount = 0;
+    if (pauseLinks) {
+      const res = await prisma.shortLink.updateMany({
+        where: { campaignId: id, status: { not: "ARCHIVED" } },
+        data: { campaignId: null, status: "PAUSED" },
+      });
+      pausedCount = res.count;
+    } else {
+      // Unlink only (don't break the URLs).
+      await prisma.shortLink.updateMany({
+        where: { campaignId: id },
+        data: { campaignId: null },
+      });
+    }
+
     await prisma.campaign.delete({
       where: { id },
     });
@@ -267,11 +283,16 @@ export async function DELETE(
         userId: session.user.id,
         action: "DELETE_CAMPAIGN",
         targetId: id,
-        metadata: { name: campaign.name, linkCount: campaign._count.links },
+        metadata: {
+          name: campaign.name,
+          linkCount: campaign._count.links,
+          pausedLinks: pauseLinks,
+          pausedCount,
+        },
       },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, pausedCount });
   } catch (error) {
     console.error("Failed to delete campaign:", error);
     return NextResponse.json({ error: "Failed to delete campaign" }, { status: 500 });
