@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { useToast } from "@/components/ui/Toast";
 import {
   Users,
   Loader2,
@@ -72,6 +73,7 @@ export function MembersTab() {
   const t = useTranslations("workspace");
   const tCommon = useTranslations("common");
   const qc = useQueryClient();
+  const { success, error: toastError } = useToast();
 
   // Shared query keys — every mutation in this tab should invalidate
   // the matching one so the next render sees fresh data, and so cross-
@@ -135,6 +137,7 @@ export function MembersTab() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
   const canManage = hasPermission("manage");
   const isOwner = currentWorkspace?.role === "OWNER";
@@ -258,7 +261,11 @@ export function MembersTab() {
     }
   };
 
-  const handleResendInvitation = async (invitationId: string) => {
+  const handleResendInvitation = async (
+    invitationId: string,
+    email: string,
+  ) => {
+    setResendingId(invitationId);
     try {
       const res = await fetch(`/api/workspaces/${workspaceId}/invitations`, {
         method: "PATCH",
@@ -278,9 +285,15 @@ export function MembersTab() {
           /* clipboard may be blocked; the row's copy button still works */
         }
       }
+
+      // Toast first so user gets immediate feedback before the list
+      // re-renders and the row visually moves from "expired" to "pending".
+      success(t("invitationLinkCopied", { email }));
       await invalidateInvitations();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to resend");
+      toastError(err instanceof Error ? err.message : "Failed to resend");
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -488,11 +501,18 @@ export function MembersTab() {
                   <div className="flex items-center gap-2">
                     {isExpired ? (
                       <button
-                        onClick={() => handleResendInvitation(invitation.id)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-[#03A9F4] rounded-lg hover:bg-[#0288D1] transition-colors"
+                        onClick={() =>
+                          handleResendInvitation(invitation.id, invitation.email)
+                        }
+                        disabled={resendingId === invitation.id}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-[#03A9F4] rounded-lg hover:bg-[#0288D1] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                         title={t("resendInvitation")}
                       >
-                        <RefreshCw className="w-3.5 h-3.5" />
+                        {resendingId === invitation.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        )}
                         {t("resendInvitation")}
                       </button>
                     ) : (
