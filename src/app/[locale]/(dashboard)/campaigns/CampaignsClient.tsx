@@ -220,7 +220,7 @@ export default function CampaignsClient() {
       />
 
       {/* KPI row */}
-      <div className="kpi-row" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+      <div className="kpi-row kpi-row-3">
         <div className="kpi">
           <div className="kpi-label">
             <Megaphone size={12} /> {t("activeCampaigns")}

@@ -358,8 +358,15 @@ body {
   gap: 12px;
   margin-bottom: 20px;
 }
-@media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 500px) { .kpi-row { grid-template-columns: 1fr; } }
+.kpi-row-3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 900px) {
+  .kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .kpi-row-3 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 500px) {
+  .kpi-row { grid-template-columns: 1fr; }
+  .kpi-row-3 { grid-template-columns: 1fr; }
+}
 .kpi {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -394,7 +401,8 @@ body {
 .kpi-sub {
   display: flex;
   align-items: center;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 4px 6px;
   margin-top: 8px;
   font-size: 13px;
   color: var(--ink-400);
@@ -1227,6 +1235,11 @@ textarea.input {
 }
 
 @media (max-width: 768px) {
+  /* Leave room at the top of the page for the floating hamburger
+     button (lg:hidden, top-4 left-4, ~36px). Without this the page
+     title sits under the button and gets clipped. */
+  .main { padding-top: 64px !important; }
+
   /* PageHeader / toolbar wrap so action buttons don't overflow. */
   .page-head {
     flex-direction: column;
@@ -1234,6 +1247,13 @@ textarea.input {
     gap: 12px;
   }
   .page-head > * { width: 100%; }
+  /* Actions row: allow buttons to wrap across multiple rows + scroll
+     horizontally if a button is too wide rather than spilling off. */
+  .page-head .row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .page-head .row > * { flex: 0 0 auto; }
   .toolbar {
     flex-wrap: wrap;
     gap: 8px;
@@ -1241,6 +1261,11 @@ textarea.input {
   .chip-row {
     flex-wrap: wrap;
   }
+  /* SyncButton "Last synced X ago" label squeezes into a vertical
+     column at narrow widths because the parent wraps. Hide the label
+     on mobile — the icon button alone is enough; long-press still
+     shows the timestamp via title attr. */
+  .sync-button-label { display: none; }
 
   /* Form grids → single column. */
   .grid-resp-2 { grid-template-columns: 1fr; }

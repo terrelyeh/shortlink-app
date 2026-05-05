@@ -50,7 +50,8 @@ export function SyncButton({ queryKeys }: { queryKeys: readonly unknown[][] }) {
     <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
       {lastSyncedAt && (
         <span
-          style={{ fontSize: 11.5, color: "var(--ink-500)" }}
+          className="sync-button-label"
+          style={{ fontSize: 11.5, color: "var(--ink-500)", whiteSpace: "nowrap" }}
           title={lastSyncedAt.toLocaleString()}
         >
           {t("lastSynced", { time: formatRelativeTime(lastSyncedAt, t) })}
