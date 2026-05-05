@@ -47,12 +47,13 @@ export async function GET(request: NextRequest) {
     const rawDays = parseInt(searchParams.get("days") || String(DEFAULT_DAYS), 10);
     const days = Math.min(Math.max(Number.isFinite(rawDays) ? rawDays : DEFAULT_DAYS, 1), MAX_DAYS);
 
-    // v2 suffix: payload shape gained sparkline / trendState / trendPct /
-    // lastClickAt fields on each campaign and orphan. Bumping the key
-    // invalidates any stale v1 payloads still cached in Redis — without
-    // it the client crashes trying to .some() on an undefined sparkline.
+    // v3 suffix: filter rule changed — buckets with no Campaign row
+    // AND no active link are now hidden ("delete campaign + pause all
+    // links" should make a campaign disappear from the leaderboard).
+    // Old v2 payloads still in Redis would re-show those ghost rows
+    // for up to 60s, so we bust them.
     const key = cacheKey(
-      "campaigns-summary-v2",
+      "campaigns-summary-v3",
       session.user.id,
       scope.workspaceId ?? "_",
       days,
@@ -78,6 +79,7 @@ export async function GET(request: NextRequest) {
           code: true,
           title: true,
           originalUrl: true,
+          status: true,
           utmCampaign: true,
           campaignId: true,
           campaign: {
@@ -176,6 +178,11 @@ export async function GET(request: NextRequest) {
         // Max-of-max across this campaign's links — used for the "Last
         // activity" column. Null when no link has ever been clicked.
         lastClickAt: string | null;
+        // Used to hide ghost rows: a "delete + pause all links" leaves
+        // links with the utm_campaign string but no Campaign FK. We
+        // don't want those to keep haunting the leaderboard if every
+        // remaining link is non-active.
+        hasActiveLink: boolean;
       }
       const buckets = new Map<string, Bucket>();
       const orphanLinks: typeof links = [];
@@ -200,12 +207,14 @@ export async function GET(request: NextRequest) {
             clicks: 0,
             conversions: 0,
             lastClickAt: null,
+            hasActiveLink: false,
           });
         }
         const b = buckets.get(campaignName)!;
         b.linkCount += 1;
         b.clicks += windowClicksMap.get(link.id) ?? 0;
         b.conversions += windowConversionsMap.get(link.id) ?? 0;
+        if (link.status === "ACTIVE") b.hasActiveLink = true;
         const linkLast = lastClickMap.get(link.id);
         if (linkLast && (!b.lastClickAt || linkLast > b.lastClickAt)) {
           b.lastClickAt = linkLast;
@@ -213,6 +222,12 @@ export async function GET(request: NextRequest) {
       }
 
       const campaigns = Array.from(buckets.values())
+        // Drop "ghost" rows: utm_campaign string survives on links even
+        // after the Campaign row is deleted. We keep showing them while
+        // any link is still ACTIVE (legitimate orphan that needs
+        // cleanup), but a fully-retired bucket (no Campaign + all links
+        // paused/archived) should disappear from the leaderboard.
+        .filter((b) => b.id !== null || b.hasActiveLink)
         .map((b) => ({
           id: b.id,
           name: b.name,
