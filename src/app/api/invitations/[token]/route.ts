@@ -40,10 +40,27 @@ export async function GET(
       return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
     }
 
-    if (invitation.status !== "PENDING") {
+    // ACCEPTED isn't a real error from the user's POV — it usually
+    // means our events.signIn hook already auto-accepted on Google
+    // OAuth (the common path). Return 200 + an `alreadyAccepted` flag
+    // so the page can show "Welcome back" instead of a scary red error.
+    if (invitation.status === "ACCEPTED") {
+      return NextResponse.json({
+        alreadyAccepted: true,
+        invitation: {
+          email: invitation.email,
+          workspace: invitation.workspace,
+        },
+      });
+    }
+
+    if (invitation.status === "CANCELLED" || invitation.status === "EXPIRED") {
       return NextResponse.json(
-        { error: "Invitation has already been used or cancelled", status: invitation.status },
-        { status: 400 }
+        {
+          error: "Invitation has already been cancelled",
+          status: invitation.status,
+        },
+        { status: 400 },
       );
     }
 

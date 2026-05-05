@@ -63,6 +63,12 @@ export default function InvitePage({
   const [error, setError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
   const [accepted, setAccepted] = useState(false);
+  // True when GET returned alreadyAccepted=true — usually means the
+  // events.signIn hook already auto-accepted while the user was being
+  // bounced through Google OAuth. Show a green welcome instead of red.
+  const [alreadyJoined, setAlreadyJoined] = useState<{
+    workspace: { name: string; slug: string };
+  } | null>(null);
 
   // Fetch invitation details on mount
   useEffect(() => {
@@ -74,7 +80,9 @@ export default function InvitePage({
         const data = await res.json();
         if (cancelled) return;
 
-        if (!res.ok) {
+        if (data.alreadyAccepted) {
+          setAlreadyJoined({ workspace: data.invitation.workspace });
+        } else if (!res.ok) {
           setError(data.error || "Invitation not found");
         } else {
           setInvitation(data.invitation);
@@ -126,6 +134,32 @@ export default function InvitePage({
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
       </div>
+    );
+  }
+
+  // Already a member — most common path is "auto-accepted via signIn
+  // hook a moment ago". Treat as success, not error.
+  if (alreadyJoined) {
+    return (
+      <CenterShell>
+        <div className="text-center">
+          <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="w-7 h-7 text-emerald-500" />
+          </div>
+          <h1 className="text-xl font-semibold text-slate-900 mb-2">
+            You&apos;re already in {alreadyJoined.workspace.name}
+          </h1>
+          <p className="text-sm text-slate-500 mb-5">
+            This invitation has been accepted. Head to the dashboard to start working.
+          </p>
+          <button
+            onClick={() => router.push("/campaigns")}
+            className="w-full py-2.5 bg-[#03A9F4] text-white text-sm font-semibold rounded-lg hover:bg-[#0288D1] transition-colors"
+          >
+            Go to dashboard
+          </button>
+        </div>
+      </CenterShell>
     );
   }
 
