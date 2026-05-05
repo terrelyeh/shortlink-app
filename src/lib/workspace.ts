@@ -79,10 +79,27 @@ export async function resolveWorkspaceScope(
     return { workspaceId, where: { workspaceId } };
   }
 
-  // No workspace specified — fall back to user-scoped filtering.
-  if (session.user.role === "MEMBER" || session.user.role === "VIEWER") {
+  // No header sent — typical race when the browser fires a request
+  // before WorkspaceContext has populated localStorage. Fall back to
+  // the user's primary workspace (oldest joined) so writes don't end
+  // up as workspaceId=NULL orphans that the OWNER can't see later.
+  if (session?.user?.id) {
+    const member = await prisma.workspaceMember.findFirst({
+      where: { userId: session.user.id },
+      orderBy: { joinedAt: "asc" },
+      select: { workspaceId: true },
+    });
+    if (member) {
+      return {
+        workspaceId: member.workspaceId,
+        where: { workspaceId: member.workspaceId },
+      };
+    }
+    // Genuine no-workspace case — user has zero memberships. Should
+    // really only happen for users mid-onboarding.
     return { workspaceId: null, where: { createdById: session.user.id } };
   }
+
   return { workspaceId: null, where: {} };
 }
 

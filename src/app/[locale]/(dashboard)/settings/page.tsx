@@ -301,7 +301,7 @@ export default function SettingsPage() {
                         {session?.user?.email}
                       </p>
                       <p style={{ fontSize: 11, color: "var(--ink-500)", margin: "2px 0 12px", textTransform: "capitalize" }}>
-                        {t("role")}: {session?.user?.role?.toLowerCase()}
+                        {t("role")}: {(currentWorkspace?.role ?? session?.user?.role ?? "").toLowerCase()}
                       </p>
                       <div className="row" style={{ gap: 8 }}>
                         <button
@@ -327,7 +327,7 @@ export default function SettingsPage() {
                       </div>
                       <div style={{ fontSize: 12, color: "var(--ink-400)" }}>{session?.user?.email}</div>
                       <div style={{ fontSize: 11, color: "var(--ink-500)", marginTop: 2, textTransform: "capitalize" }}>
-                        {t("role")}: {session?.user?.role?.toLowerCase()}
+                        {t("role")}: {(currentWorkspace?.role ?? session?.user?.role ?? "").toLowerCase()}
                       </div>
                     </>
                   )}

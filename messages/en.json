@@ -646,6 +646,8 @@
     "invitationSent": "Invitation sent to {email}",
     "invitationLinkCopied": "Invite link for {email} copied — share it with the invitee.",
     "invitedBy": "Invited by {name}",
+    "invitationExpired": "Expired",
+    "resendInvitation": "Resend",
     "copyInviteLink": "Copy Invite Link",
     "cancelInvitation": "Cancel Invitation",
     "removeMember": "Remove Member",

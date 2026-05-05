@@ -647,6 +647,8 @@
     "invitationSent": "邀請已發送至 {email}",
     "invitationLinkCopied": "已複製 {email} 的邀請連結，請手動傳送給對方。",
     "invitedBy": "邀請者：{name}",
+    "invitationExpired": "已過期",
+    "resendInvitation": "重發邀請",
     "copyInviteLink": "複製邀請連結",
     "cancelInvitation": "取消邀請",
     "removeMember": "移除成員",

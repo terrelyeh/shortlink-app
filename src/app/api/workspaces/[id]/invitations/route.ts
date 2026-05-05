@@ -54,13 +54,13 @@ export async function GET(
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
+    // Show all PENDING invitations regardless of expiry — expired ones
+    // are still useful (admin sees who hasn't joined yet, can resend).
+    // Hide CANCELLED / ACCEPTED here; those have nothing to act on.
     const invitations = await prisma.workspaceInvitation.findMany({
       where: {
         workspaceId: id,
         status: "PENDING",
-        expiresAt: {
-          gt: new Date(),
-        },
       },
       select: {
         id: true,
@@ -242,6 +242,64 @@ export async function POST(
       { error: "Failed to create invitation" },
       { status: 500 }
     );
+  }
+}
+
+// PATCH /api/workspaces/[id]/invitations - Resend (refresh expiry +
+// new token) an invitation that's been sitting too long. Lets admin
+// hand out a fresh URL without forcing a brand-new invite row.
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const body = await request.json().catch(() => ({}));
+    const invitationId = body.invitationId;
+    if (!invitationId) {
+      return NextResponse.json({ error: "Invitation ID required" }, { status: 400 });
+    }
+
+    const access = await checkWorkspaceAccess(id, session.user.id, ["OWNER", "ADMIN"]);
+    if ("error" in access) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
+    }
+
+    const invitation = await prisma.workspaceInvitation.findUnique({
+      where: { id: invitationId },
+    });
+    if (!invitation || invitation.workspaceId !== id) {
+      return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
+    }
+    if (invitation.status === "ACCEPTED") {
+      return NextResponse.json({ error: "Already accepted" }, { status: 400 });
+    }
+
+    const newToken = crypto.randomBytes(32).toString("hex");
+    const updated = await prisma.workspaceInvitation.update({
+      where: { id: invitationId },
+      data: {
+        token: newToken,
+        status: "PENDING",
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXTAUTH_URL ||
+      new URL(request.url).origin;
+    return NextResponse.json({
+      invitation: { ...updated, inviteUrl: `${baseUrl}/invite/${newToken}` },
+    });
+  } catch (error) {
+    console.error("Failed to resend invitation:", error);
+    return NextResponse.json({ error: "Failed to resend invitation" }, { status: 500 });
   }
 }
 

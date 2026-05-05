@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { WorkspaceSwitcher } from "../workspace/WorkspaceSwitcher";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 interface NavItem {
   href: string;
@@ -38,6 +39,12 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
   const t = useTranslations("nav");
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Display the workspace-level role (the one that actually controls
+  // permissions today), not the legacy global User.role. The userRole
+  // prop is still needed for /audit-log gating but never shown to user.
+  const { currentWorkspace } = useWorkspace();
+  const displayRole = currentWorkspace?.role ?? userRole;
 
   const navItems: NavItem[] = [
     { href: "/campaigns", labelKey: "campaigns", icon: <Megaphone size={15} /> },
@@ -111,7 +118,7 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
               {userName}
             </div>
             <div className="user-role" style={{ textTransform: "capitalize" }}>
-              {userRole.toLowerCase()}
+              {displayRole.toLowerCase()}
             </div>
           </div>
         </div>

@@ -20,6 +20,8 @@ import {
   Check,
   X,
   Clock,
+  RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 
 type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
@@ -256,6 +258,32 @@ export function MembersTab() {
     }
   };
 
+  const handleResendInvitation = async (invitationId: string) => {
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/invitations`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invitationId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to resend");
+
+      // Auto-copy the new invite URL to clipboard so user can paste it
+      // immediately without hunting for the row's copy button.
+      const url: string | undefined = data?.invitation?.inviteUrl;
+      if (url) {
+        try {
+          await navigator.clipboard.writeText(url);
+        } catch {
+          /* clipboard may be blocked; the row's copy button still works */
+        }
+      }
+      await invalidateInvitations();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to resend");
+    }
+  };
+
   const handleCancelInvitation = async (invitationId: string) => {
     try {
       const response = await fetch(
@@ -416,22 +444,40 @@ export function MembersTab() {
           <div className="space-y-3">
             {invitations.map((invitation) => {
               const RoleIcon = roleIcons[invitation.role];
+              const isExpired = new Date(invitation.expiresAt) < new Date();
               return (
                 <div
                   key={invitation.id}
-                  className="flex items-center justify-between p-3 bg-amber-50 border border-amber-100 rounded-lg"
+                  className={`flex items-center justify-between p-3 border rounded-lg ${
+                    isExpired
+                      ? "bg-red-50 border-red-100"
+                      : "bg-amber-50 border-amber-100"
+                  }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-                      <Mail className="w-5 h-5 text-amber-600" />
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        isExpired ? "bg-red-100" : "bg-amber-100"
+                      }`}
+                    >
+                      {isExpired ? (
+                        <AlertTriangle className="w-5 h-5 text-red-600" />
+                      ) : (
+                        <Mail className="w-5 h-5 text-amber-600" />
+                      )}
                     </div>
                     <div>
                       <p className="font-medium text-slate-900">{invitation.email}</p>
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${roleColors[invitation.role]}`}>
                           <RoleIcon className="w-3 h-3" />
                           {t(`roles.${invitation.role}`)}
                         </span>
+                        {isExpired && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">
+                            {t("invitationExpired")}
+                          </span>
+                        )}
                         <span>
                           {t("invitedBy", { name: invitation.invitedBy.name || invitation.invitedBy.email })}
                         </span>
@@ -440,17 +486,28 @@ export function MembersTab() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => copyInviteLink(invitation)}
-                      className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
-                      title={t("copyInviteLink")}
-                    >
-                      {copiedInviteLink === invitation.id ? (
-                        <Check className="w-4 h-4 text-green-500" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                    </button>
+                    {isExpired ? (
+                      <button
+                        onClick={() => handleResendInvitation(invitation.id)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-[#03A9F4] rounded-lg hover:bg-[#0288D1] transition-colors"
+                        title={t("resendInvitation")}
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        {t("resendInvitation")}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => copyInviteLink(invitation)}
+                        className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
+                        title={t("copyInviteLink")}
+                      >
+                        {copiedInviteLink === invitation.id ? (
+                          <Check className="w-4 h-4 text-green-500" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
                     <button
                       onClick={() => handleCancelInvitation(invitation.id)}
                       className="p-2 text-red-400 hover:text-red-600 transition-colors"
