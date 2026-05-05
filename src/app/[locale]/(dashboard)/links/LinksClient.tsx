@@ -6,6 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/routing";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinkTableRow } from "@/components/links/LinkTableRow";
+import { LinkMobileCard } from "@/components/links/LinkMobileCard";
+import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
@@ -154,6 +156,10 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
     await qc.invalidateQueries({ queryKey: tagsKey, refetchType: "all" });
     invalidateDerived();
   }, [qc, linksKey, tagsKey, invalidateDerived]);
+
+  // Mobile users see the same data as cards (vertical) instead of the
+  // wide desktop table — driven by viewport, not user preference.
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -657,6 +663,21 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
             description={t("createFirst")}
             action={{ label: t("createNew"), href: "/links/new" }}
           />
+        </div>
+      ) : isMobile ? (
+        <div className="link-mobile-card-list">
+          {links.map((link) => (
+            <LinkMobileCard
+              key={link.id}
+              link={link}
+              shortBaseUrl={shortBaseUrl}
+              selected={selectedIds.has(link.id)}
+              onSelect={toggleSelect}
+              onDelete={confirmDelete}
+              onStatusChange={handleStatusChange}
+              onClone={handleClone}
+            />
+          ))}
         </div>
       ) : (
         <div className="tbl-wrap">
