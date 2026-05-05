@@ -446,14 +446,7 @@ export default function KickstartPage() {
               whyHide={t("kickstartWhyHide")}
             />
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 16,
-                marginTop: 16,
-              }}
-            >
+            <div className="grid-resp-2" style={{ marginTop: 16 }}>
               <div>
                 <label
                   style={{
@@ -604,7 +597,8 @@ export default function KickstartPage() {
               </span>
             </div>
 
-            <table className="data" style={{ fontSize: 13, marginTop: 16 }}>
+            <div className="table-scroll" style={{ marginTop: 16 }}>
+            <table className="data" style={{ fontSize: 13 }}>
               <thead>
                 <tr>
                   <th style={{ width: 40 }}></th>
@@ -773,6 +767,7 @@ export default function KickstartPage() {
                 })}
               </tbody>
             </table>
+            </div>
 
             <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-start" }}>
               <button

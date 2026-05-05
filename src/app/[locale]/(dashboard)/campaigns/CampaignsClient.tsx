@@ -381,6 +381,7 @@ export default function CampaignsClient() {
               : t("noCampaignsYet")}
           </div>
         ) : (
+          <div className="table-scroll">
           <table className="data">
             <thead>
               <tr>
@@ -520,6 +521,7 @@ export default function CampaignsClient() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -545,6 +547,7 @@ export default function CampaignsClient() {
               {t("showingTopN", { n: data.orphans.length })}
             </span>
           </div>
+          <div className="table-scroll">
           <table className="data">
             <thead>
               <tr>
@@ -621,6 +624,7 @@ export default function CampaignsClient() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </>

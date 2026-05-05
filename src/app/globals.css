@@ -522,7 +522,12 @@ body {
   background: #fff;
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  overflow: hidden;
+  /* Allow horizontal scroll on narrow viewports — wide tables (Links,
+     Campaigns leaderboard, Kickstart wizard) all live inside .tbl-wrap
+     or a card. Without this they'd clip on phone widths. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 .tbl-head {
   display: flex;
@@ -1196,3 +1201,79 @@ textarea.input {
   }
 }
 .animate-slide-up { animation: slide-up 0.2s ease-out; }
+
+/* ==========================================================================
+   Mobile fallbacks — pragmatic responsive layer (added 2026-05).
+   Goal: dashboard usable on phones for view + basic create, not a full
+   re-design. Wide tables horizontally scroll inside their card; KPI /
+   form grids collapse to one column; touch targets bump to 44px so
+   icon buttons aren't fingerprint-sized.
+   ========================================================================== */
+
+.table-scroll {
+  /* Wrap any wide <table> with this so it scrolls horizontally inside
+     its card on narrow screens instead of breaking the layout. */
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Auto-wrap responsive grids — page-level Kickstart / form pages
+   set this className instead of inline gridTemplateColumns. */
+.grid-resp-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  /* PageHeader / toolbar wrap so action buttons don't overflow. */
+  .page-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .page-head > * { width: 100%; }
+  .toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chip-row {
+    flex-wrap: wrap;
+  }
+
+  /* Form grids → single column. */
+  .grid-resp-2 { grid-template-columns: 1fr; }
+
+  /* Touch targets — bump icon buttons so they're tappable. iOS HIG
+     and Material both want 44px minimum. */
+  .btn {
+    min-height: 40px;
+  }
+  .btn-ghost,
+  .nav-item {
+    min-height: 44px;
+  }
+
+  /* Cards a touch tighter on mobile so content has more room. */
+  .card-padded { padding: 18px 16px; }
+
+  /* Data tables: keep the readable size + force horizontal scroll on
+     overflow rather than squashing columns into illegibility. */
+  table.data {
+    font-size: 13.5px;
+  }
+  table.data thead th,
+  table.data tbody td {
+    padding: 12px 14px;
+    white-space: nowrap;
+  }
+
+  /* Modal: ShareModal etc. shouldn't hug the screen edge. */
+  .modal-card,
+  .max-w-md,
+  .max-w-lg {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+}

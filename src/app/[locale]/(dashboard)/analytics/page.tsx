@@ -513,6 +513,7 @@ export default function AnalyticsPage() {
                         <div className="tbl-head" style={{ padding: "12px 16px" }}>
                           <div className="tbl-head-title">{t("utm.campaignSource")}</div>
                         </div>
+                        <div className="table-scroll">
                         <table className="data">
                           <thead>
                             <tr>
@@ -554,6 +555,7 @@ export default function AnalyticsPage() {
                             })}
                           </tbody>
                         </table>
+                        </div>
                       </div>
                     )}
 
@@ -565,6 +567,7 @@ export default function AnalyticsPage() {
                             {t("utm.campaignContentDesc")}
                           </span>
                         </div>
+                        <div className="table-scroll">
                         <table className="data">
                           <thead>
                             <tr>
@@ -606,6 +609,7 @@ export default function AnalyticsPage() {
                             })}
                           </tbody>
                         </table>
+                        </div>
                       </div>
                     )}
                   </>
@@ -730,6 +734,7 @@ export default function AnalyticsPage() {
                     <div className="tbl-head">
                       <div className="tbl-head-title">{t("topPerformingLinks")}</div>
                     </div>
+                    <div className="table-scroll">
                     <table className="data">
                       <thead>
                         <tr>
@@ -787,6 +792,7 @@ export default function AnalyticsPage() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 )}
               </section>

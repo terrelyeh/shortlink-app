@@ -4,7 +4,7 @@
  * /link-geo-blocked, /share/[token], etc.) that don't live under [locale]/.
  */
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -23,6 +23,14 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "EnGenius ShortLink",
   description: "Internal Marketing URL Shortener",
+};
+
+// Viewport — required for mobile to render at the correct width
+// instead of the desktop-emulating 980px default. Allow user zoom for
+// accessibility (don't lock to maximum-scale=1).
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

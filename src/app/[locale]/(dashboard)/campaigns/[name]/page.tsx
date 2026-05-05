@@ -573,6 +573,7 @@ export default function CampaignDetailPage() {
               </Link>
             </div>
           ) : (
+            <div className="table-scroll">
             <table className="data">
               <thead>
                 <tr>
@@ -738,6 +739,7 @@ export default function CampaignDetailPage() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       )}
