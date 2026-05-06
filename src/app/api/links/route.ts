@@ -79,6 +79,10 @@ export async function GET(request: NextRequest) {
     const tagId = searchParams.get("tagId");
     const sortBy = searchParams.get("sortBy") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";
+    // Pre-launch test click filter — same semantics as /api/analytics/raw.
+    // Default off (real traffic only). The /links list page never passes
+    // this; only callers that surface a toggle (campaign detail) do.
+    const includeInternal = searchParams.get("includeInternal") === "1";
 
     const scope = await resolveWorkspaceScope(request, session);
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -133,6 +137,7 @@ export async function GET(request: NextRequest) {
       tagId ?? "_",
       sortBy,
       sortOrder,
+      includeInternal ? "with-internal" : "real-only",
     );
 
     const payload = await cached(key, 30, async () => {
@@ -141,27 +146,36 @@ export async function GET(request: NextRequest) {
       const fourteenDaysAgo = new Date();
       fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
+      // The relation-count filter and the trend-window filter share
+      // this rule. When includeInternal is true, we just don't filter.
+      const internalFilter = includeInternal ? {} : { isInternal: false };
+
       const [links, total] = await Promise.all([
         prisma.shortLink.findMany({
           where,
           include: {
-            // _count.clicks filtered to real-traffic only — the redirect
-            // handler already skips clickCount increment for internal
-            // clicks, so we filter the relation count to match. Both
-            // numbers stay in sync this way.
+            // _count.clicks respects the includeInternal flag so KPI
+            // numbers on /campaigns/[name] match what /analytics shows
+            // when the same toggle is on. Default behavior (no flag) is
+            // real-only — same as the old code.
             _count: {
               select: {
-                clicks: { where: { isInternal: false } },
+                clicks: { where: internalFilter },
                 conversions: true,
               },
             },
             tags: { include: { tag: true } },
           },
-          // Order by the denormalized clickCount (real-only) instead of
-          // the relation count — equivalent semantically and uses the
-          // existing index. Saves an aggregate.
+          // When real-only: order by the denormalized clickCount (which
+          // is real-only too — redirect handler skips its increment for
+          // internal clicks), saving an aggregate. When includeInternal
+          // is requested, we have to fall back to a relation count so
+          // the order matches the displayed numbers. Slight perf cost,
+          // worth the consistency.
           orderBy: sortBy === "clicks"
-            ? { clickCount: sortOrder as "asc" | "desc" }
+            ? includeInternal
+              ? { clicks: { _count: sortOrder as "asc" | "desc" } }
+              : { clickCount: sortOrder as "asc" | "desc" }
             : { [sortBy]: sortOrder },
           skip: (page - 1) * limit,
           take: limit,
@@ -177,7 +191,7 @@ export async function GET(request: NextRequest) {
             where: {
               shortLinkId: { in: linkIds },
               timestamp: { gte: sevenDaysAgo },
-              isInternal: false,
+              ...internalFilter,
             },
             _count: { _all: true },
           }),
@@ -186,7 +200,7 @@ export async function GET(request: NextRequest) {
             where: {
               shortLinkId: { in: linkIds },
               timestamp: { gte: fourteenDaysAgo, lt: sevenDaysAgo },
-              isInternal: false,
+              ...internalFilter,
             },
             _count: { _all: true },
           }),

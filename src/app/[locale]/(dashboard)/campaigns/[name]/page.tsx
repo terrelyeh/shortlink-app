@@ -86,17 +86,21 @@ export default function CampaignDetailPage() {
 
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
 
-  const linksKey = useMemo(() => ["campaign-links", campaignName] as const, [campaignName]);
-  const goalKey = useMemo(() => ["campaign-goal", campaignName] as const, [campaignName]);
   // Pre-launch test click filter. Off by default — campaign metrics
   // show real traffic only. Toggle to include clicks the redirect
   // handler flagged as internal.
   const [includeInternal, setIncludeInternal] = useState(false);
+  // Both keys depend on includeInternal so toggling refetches with the
+  // right filter. campaign-links carries it for the KPI / table; the
+  // raw analytics carries it for charts and breakdowns.
+  const linksKey = useMemo(
+    () => ["campaign-links", campaignName, includeInternal ? "with-internal" : "real-only"] as const,
+    [campaignName, includeInternal],
+  );
+  const goalKey = useMemo(() => ["campaign-goal", campaignName] as const, [campaignName]);
   // Raw analytics are expensive to fetch (up to 2MB) and used by many
   // pages — share the same key everywhere so only one network call
   // happens across /analytics, /campaigns/[name], /campaigns/compare.
-  // The includeInternal flag becomes part of the key so toggling it
-  // doesn't smear two payloads into the same cache slot.
   const rawKey = useMemo(
     () => ["analytics-raw", includeInternal ? "with-internal" : "real-only"] as const,
     [includeInternal],
@@ -105,9 +109,14 @@ export default function CampaignDetailPage() {
   const { data: linksData, isLoading: loading } = useQuery({
     queryKey: linksKey,
     queryFn: async () => {
-      const response = await fetch(
-        `/api/links?campaign=${encodeURIComponent(campaignName)}&limit=100&sortBy=clicks&sortOrder=desc`,
-      );
+      const params = new URLSearchParams({
+        campaign: campaignName,
+        limit: "100",
+        sortBy: "clicks",
+        sortOrder: "desc",
+      });
+      if (includeInternal) params.set("includeInternal", "1");
+      const response = await fetch(`/api/links?${params.toString()}`);
       if (!response.ok) throw new Error("Failed to load links");
       const data = await response.json();
       return (data.links || []) as CampaignLink[];
