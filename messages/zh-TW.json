@@ -577,6 +577,7 @@
       "deleteAndPauseConfirm": "刪除並停用 {count} 條連結",
       "deleteSuccess": "活動已刪除，連結保留可用。",
       "deleteSuccessWithPause": "活動已刪除，{count} 條連結已停用。",
+      "resetClicksLabel": "重設點擊",
       "resetClicksTooltip": "重設點擊計數（軟重設，可還原）",
       "resetDialogTitle": "重設「{name}」的點擊計數？",
       "resetDialogBody": "此動作會把這個活動旗下 {links} 條連結共 {count} 筆實際點擊標記為測試數據，KPI / 圖表會立刻歸 0。",

@@ -576,6 +576,7 @@
       "deleteAndPauseConfirm": "Delete + pause {count, plural, one {link} other {links}}",
       "deleteSuccess": "Campaign deleted. Links unlinked but still functional.",
       "deleteSuccessWithPause": "Campaign deleted and {count} link(s) paused.",
+      "resetClicksLabel": "Reset clicks",
       "resetClicksTooltip": "Reset click counters (soft reset, reversible)",
       "resetDialogTitle": "Reset clicks for \"{name}\"?",
       "resetDialogBody": "This flags all {count} real click(s) across {links} link(s) in this campaign as test data. KPIs / charts will drop to 0 immediately.",

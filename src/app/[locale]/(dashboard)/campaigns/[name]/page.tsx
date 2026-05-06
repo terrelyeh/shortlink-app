@@ -439,16 +439,17 @@ export default function CampaignDetailPage() {
               <Plus size={13} /> {t("addLink")}
             </Link>
             {/* Reset clicks — non-destructive (soft reset via isInternal
-                flag). Disabled when there are no links yet. icon-only
-                with title to keep header compact; the dialog has the
-                full explanation. */}
+                flag). Disabled when there are no links yet. Labeled so
+                its purpose is discoverable without needing to hover
+                for the tooltip. */}
             <button
-              className="btn btn-ghost"
+              className="btn btn-secondary"
               onClick={() => setResetOpen(true)}
               disabled={links.length === 0 || totalClicks === 0}
               title={t("resetClicksTooltip")}
             >
               <RotateCcw size={13} />
+              {t("resetClicksLabel")}
             </button>
             <button
               className="btn btn-ghost"
