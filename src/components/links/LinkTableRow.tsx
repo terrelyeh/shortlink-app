@@ -249,10 +249,21 @@ export function LinkTableRow({
           )}
         </td>
 
-        {/* Short URL + Copy */}
+        {/* Short URL — click to open in new tab as a test (?_test=1) so
+            the redirect handler flags the click as internal, keeping
+            test traffic out of analytics. The copy button next to it
+            still copies the clean URL (without ?_test=1). */}
         <td className="py-2 pr-3 whitespace-nowrap">
           <div className="flex items-center gap-1">
-            <code className="text-[13px] text-[#03A9F4] font-medium">/{link.code}</code>
+            <a
+              href={`${shortUrl}?_test=1`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[13px] text-[#03A9F4] font-medium hover:underline"
+              title={t("clickToTest")}
+            >
+              <code>/{link.code}</code>
+            </a>
             <button
               onClick={copyToClipboard}
               className="p-1 rounded hover:bg-slate-100 transition-colors"

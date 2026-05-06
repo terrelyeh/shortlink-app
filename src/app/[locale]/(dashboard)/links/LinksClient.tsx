@@ -27,6 +27,7 @@ import {
   ChevronDown,
   FileSpreadsheet,
   X,
+  Info,
 } from "lucide-react";
 import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -699,7 +700,23 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
                 <th style={{ width: 120 }}>{t("tags")}</th>
                 <th style={{ width: 100 }}>{t("status")}</th>
                 <th className="num" style={{ width: 110 }}>
-                  {t("clicks")}
+                  {/* The native title attribute gives a hover tooltip
+                      (cursor: help) clarifying that this column is real
+                      traffic only — test clicks (?_test=1 or workspace
+                      members) never reach this counter. */}
+                  <span
+                    title={t("clicksColumnTip")}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
+                      gap: 4,
+                      cursor: "help",
+                    }}
+                  >
+                    {t("clicks")}
+                    <Info size={11} style={{ opacity: 0.6 }} />
+                  </span>
                 </th>
                 <th style={{ width: 36 }} />
               </tr>

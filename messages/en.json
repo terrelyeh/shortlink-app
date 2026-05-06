@@ -149,6 +149,8 @@
     "menuAnalytics": "Analytics",
     "menuTestLink": "Test link",
     "menuTestLinkTooltip": "Open in a new tab and flag this click as a test (excluded from analytics)",
+    "clickToTest": "Click to open in a new tab as a test (this click is flagged as test and excluded from analytics)",
+    "clicksColumnTip": "Real traffic only. Clicks from the 'Test link' button, the short URL link in this table (?_test=1), or logged-in workspace members visiting their own links are not counted.",
     "menuPause": "Pause",
     "menuActivate": "Activate",
     "menuDelete": "Delete",
