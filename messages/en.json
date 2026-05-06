@@ -161,7 +161,12 @@
     "advancedOptionsDesc": "Redirect type, expiration, click limits",
     "redirect302": "302 redirect",
     "redirect301": "301 redirect",
-    "creating": "Creating..."
+    "creating": "Creating...",
+    "shortUrlCode": "Short URL code",
+    "shortUrlCodeLockedHint": "Code can't be changed after creation — modifying would break links already shared, printed, or running in ads",
+    "shortUrlCopied": "Short URL copied",
+    "createdOn": "Created",
+    "totalClicks": "Total clicks"
   },
   "utm": {
     "title": "UTM Parameters",

@@ -21,6 +21,12 @@ import {
   ChevronUp,
   Edit,
   Trash2,
+  Copy,
+  Check,
+  Lock,
+  MousePointerClick,
+  CalendarClock,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -96,6 +102,13 @@ export default function EditLinkPage() {
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showUTM, setShowUTM] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Read-only metadata kept on the page for the stats strip in the
+  // header. `code` itself can't be edited (server schema rejects it) —
+  // changing it would invalidate every shared/printed/embedded link.
+  const [clicksCount, setClicksCount] = useState(0);
+  const [createdAt, setCreatedAt] = useState<string | null>(null);
 
   // Fetch link data
   useEffect(() => {
@@ -124,6 +137,8 @@ export default function EditLinkPage() {
         setCode(data.code);
         setStatus(data.status);
         setRedirectType(data.redirectType);
+        setClicksCount(data._count?.clicks ?? 0);
+        setCreatedAt(data.createdAt);
         setUtmSource(data.utmSource || "");
         setUtmMedium(data.utmMedium || "");
         setUtmCampaign(data.utmCampaign || "");
@@ -268,10 +283,31 @@ export default function EditLinkPage() {
   }
 
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
+  const fullShortUrl = `${shortBaseUrl}/${code}`;
+
+  const handleCopyShortUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(fullShortUrl);
+      setCopied(true);
+      toast.success(t("shortUrlCopied"));
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard API can be blocked in non-https or restricted contexts;
+      // toast already covers the success path so silent on failure is OK.
+    }
+  };
+
+  const formattedCreatedAt = createdAt
+    ? new Date(createdAt).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : "";
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="mb-8">
+    <div className="max-w-5xl mx-auto">
+      <div className="mb-6">
         <Link
           href="/links"
           className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 transition-colors group"
@@ -282,9 +318,9 @@ export default function EditLinkPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-        {/* Header */}
+        {/* Header — title + read-only short URL field + stats strip */}
         <div className="px-8 py-6 border-b border-slate-100">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 mb-5">
             <div className="w-10 h-10 bg-sky-50 rounded-lg flex items-center justify-center">
               <Edit className="w-5 h-5 text-[#03A9F4]" />
             </div>
@@ -292,10 +328,73 @@ export default function EditLinkPage() {
               <h1 className="text-xl font-semibold text-slate-900">
                 {t("editLink")}
               </h1>
-              <p className="text-slate-400 text-sm font-mono">
-                {shortBaseUrl}/{code}
+              <p className="text-slate-400 text-sm">
+                {t("shortUrlCodeLockedHint")}
               </p>
             </div>
+          </div>
+
+          {/* Read-only short URL field with copy button + open-in-new-tab.
+              Code can't change (would break shared / printed links). */}
+          <div className="flex items-stretch gap-2">
+            <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl">
+              <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+              <span className="text-xs uppercase tracking-wider text-slate-400 font-semibold shrink-0">
+                {t("shortUrlCode")}
+              </span>
+              <span className="font-mono text-sm text-slate-700 truncate">
+                {fullShortUrl}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyShortUrl}
+              className="px-4 inline-flex items-center gap-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-colors text-sm font-medium"
+              aria-label={tCommon("copyLink")}
+            >
+              {copied ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-500" />
+                  <span>{tCommon("copied")}</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  <span>{tCommon("copy")}</span>
+                </>
+              )}
+            </button>
+            <a
+              href={fullShortUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 inline-flex items-center justify-center bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-colors"
+              aria-label="Open short URL"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          </div>
+
+          {/* Stats strip — clicks + created date */}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-4 text-xs">
+            <div className="inline-flex items-center gap-2 text-slate-500">
+              <MousePointerClick className="w-3.5 h-3.5" />
+              <span className="uppercase tracking-wider font-semibold">
+                {t("totalClicks")}
+              </span>
+              <span className="font-mono tabular-nums text-slate-700 text-sm">
+                {clicksCount.toLocaleString()}
+              </span>
+            </div>
+            {formattedCreatedAt && (
+              <div className="inline-flex items-center gap-2 text-slate-500">
+                <CalendarClock className="w-3.5 h-3.5" />
+                <span className="uppercase tracking-wider font-semibold">
+                  {t("createdOn")}
+                </span>
+                <span className="text-slate-700 text-sm">{formattedCreatedAt}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -343,44 +442,46 @@ export default function EditLinkPage() {
             />
           </div>
 
-          {/* Status */}
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              {t("status")}
-            </label>
-            <div className="flex gap-2">
-              {(["ACTIVE", "PAUSED", "ARCHIVED"] as const).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setStatus(s)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    status === s
-                      ? s === "ACTIVE"
-                        ? "bg-emerald-50 text-emerald-700 border-2 border-emerald-200"
-                        : s === "PAUSED"
-                          ? "bg-amber-50 text-amber-700 border-2 border-amber-200"
-                          : "bg-slate-100 text-slate-700 border-2 border-slate-300"
-                      : "bg-slate-50 text-slate-500 border-2 border-transparent hover:border-slate-200"
-                  }`}
-                >
-                  {t(s === "ACTIVE" ? "active" : s === "PAUSED" ? "paused" : "archived")}
-                </button>
-              ))}
+          {/* Status + Tags — side-by-side on wider screens to make better
+              use of the widened canvas (was stacked when max-w was 2xl). */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                {t("status")}
+              </label>
+              <div className="flex gap-2">
+                {(["ACTIVE", "PAUSED", "ARCHIVED"] as const).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setStatus(s)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      status === s
+                        ? s === "ACTIVE"
+                          ? "bg-emerald-50 text-emerald-700 border-2 border-emerald-200"
+                          : s === "PAUSED"
+                            ? "bg-amber-50 text-amber-700 border-2 border-amber-200"
+                            : "bg-slate-100 text-slate-700 border-2 border-slate-300"
+                        : "bg-slate-50 text-slate-500 border-2 border-transparent hover:border-slate-200"
+                    }`}
+                  >
+                    {t(s === "ACTIVE" ? "active" : s === "PAUSED" ? "paused" : "archived")}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Tags */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
-              <Tag className="w-4 h-4" />
-              {t("tags")}
-            </label>
-            <TagInput
-              selectedTags={selectedTags}
-              onChange={setSelectedTags}
-              placeholder={t("addTag")}
-            />
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
+                <Tag className="w-4 h-4" />
+                {t("tags")}
+              </label>
+              <TagInput
+                selectedTags={selectedTags}
+                onChange={setSelectedTags}
+                placeholder={t("addTag")}
+              />
+            </div>
           </div>
 
           {/* UTM Builder Toggle */}
@@ -578,34 +679,36 @@ export default function EditLinkPage() {
                   </div>
                 </div>
 
-                {/* Scheduled start */}
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Scheduled start
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={startsAt}
-                    onChange={(e) => setStartsAt(e.target.value)}
-                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] transition-all"
-                  />
-                  <p className="mt-2 text-xs text-slate-500">
-                    Link is inactive until this time. Leave blank to activate immediately.
-                  </p>
-                </div>
+                {/* Scheduled start + Expiration — side-by-side. They're a
+                    natural pair (when the link goes live / when it stops). */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Scheduled start
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={startsAt}
+                      onChange={(e) => setStartsAt(e.target.value)}
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] transition-all"
+                    />
+                    <p className="mt-2 text-xs text-slate-500">
+                      Link is inactive until this time. Leave blank to activate immediately.
+                    </p>
+                  </div>
 
-                {/* Expiration */}
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    {t("expiresAt")}
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={expiresAt}
-                    onChange={(e) => setExpiresAt(e.target.value)}
-                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] transition-all"
-                  />
-                  <p className="mt-2 text-xs text-slate-500">{t("noExpiry")}</p>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      {t("expiresAt")}
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={expiresAt}
+                      onChange={(e) => setExpiresAt(e.target.value)}
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] transition-all"
+                    />
+                    <p className="mt-2 text-xs text-slate-500">{t("noExpiry")}</p>
+                  </div>
                 </div>
 
                 {/* Max Clicks */}
@@ -619,7 +722,7 @@ export default function EditLinkPage() {
                     value={maxClicks}
                     onChange={(e) => setMaxClicks(e.target.value)}
                     placeholder={t("noLimit")}
-                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] transition-all placeholder:text-slate-400"
+                    className="w-full md:max-w-xs px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] transition-all placeholder:text-slate-400"
                   />
                 </div>
 

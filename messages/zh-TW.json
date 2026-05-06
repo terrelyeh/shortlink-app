@@ -162,7 +162,12 @@
     "advancedOptionsDesc": "轉址類型、到期時間、點擊上限",
     "redirect302": "302 轉址",
     "redirect301": "301 轉址",
-    "creating": "建立中..."
+    "creating": "建立中...",
+    "shortUrlCode": "短網址代碼",
+    "shortUrlCodeLockedHint": "代碼建立後不可變更，避免破壞既有分享 / 印刷 / 廣告中的連結",
+    "shortUrlCopied": "短網址已複製",
+    "createdOn": "建立於",
+    "totalClicks": "累積點擊"
   },
   "utm": {
     "title": "UTM 參數",
