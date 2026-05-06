@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useRouter } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { UTMBuilder } from "@/components/forms/UTMBuilder";
 import { TagInput } from "@/components/tags/TagInput";
 import { useToast } from "@/components/ui/Toast";
@@ -77,7 +77,6 @@ export default function EditLinkPage() {
 
   const linkId = params.id as string;
 
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,73 +109,102 @@ export default function EditLinkPage() {
   const [clicksCount, setClicksCount] = useState(0);
   const [createdAt, setCreatedAt] = useState<string | null>(null);
 
-  // Fetch link data
+  // Once we've populated form state from data (placeholder OR fresh),
+  // freeze sync — otherwise a background refetch arriving 300 ms later
+  // would clobber whatever the user just typed.
+  const populatedRef = useRef(false);
+
+  // React Query for the edit-page data.
+  // Critical perf trick: placeholderData reads from the cached /links
+  // list payload (`["links", 500]`) so the form is **immediately** filled
+  // with the same row the user just clicked. No blank spinner — feels
+  // instant. Background refetch confirms / fills any drift.
+  const { data: linkData, isLoading } = useQuery<LinkData>({
+    queryKey: ["link", linkId],
+    queryFn: async () => {
+      const response = await fetch(`/api/links/${linkId}`);
+      if (!response.ok) throw new Error("Link not found");
+      return (await response.json()) as LinkData;
+    },
+    placeholderData: () => {
+      // Lookup in the list cache. Same shape (full ShortLink + tags +
+      // _count) so it's a drop-in. If user landed here from a deep link
+      // without visiting /links first, this is undefined → falls back
+      // to normal loading state.
+      const listPayload = qc.getQueryData<{ links: LinkData[] }>([
+        "links",
+        500,
+      ]);
+      return listPayload?.links.find((l) => l.id === linkId);
+    },
+    enabled: !!linkId,
+  });
+
+  // Populate form state once data is available. Guard with populatedRef
+  // so a background refetch (placeholder → fresh) doesn't overwrite
+  // user edits that happened in between.
   useEffect(() => {
-    async function fetchLink() {
-      try {
-        const response = await fetch(`/api/links/${linkId}`);
-        if (!response.ok) throw new Error("Link not found");
-        const data: LinkData = await response.json();
+    if (!linkData || populatedRef.current) return;
+    populatedRef.current = true;
 
-        // Strip UTM params from URL for editing (they are managed separately)
-        let cleanUrl = data.originalUrl;
-        try {
-          const url = new URL(data.originalUrl);
-          ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"].forEach(
-            (p) => url.searchParams.delete(p)
-          );
-          cleanUrl = url.toString();
-          // Remove trailing ? if no params left
-          if (cleanUrl.endsWith("?")) cleanUrl = cleanUrl.slice(0, -1);
-        } catch {
-          // URL parsing failed, use as-is
-        }
-
-        setOriginalUrl(cleanUrl);
-        setTitle(data.title || "");
-        setCode(data.code);
-        setStatus(data.status);
-        setRedirectType(data.redirectType);
-        setClicksCount(data._count?.clicks ?? 0);
-        setCreatedAt(data.createdAt);
-        setUtmSource(data.utmSource || "");
-        setUtmMedium(data.utmMedium || "");
-        setUtmCampaign(data.utmCampaign || "");
-        setUtmContent(data.utmContent || "");
-        setUtmTerm(data.utmTerm || "");
-        setSelectedTags(data.tags.map((t) => t.tag));
-
-        if (data.startsAt) {
-          setStartsAt(new Date(data.startsAt).toISOString().slice(0, 16));
-        }
-        if (data.expiresAt) {
-          const d = new Date(data.expiresAt);
-          setExpiresAt(d.toISOString().slice(0, 16));
-        }
-        if (data.maxClicks) setMaxClicks(String(data.maxClicks));
-        if (data.allowedCountries?.length) setAllowedCountries(data.allowedCountries);
-        if (Array.isArray(data.variants) && data.variants.length > 0) {
-          setVariants(data.variants);
-        }
-
-        // Auto-expand sections if they have values
-        if (data.utmSource || data.utmMedium || data.utmContent || data.utmTerm) setShowUTM(true);
-        if (
-          data.startsAt ||
-          data.expiresAt ||
-          data.maxClicks ||
-          data.allowedCountries?.length ||
-          data.redirectType === "PERMANENT"
-        )
-          setShowAdvanced(true);
-      } catch {
-        setError("Failed to load link");
-      } finally {
-        setLoading(false);
-      }
+    // Strip UTM params from URL for editing (they are managed separately)
+    let cleanUrl = linkData.originalUrl;
+    try {
+      const url = new URL(linkData.originalUrl);
+      ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"].forEach(
+        (p) => url.searchParams.delete(p),
+      );
+      cleanUrl = url.toString();
+      if (cleanUrl.endsWith("?")) cleanUrl = cleanUrl.slice(0, -1);
+    } catch {
+      // URL parsing failed, use as-is
     }
-    fetchLink();
-  }, [linkId]);
+
+    setOriginalUrl(cleanUrl);
+    setTitle(linkData.title || "");
+    setCode(linkData.code);
+    setStatus(linkData.status);
+    setRedirectType(linkData.redirectType);
+    setClicksCount(linkData._count?.clicks ?? 0);
+    setCreatedAt(linkData.createdAt);
+    setUtmSource(linkData.utmSource || "");
+    setUtmMedium(linkData.utmMedium || "");
+    setUtmCampaign(linkData.utmCampaign || "");
+    setUtmContent(linkData.utmContent || "");
+    setUtmTerm(linkData.utmTerm || "");
+    setSelectedTags(linkData.tags.map((t) => t.tag));
+
+    if (linkData.startsAt) {
+      setStartsAt(new Date(linkData.startsAt).toISOString().slice(0, 16));
+    }
+    if (linkData.expiresAt) {
+      const d = new Date(linkData.expiresAt);
+      setExpiresAt(d.toISOString().slice(0, 16));
+    }
+    if (linkData.maxClicks) setMaxClicks(String(linkData.maxClicks));
+    if (linkData.allowedCountries?.length) setAllowedCountries(linkData.allowedCountries);
+    if (Array.isArray(linkData.variants) && linkData.variants.length > 0) {
+      setVariants(linkData.variants);
+    }
+
+    // Auto-expand sections if they have values
+    if (linkData.utmSource || linkData.utmMedium || linkData.utmContent || linkData.utmTerm) {
+      setShowUTM(true);
+    }
+    if (
+      linkData.startsAt ||
+      linkData.expiresAt ||
+      linkData.maxClicks ||
+      linkData.allowedCountries?.length ||
+      linkData.redirectType === "PERMANENT"
+    ) {
+      setShowAdvanced(true);
+    }
+  }, [linkData]);
+
+  // True "no data at all" loading — only when both query AND list cache
+  // miss. With placeholderData this is rare (only on direct deep links).
+  const loading = isLoading && !linkData;
 
   const handleUTMChange = (values: {
     utmSource: string;
@@ -262,6 +290,11 @@ export default function EditLinkPage() {
       // campaigns), click routing, status, variants — anything shown on
       // other pages. Bust the shared caches so nav back to Campaigns /
       // Analytics doesn't show stale numbers.
+      // Crucially: invalidate ["links", 500] too — without this the
+      // user navigates back to /links and sees stale row data (status
+      // / title / utm not updated).
+      qc.invalidateQueries({ queryKey: ["links"] });
+      qc.invalidateQueries({ queryKey: ["link", linkId] });
       qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
       qc.invalidateQueries({ queryKey: ["analytics-raw"] });
       qc.invalidateQueries({ queryKey: ["campaign-links"] });
