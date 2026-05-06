@@ -8,7 +8,18 @@
  */
 
 import Link from "next/link";
-import { ArrowLeft, FlaskConical, RotateCcw, ToggleLeft, Info } from "lucide-react";
+import {
+  ArrowLeft,
+  FlaskConical,
+  RotateCcw,
+  ToggleLeft,
+  Info,
+  Copy,
+  MoreVertical,
+  Check,
+  ExternalLink,
+  AlertTriangle,
+} from "lucide-react";
 
 export default function TestClicksNote() {
   return (
@@ -86,6 +97,42 @@ export default function TestClicksNote() {
           列表裡藍色的 <code>/cx26-Lin-Promo-1</code> 文字就是 anchor，點下去 = 開新分頁測試。
           旁邊的複製按鈕<strong>不會</strong>帶 <code>?_test=1</code>，所以複製出去給客戶的還是乾淨網址。
         </p>
+        {/* Mockup: how the short URL cell looks on /links */}
+        <div className="mock-frame">
+          <div className="mock-label">範例</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 0" }}>
+            <a
+              href="#"
+              onClick={(e) => e.preventDefault()}
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 13,
+                color: "#03A9F4",
+                fontWeight: 500,
+                textDecoration: "none",
+              }}
+            >
+              /cx26-Lin-Promo-1
+            </a>
+            <button
+              type="button"
+              style={{
+                padding: 4,
+                borderRadius: 4,
+                background: "transparent",
+                border: 0,
+                color: "var(--ink-400)",
+                cursor: "pointer",
+              }}
+              aria-label="copy"
+            >
+              <Copy size={12} />
+            </button>
+            <span style={{ marginLeft: 12, fontSize: 12, color: "var(--ink-500)" }}>
+              ← 點藍字 = 測試（帶 ?_test=1）　・　點 <Copy size={11} style={{ display: "inline", verticalAlign: "-2px" }} /> = 複製乾淨網址
+            </span>
+          </div>
+        </div>
 
         <h3 className="flex items-center gap-2">
           <FlaskConical className="w-4 h-4 text-violet-500" />
@@ -94,6 +141,47 @@ export default function TestClicksNote() {
         <p>
           每一列右邊的 <code>⋯</code> 選單裡有「測試短網址」項，點了開新分頁。手機 card view 的選單也有同樣項目。
         </p>
+        {/* Mockup: row menu open */}
+        <div className="mock-frame">
+          <div className="mock-label">範例</div>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+            <button
+              type="button"
+              style={{
+                padding: 6,
+                borderRadius: 4,
+                background: "var(--bg-subtle)",
+                border: "1px solid var(--border)",
+                color: "var(--ink-400)",
+                cursor: "pointer",
+              }}
+              aria-label="more"
+            >
+              <MoreVertical size={14} />
+            </button>
+            <div
+              style={{
+                width: 200,
+                background: "white",
+                borderRadius: 8,
+                border: "1px solid var(--border)",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                padding: "4px 0",
+                fontSize: 13,
+              }}
+            >
+              <div className="mock-menu-item">編輯</div>
+              <div className="mock-menu-item">數據分析</div>
+              <div className="mock-menu-item mock-menu-highlight">
+                <FlaskConical size={13} style={{ color: "var(--brand-700)" }} />
+                測試短網址
+              </div>
+              <div className="mock-menu-item">QR Code</div>
+              <div className="mock-menu-item">建立副本</div>
+              <div className="mock-menu-item">暫停</div>
+            </div>
+          </div>
+        </div>
 
         <h3 className="flex items-center gap-2">
           <FlaskConical className="w-4 h-4 text-violet-500" />
@@ -102,6 +190,81 @@ export default function TestClicksNote() {
         <p>
           頁面頂端 read-only 短網址欄位旁邊有紫色「測試短網址」按鈕。剛改完設定想立刻驗證時最順手。
         </p>
+        {/* Mockup: edit page header strip */}
+        <div className="mock-frame">
+          <div className="mock-label">範例</div>
+          <div style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "10px 14px",
+                background: "var(--bg-subtle)",
+                border: "1px solid var(--border)",
+                borderRadius: 10,
+                fontSize: 13,
+              }}
+            >
+              <span style={{ fontSize: 11, color: "var(--ink-500)", fontWeight: 600, letterSpacing: "0.04em" }}>
+                短網址代碼
+              </span>
+              <span style={{ fontFamily: "var(--font-mono)", color: "var(--ink-200)" }}>
+                go.engenius.ai/cx26-Lin-Promo-1
+              </span>
+            </div>
+            <button
+              type="button"
+              style={{
+                padding: "0 14px",
+                background: "white",
+                border: "1px solid var(--border)",
+                borderRadius: 10,
+                color: "var(--ink-400)",
+                fontSize: 13,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <Copy size={13} /> 複製
+            </button>
+            <button
+              type="button"
+              style={{
+                padding: "0 14px",
+                background: "white",
+                border: "1px solid var(--border)",
+                borderRadius: 10,
+                color: "var(--ink-400)",
+                cursor: "pointer",
+              }}
+              aria-label="open"
+            >
+              <ExternalLink size={13} />
+            </button>
+            <button
+              type="button"
+              style={{
+                padding: "0 14px",
+                background: "#F3E8FF",
+                border: "1px solid #D8B4FE",
+                borderRadius: 10,
+                color: "#7E22CE",
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <FlaskConical size={13} /> 測試短網址
+            </button>
+          </div>
+        </div>
       </section>
 
       <section className="note-section">
@@ -120,6 +283,20 @@ export default function TestClicksNote() {
           /analytics 跟 /campaigns/[name] 頂部有「<strong>含測試點擊</strong>」toggle，打開即可看到完整數字。
           常見用途：跟內部其他 dashboard 對數字（外部數字含 click event 沒過濾的話），或審查 QA 流量分布。
         </p>
+        {/* Mockup: toggle states side-by-side */}
+        <div className="mock-frame">
+          <div className="mock-label">兩種狀態</div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <span className="mock-toggle">
+              <span className="mock-checkbox" />
+              含測試點擊
+            </span>
+            <span className="mock-toggle mock-toggle-on">
+              <span className="mock-checkbox mock-checkbox-on">✓</span>
+              含測試點擊
+            </span>
+          </div>
+        </div>
 
         <h3>列表「點擊數」永遠是 real-only</h3>
         <p>
@@ -129,12 +306,45 @@ export default function TestClicksNote() {
 
         <h3>過濾指示</h3>
         <p>
-          當期間內有測試點擊被過濾時，/analytics 跟 /campaigns/[name] 會顯示一行提示：
+          當期間內有測試點擊被過濾時，/analytics 跟 /campaigns/[name] 會顯示一行提示。想看可以點旁邊「全部顯示」一鍵打開 toggle。
         </p>
-        <blockquote>已過濾 <strong>N</strong> 筆測試點擊（來自「測試短網址」或工作區成員）</blockquote>
-        <p>
-          想看可以點旁邊「全部顯示」一鍵打開 toggle。
-        </p>
+        {/* Mockup: filter banner */}
+        <div className="mock-frame">
+          <div className="mock-label">範例</div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              padding: "10px 14px",
+              background: "var(--bg-subtle)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              fontSize: 12.5,
+              color: "var(--ink-400)",
+            }}
+          >
+            <span style={{ fontVariantNumeric: "tabular-nums" }}>
+              已過濾 <strong style={{ color: "var(--ink-200)" }}>2</strong> 筆測試點擊（來自「測試短網址」或工作區成員）
+            </span>
+            <button
+              type="button"
+              style={{
+                height: 26,
+                fontSize: 12,
+                padding: "0 10px",
+                borderRadius: 6,
+                background: "transparent",
+                border: 0,
+                color: "var(--ink-400)",
+                cursor: "pointer",
+              }}
+            >
+              全部顯示
+            </button>
+          </div>
+        </div>
       </section>
 
       <section className="note-section">
@@ -145,6 +355,93 @@ export default function TestClicksNote() {
         <p>
           測試了一段時間後想「正式從 0 開始算」？/campaigns/[name] PageHeader 有圈箭頭 icon，點了開啟確認 dialog。
         </p>
+        {/* Mockup: reset confirmation dialog */}
+        <div className="mock-frame mock-frame-dialog">
+          <div className="mock-label">確認對話框長這樣</div>
+          <div
+            style={{
+              background: "white",
+              borderRadius: 16,
+              border: "1px solid var(--border)",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+              padding: 20,
+              maxWidth: 420,
+            }}
+          >
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: "#FEF3C7",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 12,
+              }}
+            >
+              <RotateCcw size={16} style={{ color: "#D97706" }} />
+            </div>
+            <h4 style={{ fontSize: 15, fontWeight: 600, color: "var(--ink-100)", margin: "0 0 4px" }}>
+              重設「computex-26」的點擊計數？
+            </h4>
+            <p style={{ fontSize: 13, color: "var(--ink-500)", margin: "0 0 14px" }}>
+              此動作會把這個活動旗下 8 條連結共 66 筆實際點擊標記為測試數據，KPI / 圖表會立刻歸 0。
+            </p>
+            <div
+              style={{
+                background: "#ECFDF5",
+                border: "1px solid #BBF7D0",
+                borderRadius: 8,
+                padding: "10px 12px",
+                fontSize: 12,
+                color: "#065F46",
+                lineHeight: 1.65,
+              }}
+            >
+              <div>✓ 可隨時還原（資料保留，不是刪除）</div>
+              <div>✓ 在分析頁打開「含測試點擊」就能查看</div>
+              <div style={{ color: "#92400E" }}>⚠ KPI 跟趨勢圖會立刻顯示 0</div>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  height: 36,
+                  background: "white",
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: "var(--ink-300)",
+                  cursor: "pointer",
+                }}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  height: 36,
+                  background: "#D97706",
+                  border: 0,
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: "white",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                }}
+              >
+                <RotateCcw size={13} /> 確認重設
+              </button>
+            </div>
+          </div>
+        </div>
 
         <h3>它做什麼</h3>
         <ul>
@@ -303,6 +600,76 @@ export default function TestClicksNote() {
           border-radius: 8px;
           font-size: 14px;
           color: var(--ink-300);
+        }
+        /* Inline UI mockups — visualize the actual components without
+           shipping screenshots. Stay in sync with the design tokens. */
+        .mock-frame {
+          margin: 14px 0 22px;
+          padding: 18px 18px 20px;
+          background: #fff;
+          border: 1px dashed var(--border);
+          border-radius: 10px;
+          position: relative;
+        }
+        .mock-label {
+          position: absolute;
+          top: -9px;
+          left: 14px;
+          padding: 1px 8px;
+          background: #fff;
+          font-size: 11px;
+          color: var(--ink-500);
+          font-weight: 500;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+        }
+        .mock-frame-dialog {
+          background: var(--bg-subtle);
+        }
+        .mock-menu-item {
+          padding: 6px 12px;
+          color: var(--ink-200);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .mock-menu-highlight {
+          background: rgba(3, 169, 244, 0.06);
+          color: var(--brand-700);
+          font-weight: 500;
+        }
+        .mock-toggle {
+          height: 32px;
+          padding: 0 10px;
+          font-size: 12px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          border: 1px solid var(--border);
+          border-radius: 7px;
+          color: var(--ink-400);
+          background: white;
+        }
+        .mock-toggle-on {
+          color: var(--brand-700);
+          border-color: var(--brand-500);
+          background: rgba(3, 169, 244, 0.06);
+        }
+        .mock-checkbox {
+          width: 14px;
+          height: 14px;
+          border: 1.5px solid currentColor;
+          border-radius: 3px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          line-height: 1;
+        }
+        .mock-toggle-on .mock-checkbox-on {
+          background: var(--brand-700);
+          border-color: var(--brand-700);
+          color: white;
         }
       `}</style>
     </article>
