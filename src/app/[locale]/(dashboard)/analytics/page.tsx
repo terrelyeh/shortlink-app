@@ -363,47 +363,100 @@ export default function AnalyticsPage() {
         )}
       </div>
 
-      {/* Selected link callout */}
+      {/* Selected link callout — promoted to a clearly-noticed filter
+          banner so the user always knows analytics are scoped to one
+          link, not all-workspace traffic. */}
       {selectedLink && (
         <div
           style={{
             display: "flex",
-            alignItems: "center",
-            gap: 12,
+            alignItems: "stretch",
+            gap: 14,
             background: "var(--brand-50)",
-            borderLeft: "2px solid var(--brand-500)",
-            borderRadius: "0 6px 6px 0",
-            padding: "10px 14px",
-            marginBottom: 14,
+            border: "1px solid var(--brand-100)",
+            borderLeft: "4px solid var(--brand-500)",
+            borderRadius: 10,
+            padding: "14px 18px",
+            marginBottom: 18,
+            boxShadow: "0 1px 2px rgba(3, 169, 244, 0.08)",
           }}
         >
+          <div
+            style={{
+              flexShrink: 0,
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              background: "var(--brand-100)",
+              color: "var(--brand-700)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              alignSelf: "flex-start",
+              marginTop: 2,
+            }}
+          >
+            <Link2 size={18} />
+          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 13, color: "var(--ink-200)", margin: 0 }}>
-              <span style={{ fontWeight: 500 }}>{t("viewingLinkAnalytics")}</span>{" "}
-              <span style={{ fontFamily: "var(--font-mono)", color: "var(--brand-600)" }}>
+            <div
+              style={{
+                fontSize: 11.5,
+                fontWeight: 600,
+                color: "var(--brand-700)",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                marginBottom: 4,
+              }}
+            >
+              {t("viewingLinkAnalytics")}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 8,
+                flexWrap: "wrap",
+                rowGap: 2,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: "var(--ink-100)",
+                }}
+              >
                 /{selectedLink.code}
               </span>
               {selectedLink.title && (
-                <span className="muted" style={{ marginLeft: 4 }}>
+                <span style={{ fontSize: 14, color: "var(--ink-300)" }}>
                   — {selectedLink.title}
                 </span>
               )}
-            </p>
-            <p
+            </div>
+            <div
               style={{
-                fontSize: 11.5,
+                fontSize: 12,
                 color: "var(--ink-500)",
-                margin: "3px 0 0",
+                marginTop: 4,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}
+              title={selectedLink.originalUrl}
             >
-              {selectedLink.originalUrl}
-            </p>
+              → {selectedLink.originalUrl}
+            </div>
           </div>
-          <button className="btn btn-ghost" style={{ padding: 4 }} onClick={() => setSelectedLinkId("")}>
-            <X size={13} />
+          <button
+            className="btn btn-ghost"
+            style={{ padding: "6px 10px", height: 32, alignSelf: "flex-start" }}
+            onClick={() => setSelectedLinkId("")}
+            title={t("clearFilter")}
+          >
+            <X size={14} />
           </button>
         </div>
       )}
