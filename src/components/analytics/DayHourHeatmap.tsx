@@ -5,9 +5,12 @@
  * shaded by click count. Marketers use this to find best send time
  * for EDM / social posts based on historical click patterns.
  *
- * Pure CSS grid (no recharts). Server clock is used for the hour
- * bucket — viewer's timezone might differ but for marketing-team
- * use (most clicks within +/- a few timezones of HQ) this is fine.
+ * Pure CSS grid (no recharts). Bucketing happens in compute.ts via
+ * `new Date(timestamp).getDay()/.getHours()`, which uses the JS
+ * runtime's local timezone — i.e. the **viewer's browser timezone**.
+ * Single-region teams (everyone in Taipei) see consistent buckets;
+ * a teammate viewing from another TZ would see clicks bucketed in
+ * their own local hours. Acceptable trade-off for an internal tool.
  */
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -78,30 +81,38 @@ export function DayHourHeatmap({ data }: DayHourHeatmapProps) {
         ))}
       </div>
 
-      {/* Legend */}
+      {/* Legend + viewer-TZ disclosure so users understand bucketing
+          uses their own browser timezone, not server / UTC. */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 6,
+          justifyContent: "space-between",
+          gap: 12,
           marginTop: 12,
           fontSize: 11,
           color: "var(--ink-500)",
+          flexWrap: "wrap",
         }}
       >
-        <span>Less</span>
-        {[0.1, 0.3, 0.5, 0.75, 1].map((i) => (
-          <div
-            key={i}
-            style={{
-              width: 14,
-              height: 14,
-              borderRadius: 3,
-              background: `rgba(3, 169, 244, ${i})`,
-            }}
-          />
-        ))}
-        <span>More · max {max}/h</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span>Less</span>
+          {[0.1, 0.3, 0.5, 0.75, 1].map((i) => (
+            <div
+              key={i}
+              style={{
+                width: 14,
+                height: 14,
+                borderRadius: 3,
+                background: `rgba(3, 169, 244, ${i})`,
+              }}
+            />
+          ))}
+          <span>More · max {max}/h</span>
+        </div>
+        <span style={{ fontVariantNumeric: "tabular-nums" }}>
+          Times in {Intl.DateTimeFormat().resolvedOptions().timeZone}
+        </span>
       </div>
     </div>
   );
