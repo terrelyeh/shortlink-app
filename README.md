@@ -14,6 +14,7 @@
 | **UTM 模板系統** | 儲存常用 UTM 組合為模板（通路級預設，如「EDM 週報」「FB 付費廣告」）；快速套用到新連結。**不綁定 campaign** — 同一個模板可橫跨多個活動 |
 | **批次建立（固定 URL + 多 content）** | 一次建立多個短網址變體（如多位 KOL 的追蹤連結） |
 | **CSV 匯入批次建立** | 每 row 獨立 URL / UTM / tags / 排程 / 地區限制，上限 500 row |
+| **活動啟動器 Kickstart** | `/campaigns/kickstart` 選 playbook（Product Launch / Exhibition Event）→ 一鍵展開 8–10 個頻道的追蹤連結；偵測到既有活動時自動切擴充模式只建缺的，避免重複 |
 | **OG 縮圖自動抓取** | 建連結後背景抓目標頁的 `og:image` / `og:title` 作為預覽縮圖 |
 | **QR Code 產生** | 自動為每個短網址產生 QR Code，支援 PNG 下載與複製到剪貼簿 |
 | **連結分組與標籤** | 使用群組和標籤整理連結，支援多標籤篩選 |
@@ -60,23 +61,23 @@
 | 功能 | 說明 |
 |------|------|
 | **工作區 (Workspace)** | 多工作區支援，每個團隊獨立管理連結與活動 |
-| **角色權限** | 系統層級 Admin / Manager / Member / Viewer 四級權限 |
-| **工作區角色** | 工作區層級 Owner / Admin / Member / Viewer 獨立權限 |
-| **成員邀請** | 透過 Email 邀請成員加入工作區，含邀請連結與到期時間 |
-| **共享報告** | 產生公開分享連結，支援密碼保護、到期時間、最大瀏覽次數 |
+| **工作區角色** | Owner / Admin / Member / Viewer 四級。OWNER/ADMIN 可管成員 + 跨人編輯任何資料；MEMBER/VIEWER 只能改自己建的，但都看得到工作區全員資料 |
+| **成員邀請（Targeted Invite Link）** | 不寄 email — 產生帶 token 的連結，自己貼 Slack/Email 給對方；對方 Google 登入後 hook 自動加入工作區。連結 7 天到期，UI 留著過期記錄 + 一鍵重發 |
+| **Campaign 刪除模式** | 「只刪 Campaign」連結保留可用；「刪除並停用所有連結」連結同步 PAUSED — 給整批清測試專案用 |
+| **共享報告** | 產生公開分享連結，支援密碼保護、到期時間、最大瀏覽次數；scope 可選單一連結 / 整個 Campaign / 工作區某時段 |
 | **審計日誌** | 記錄所有操作（建立、更新、刪除、分享、邀請成員等） |
-| **使用者管理** | Admin 可管理團隊成員與角色 |
 
 ### 其他特色
 
 - **國際化 (i18n)** - 支援英文與繁體中文；UTM 參數名（`utm_source` 等）與產業縮寫（CVR / CTR / QR）刻意保留英文，對齊 GA / 外部工具
 - **切頁瞬間完成** - 所有 dashboard 頁面走 React Query client cache，第一次進站後切換 tabs 零網路延遲；每頁右上角「Sync」按鈕手動強制重抓 + 顯示「最後同步時間」
-- **響應式設計** - 適配桌面與行動裝置
+- **行動裝置基本操作** - `/links` 在手機自動切 card view；KPI / page header / 表格觸控目標 ≥44px；複雜表單（A/B variant 編輯、Kickstart 寬表）建議走桌面
+- **品牌短域名** - 短網址走 `go.engenius.ai`（custom domain），Dashboard 走 `mkt-shortlink.vercel.app`；middleware 自動把 `go.engenius.ai/<code>` rewrite 到 `/s/<code>`，短域名其他路徑 302 回品牌站避免暴露 dashboard
 - **軟刪除** - 已刪除連結保留於資料庫，可供稽核
 - **連結生命週期** - 排程啟用（`startsAt`）/ 到期（`expiresAt`）/ 最大點擊次數（`maxClicks`）
 - **Rate Limiting** - 重導向端點（per-IP 60/min）與分享報告端點均設有速率限制
 - **IP 匿名化** - 使用 Hash Salt 對 IP 位址進行匿名化處理
-- **Workspace IDOR 防護** - `resolveWorkspaceScope()` 驗 membership，避免越權讀取他人 workspace
+- **Workspace IDOR 防護** - `resolveWorkspaceScope()` 驗 membership 並 auto-fallback 到使用者主 workspace，避免 orphan 寫入
 
 ---
 
@@ -157,7 +158,8 @@ cp .env.example .env
 - `DATABASE_URL` - PostgreSQL 連線字串
 - `AUTH_SECRET` - 執行 `openssl rand -base64 32` 產生
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - 從 Google Cloud Console 取得
-- `ALLOWED_EMAILS` - （選填）Email 白名單，逗號分隔，例 `a@x.com,b@y.com`
+- `BOOTSTRAP_EMAILS` - 緊急 admin email（1–2 個），用來開機與緊急 recovery；正式邀請流程之外的 fallback 通道
+- `ALLOWED_EMAILS` - （選填，過渡用）Email 白名單；正常情況走 invitation 流程，這個 env 是給已存在使用者退役期間相容
 
 4. 初始化資料庫：
 ```bash
@@ -251,10 +253,10 @@ src/
 │   │   │   │   └── [id]/      # 編輯單一連結
 │   │   │   ├── analytics/     # 全站維度分析
 │   │   │   ├── templates/     # UTM 模板
-│   │   │   ├── workspaces/    # 工作區管理
-│   │   │   ├── users/         # 使用者管理（Admin）
 │   │   │   ├── audit-log/     # 審計日誌
-│   │   │   └── settings/      # 個人設定 + UTM Governance tab
+│   │   │   ├── settings/      # 個人設定 + 成員管理 + 工作區設定 + UTM Governance tab
+│   │   │   └── campaigns/kickstart/  # Playbook 一鍵建整套追蹤連結 wizard
+│   │   ├── invite/[token]/    # 受邀者落地頁 + 自己包 SessionProvider
 │   │   └── page.tsx           # 根頁 → 登入時 redirect 到 /campaigns
 │   ├── auth/                  # NextAuth 認證頁
 │   ├── api/                   # API 路由（含 /api/track 轉換追蹤）
@@ -273,7 +275,10 @@ src/
 ├── lib/
 │   ├── auth.ts                # NextAuth.js 設定
 │   ├── prisma.ts              # Prisma 客戶端
-│   ├── workspace.ts           # resolveWorkspaceScope() — 驗 membership
+│   ├── workspace.ts           # resolveWorkspaceScope (auto-fallback) + canUserActOnResource
+│   ├── fetch-workspace.ts     # patch window.fetch 自動塞 x-workspace-id header
+│   ├── hooks/useMediaQuery.ts # SSR-safe matchMedia hook（mobile 切換用）
+│   ├── campaign-playbooks.ts  # Kickstart wizard 的 playbook 定義
 │   ├── ratelimit.ts           # 速率限制（重導向 + /api/track）
 │   ├── cache.ts + cache-scopes.ts  # Redis wrapper + versioned invalidation
 │   ├── geoip.ts               # IP 地理位置查詢
@@ -288,7 +293,8 @@ src/
 └── middleware.ts              # next-intl routing（排除 /s/、/link-*、/share/ 等）
 
 scripts/
-└── backfill-campaign-autolink.mjs  # 一次性 orphan link → Campaign 綁定
+├── backfill-campaign-autolink.mjs  # 一次性 orphan link → Campaign 綁定
+└── backfill-workspace-id.mjs       # 補回 workspaceId=null 的 ShortLink/Campaign/Click
 
 screenshots/                   # UI 設計評估用截圖（gitignored 建議）
 ```
@@ -314,8 +320,9 @@ screenshots/                   # UI 設計評估用截圖（gitignored 建議）
 | 端點 | 方法 | 說明 |
 |------|------|------|
 | `/api/campaigns` | GET, POST | 列出 / 建立行銷活動 |
-| `/api/campaigns/[id]` | GET, PATCH, DELETE | 單一活動操作 |
+| `/api/campaigns/[id]` | GET, PATCH, DELETE | 單一活動操作（DELETE 支援 `?pauseLinks=true` 連同停用所有連結） |
 | `/api/utm-campaigns` | GET | UTM Campaign 聚合統計（連結數、點擊數） |
+| `/api/utm-campaigns/[name]` | GET, PATCH, DELETE | by name 操作（PATCH 改 goal、DELETE 同 `?pauseLinks=true` 模式） |
 
 ### 分析與匯出
 
@@ -356,15 +363,13 @@ screenshots/                   # UI 設計評估用截圖（gitignored 建議）
 | `/api/workspaces` | GET, POST | 列出 / 建立工作區 |
 | `/api/workspaces/[id]` | GET, PATCH, DELETE | 單一工作區操作 |
 | `/api/workspaces/[id]/members` | GET, PATCH, DELETE | 管理工作區成員 |
-| `/api/workspaces/[id]/invitations` | GET, POST, DELETE | 管理邀請 |
-| `/api/invitations/[token]` | GET, POST | 查看 / 接受邀請 |
+| `/api/workspaces/[id]/invitations` | GET, POST, PATCH, DELETE | 管理邀請（PATCH = 重發、產新 token） |
+| `/api/invitations/[token]` | GET, POST | 查看 / 接受邀請（GET 對 ACCEPTED 回 200 + `alreadyAccepted: true` 不當錯誤） |
 
 ### 管理
 
 | 端點 | 方法 | 說明 |
 |------|------|------|
-| `/api/users` | GET | 列出使用者（Admin） |
-| `/api/users/[id]` | PATCH, DELETE | 使用者管理（Admin） |
 | `/api/user/profile` | PATCH, DELETE | 個人資料管理 |
 | `/api/audit-log` | GET | 審計日誌（Admin/Manager） |
 
@@ -382,7 +387,8 @@ screenshots/                   # UI 設計評估用截圖（gitignored 建議）
 | `NEXT_PUBLIC_APP_URL` | 是 | 應用程式 URL |
 | `NEXT_PUBLIC_SHORT_URL` | 是 | 短網址基底 URL |
 | `IP_HASH_SALT` | 是 | IP 位址雜湊鹽值 |
-| `ALLOWED_EMAILS` | 否 | Email 白名單（逗號分隔） |
+| `BOOTSTRAP_EMAILS` | 是 | 緊急 admin email（逗號分隔，1–2 個） |
+| `ALLOWED_EMAILS` | 否 | （過渡相容）Email 白名單；新部署不需要 |
 | `UPSTASH_REDIS_REST_URL` | 否 | Upstash Redis REST URL（沒設則停用快取）|
 | `UPSTASH_REDIS_REST_TOKEN` | 否 | Upstash Redis REST Token |
 
