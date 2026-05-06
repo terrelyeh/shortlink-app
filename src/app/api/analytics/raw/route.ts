@@ -37,7 +37,9 @@ export async function GET(request: NextRequest) {
     // Redis-cache the whole raw payload. This is the heaviest call in the
     // app (can return 1-2 MB) and the result is identical for every view of
     // the Analytics page within 60s. Massive hit-rate.
-    const key = cacheKey("analytics-raw", session.user.id, workspaceId ?? "_", sinceIso);
+    // v2: payload added city field. Bump key so old v1 (no city) cache
+    // doesn't poison clients that now expect city / cities aggregation.
+    const key = cacheKey("analytics-raw-v2", session.user.id, workspaceId ?? "_", sinceIso);
 
     const payload = await cached(key, 60, async () => {
       const [links, clicks] = await Promise.all([
@@ -73,6 +75,7 @@ export async function GET(request: NextRequest) {
             browser: true,
             os: true,
             country: true,
+            city: true,
             ipHash: true,
             referrer: true,
           },
@@ -92,6 +95,7 @@ export async function GET(request: NextRequest) {
           browser: c.browser,
           os: c.os,
           country: c.country,
+          city: c.city,
           ipHash: c.ipHash,
           referrer: c.referrer,
         })),

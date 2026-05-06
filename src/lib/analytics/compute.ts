@@ -17,6 +17,7 @@ export interface RawClick {
   browser: string | null;
   os: string | null;
   country: string | null;
+  city: string | null;
   ipHash: string | null;
   referrer: string | null;
 }
@@ -58,6 +59,17 @@ export interface ComputedAnalytics {
   operatingSystems: { name: string; value: number }[];
   referrers: { name: string; value: number }[];
   countries: { name: string; value: number }[];
+  cities: { name: string; country: string | null; value: number }[];
+  /** Hour-by-hour curve from the first click in the window. Useful to
+   *  see how fast a campaign decays — typical EDM has 60% in first 24h. */
+  decay: {
+    hourFromFirst: number;
+    clicks: number;
+    cumClicks: number;
+  }[];
+  /** 7×24 grid of click counts. heatmap[dayOfWeek][hour]. dayOfWeek
+   *  follows JS Date convention: 0 = Sunday, 6 = Saturday. */
+  dayHourHeatmap: number[][];
   topLinks: {
     id: string;
     code: string;
@@ -183,12 +195,21 @@ export function computeAnalytics(
     .sort((a, b) => a[0] - b[0])
     .map(([hour, clicks]) => ({ hour, clicks }));
 
-  // --- 5. Dimensions: devices / browsers / os / referrer / country ---
+  // --- 5. Dimensions: devices / browsers / os / referrer / country / city ---
   const deviceMap = new Map<string, number>();
   const browserMap = new Map<string, number>();
   const osMap = new Map<string, number>();
   const referrerMap = new Map<string, number>();
   const countryMap = new Map<string, number>();
+  // Key by "country|city" so two cities with the same name in
+  // different countries don't collapse together.
+  const cityMap = new Map<string, { country: string | null; count: number }>();
+
+  // 7×24 click heatmap (dayOfWeek × hour). Built in the same loop as
+  // the per-click dimensional aggregation to keep one pass over data.
+  const dayHourHeatmap: number[][] = Array.from({ length: 7 }, () =>
+    new Array(24).fill(0),
+  );
 
   for (const c of inRange) {
     const dev = c.device || "Unknown";
@@ -203,12 +224,64 @@ export function computeAnalytics(
     if (c.country) {
       countryMap.set(c.country, (countryMap.get(c.country) || 0) + 1);
     }
+    if (c.city) {
+      const key = `${c.country ?? ""}|${c.city}`;
+      const prev = cityMap.get(key);
+      if (prev) {
+        prev.count += 1;
+      } else {
+        cityMap.set(key, { country: c.country, count: 1 });
+      }
+    }
+    const t = new Date(c.timestamp);
+    dayHourHeatmap[t.getDay()][t.getHours()] += 1;
   }
 
   const toNameValue = (m: Map<string, number>) =>
     Array.from(m.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
+
+  const cities = Array.from(cityMap.entries())
+    .map(([key, v]) => ({
+      name: key.split("|", 2)[1],
+      country: v.country,
+      value: v.count,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 15);
+
+  // --- 5b. Decay curve from first click ---
+  // For each click, bucket by hours-since-first-click. Tail beyond
+  // 72h is collapsed into the "72+" bucket so the chart stays readable
+  // — most marketing campaigns peak inside that window anyway.
+  const DECAY_HORIZON_HOURS = 72;
+  const decay: { hourFromFirst: number; clicks: number; cumClicks: number }[] = [];
+  if (inRange.length > 0) {
+    // inRange is reverse-chronological from upstream; find true earliest
+    let firstTs = Number.POSITIVE_INFINITY;
+    for (const c of inRange) {
+      const t = new Date(c.timestamp).getTime();
+      if (t < firstTs) firstTs = t;
+    }
+    const hourBuckets = new Array(DECAY_HORIZON_HOURS + 1).fill(0);
+    for (const c of inRange) {
+      const dh = Math.floor(
+        (new Date(c.timestamp).getTime() - firstTs) / (60 * 60 * 1000),
+      );
+      const idx = dh >= DECAY_HORIZON_HOURS ? DECAY_HORIZON_HOURS : dh;
+      hourBuckets[idx] += 1;
+    }
+    let cum = 0;
+    for (let i = 0; i < hourBuckets.length; i++) {
+      cum += hourBuckets[i];
+      decay.push({
+        hourFromFirst: i,
+        clicks: hourBuckets[i],
+        cumClicks: cum,
+      });
+    }
+  }
 
   // --- 6. Top links ---
   const linkClickCount = new Map<string, number>();
@@ -304,6 +377,9 @@ export function computeAnalytics(
     operatingSystems: toNameValue(osMap),
     referrers: toNameValue(referrerMap).slice(0, 10),
     countries: toNameValue(countryMap).slice(0, 10),
+    cities,
+    decay,
+    dayHourHeatmap,
     topLinks,
     utm: {
       campaigns: sortAndSlice(campaignMap),

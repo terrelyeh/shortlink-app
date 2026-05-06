@@ -7,6 +7,8 @@ import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { ClicksChart } from "@/components/analytics/ClicksChart";
 import { PieChartComponent } from "@/components/analytics/PieChartComponent";
+import { DecayChart } from "@/components/analytics/DecayChart";
+import { DayHourHeatmap } from "@/components/analytics/DayHourHeatmap";
 import { ShareModal } from "@/components/analytics/ShareModal";
 import {
   MousePointerClick,
@@ -837,6 +839,28 @@ export default function AnalyticsPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Decay curve — 「黃金窗口」: how concentrated are clicks in the
+                    first 24/72h after launch? Helps marketers gauge how much
+                    time they have before traffic dies. Computed in compute.ts. */}
+                <div className="card card-padded" style={{ marginTop: 12 }}>
+                  <div className="section-title" style={{ marginBottom: 4 }}>
+                    {t("decayTitle")}
+                  </div>
+                  <p className="section-sub" style={{ lineHeight: 1.55 }}>
+                    {(() => {
+                      const total = data.summary.totalClicks;
+                      if (total === 0) return t("decayHint");
+                      const at24 = data.decay.find((d) => d.hourFromFirst === 24);
+                      const pct24 = at24 ? Math.round((at24.cumClicks / total) * 100) : 0;
+                      return t("decayHintWithPct", { pct: pct24 });
+                    })()}
+                  </p>
+                  <DecayChart
+                    data={data.decay}
+                    totalClicks={data.summary.totalClicks}
+                  />
+                </div>
               </section>
 
               {/* Traffic Sources */}
@@ -845,19 +869,40 @@ export default function AnalyticsPage() {
                   <h2>{t("sections.traffic")}</h2>
                   <span className="hint">countries, top links, referrers</span>
                 </div>
-                {/* Country first — always populated, the most reliable
-                    geographic signal. Made full-width so longer country
-                    names (e.g. "United States") aren't truncated. */}
-                <div className="card card-padded" style={{ marginBottom: 12 }}>
-                  <div className="section-title">{t("countries")}</div>
-                  <p className="section-sub">&nbsp;</p>
-                  {data.countries.length > 0 ? (
-                    <ProgressList rows={data.countries} color="var(--data-violet)" pillClass="pill-country" />
-                  ) : (
-                    <div style={{ padding: "24px 0", textAlign: "center" }}>
-                      <div className="placeholder">{t("noData")}</div>
-                    </div>
-                  )}
+                {/* Country + City side by side. Country = always full
+                    coverage; City = drill-down (top 15) when GeoIP
+                    resolved a city for the click. */}
+                <div className="grid-2" style={{ marginBottom: 12 }}>
+                  <div className="card card-padded">
+                    <div className="section-title">{t("countries")}</div>
+                    <p className="section-sub">&nbsp;</p>
+                    {data.countries.length > 0 ? (
+                      <ProgressList rows={data.countries} color="var(--data-violet)" pillClass="pill-country" />
+                    ) : (
+                      <div style={{ padding: "24px 0", textAlign: "center" }}>
+                        <div className="placeholder">{t("noData")}</div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="card card-padded">
+                    <div className="section-title">{t("cities")}</div>
+                    <p className="section-sub" style={{ lineHeight: 1.55 }}>
+                      {t("citiesHint")}
+                    </p>
+                    {data.cities.length > 0 ? (
+                      <ProgressList
+                        rows={data.cities.map((c) => ({
+                          name: c.country ? `${c.name}, ${c.country}` : c.name,
+                          value: c.value,
+                        }))}
+                        color="var(--data-emerald, #10B981)"
+                      />
+                    ) : (
+                      <div style={{ padding: "24px 0", textAlign: "center" }}>
+                        <div className="placeholder">{t("noData")}</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {!selectedLinkId && data.topLinks.length > 0 && (
@@ -950,9 +995,9 @@ export default function AnalyticsPage() {
               <section id="a-audience" className="a-section">
                 <div className="a-section-head">
                   <h2>{t("sections.audience")}</h2>
-                  <span className="hint">device, browser, OS</span>
+                  <span className="hint">device, browser, OS, timing</span>
                 </div>
-                <div className="card card-padded">
+                <div className="card card-padded" style={{ marginBottom: 12 }}>
                   <div className="grid-3">
                     <PieChartComponent data={data.devices} title={t("devices")} />
                     <PieChartComponent data={data.browsers} title={t("browsers")} />
@@ -961,6 +1006,18 @@ export default function AnalyticsPage() {
                       title={t("operatingSystems")}
                     />
                   </div>
+                </div>
+
+                {/* Day × hour click heatmap — surfaces best send time for
+                    EDM / social posts based on historical click patterns. */}
+                <div className="card card-padded">
+                  <div className="section-title" style={{ marginBottom: 4 }}>
+                    {t("heatmapTitle")}
+                  </div>
+                  <p className="section-sub" style={{ lineHeight: 1.55 }}>
+                    {t("heatmapHint")}
+                  </p>
+                  <DayHourHeatmap data={data.dayHourHeatmap} />
                 </div>
               </section>
             </>
