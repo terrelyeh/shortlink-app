@@ -1,4 +1,8 @@
 {
+  "footer": {
+    "notesLabel": "使用筆記",
+    "testClicksNote": "測試點擊功能說明"
+  },
   "common": {
     "appName": "短網址管理系統",
     "loading": "載入中...",

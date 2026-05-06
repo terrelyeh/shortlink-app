@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Providers } from "@/components/providers/Providers";
+import { Footer } from "@/components/layout/Footer";
 
 export default async function DashboardLayout({
   children,
@@ -23,7 +24,10 @@ export default async function DashboardLayout({
           userImage={session.user.image}
         />
         <main className="lg:pl-[260px]">
-          <div className="main">{children}</div>
+          <div className="main">
+            {children}
+            <Footer />
+          </div>
         </main>
       </div>
     </Providers>

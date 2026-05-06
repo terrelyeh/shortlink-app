@@ -1,4 +1,8 @@
 {
+  "footer": {
+    "notesLabel": "Notes",
+    "testClicksNote": "Test clicks — how it works"
+  },
   "common": {
     "appName": "Short Link Manager",
     "loading": "Loading...",
