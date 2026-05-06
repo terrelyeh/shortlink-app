@@ -330,6 +330,20 @@ body {
   box-shadow: var(--shadow-xs);
 }
 .btn-sync:hover:not(:disabled) { background: var(--brand-100); border-color: var(--brand-500); }
+
+/* Filter dropdowns / inputs — visually indicate that a value is set so
+   the user can see at a glance which filters are narrowing the data.
+   `.filter-active` uses the brand sky tint; CampaignFilter uses its
+   own violet variant inline (same colour as the campaign banner). */
+.input.filter-active {
+  background: var(--brand-50);
+  border-color: var(--brand-500);
+  color: var(--ink-100);
+  font-weight: 500;
+}
+.input.filter-active:hover:not(:disabled) {
+  background: var(--brand-100);
+}
 .btn-ghost { color: var(--ink-300); }
 .btn-ghost:hover { background: var(--bg-subtle); }
 .btn-danger { background: #DC2626; color: #fff; }

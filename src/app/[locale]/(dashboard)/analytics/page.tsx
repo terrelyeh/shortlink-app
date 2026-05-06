@@ -260,7 +260,7 @@ export default function AnalyticsPage() {
                 setSelectedTagId(e.target.value);
                 setSelectedLinkId("");
               }}
-              className="input"
+              className={`input ${selectedTagId ? "filter-active" : ""}`}
               style={{ height: 32, paddingLeft: 32, paddingRight: 28, appearance: "none", cursor: "pointer" }}
             >
               <option value="">All Tags</option>
@@ -277,7 +277,7 @@ export default function AnalyticsPage() {
                 left: 10,
                 top: "50%",
                 transform: "translateY(-50%)",
-                color: "var(--ink-500)",
+                color: selectedTagId ? "var(--brand-700)" : "var(--ink-500)",
                 pointerEvents: "none",
               }}
             />
@@ -288,7 +288,7 @@ export default function AnalyticsPage() {
                 right: 8,
                 top: "50%",
                 transform: "translateY(-50%)",
-                color: "var(--ink-500)",
+                color: selectedTagId ? "var(--brand-700)" : "var(--ink-500)",
                 pointerEvents: "none",
               }}
             />
@@ -300,7 +300,7 @@ export default function AnalyticsPage() {
             value={selectedLinkId}
             onChange={(e) => setSelectedLinkId(e.target.value)}
             disabled={loadingLinks}
-            className="input"
+            className={`input ${selectedLinkId ? "filter-active" : ""}`}
             style={{ height: 32, paddingLeft: 32, paddingRight: 28, appearance: "none", cursor: "pointer", width: "100%" }}
           >
             <option value="">{t("allLinks")}</option>
@@ -317,7 +317,7 @@ export default function AnalyticsPage() {
               left: 10,
               top: "50%",
               transform: "translateY(-50%)",
-              color: "var(--ink-500)",
+              color: selectedLinkId ? "var(--brand-700)" : "var(--ink-500)",
               pointerEvents: "none",
             }}
           />
@@ -454,6 +454,104 @@ export default function AnalyticsPage() {
             className="btn btn-ghost"
             style={{ padding: "6px 10px", height: 32, alignSelf: "flex-start" }}
             onClick={() => setSelectedLinkId("")}
+            title={t("clearFilter")}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Selected campaign callout — same banner pattern as the link
+          one, only shown when no specific link is also selected (the
+          link banner is more specific and would dominate). Uses violet
+          accents to visually distinguish from the link banner's sky. */}
+      {selectedCampaign && !selectedLink && data && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "stretch",
+            gap: 14,
+            background: "var(--violet-50, #F5F3FF)",
+            border: "1px solid #E9D5FF",
+            borderLeft: "4px solid #7C3AED",
+            borderRadius: 10,
+            padding: "14px 18px",
+            marginBottom: 18,
+            boxShadow: "0 1px 2px rgba(124, 58, 237, 0.08)",
+          }}
+        >
+          <div
+            style={{
+              flexShrink: 0,
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              background: "#E9D5FF",
+              color: "#5B21B6",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              alignSelf: "flex-start",
+              marginTop: 2,
+            }}
+          >
+            <Megaphone size={18} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 11.5,
+                fontWeight: 600,
+                color: "#5B21B6",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                marginBottom: 4,
+              }}
+            >
+              {t("viewingCampaignAnalytics")}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 8,
+                flexWrap: "wrap",
+                rowGap: 2,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: "var(--ink-100)",
+                }}
+              >
+                {selectedCampaign}
+              </span>
+              <span style={{ fontSize: 13, color: "var(--ink-400)" }}>
+                {t("inWindowClicks", { n: data.summary.totalClicks })}
+              </span>
+            </div>
+          </div>
+          <a
+            href={`/campaigns/${encodeURIComponent(selectedCampaign)}`}
+            className="btn btn-ghost"
+            style={{
+              padding: "6px 12px",
+              height: 32,
+              alignSelf: "flex-start",
+              fontSize: 12.5,
+              color: "#5B21B6",
+            }}
+            title={t("openCampaignDetail")}
+          >
+            {t("openCampaignDetail")} →
+          </a>
+          <button
+            className="btn btn-ghost"
+            style={{ padding: "6px 10px", height: 32, alignSelf: "flex-start" }}
+            onClick={() => setSelectedCampaign("")}
             title={t("clearFilter")}
           >
             <X size={14} />

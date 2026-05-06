@@ -35,13 +35,22 @@ export function CampaignFilter({ value, onChange, showNoCampaign = false }: Camp
     fetchCampaigns();
   }, []);
 
+  // When a value is selected, color the chip violet so the filter
+  // visibly broadcasts "active" — matches the campaign callout banner
+  // colour on /analytics.
+  const isActive = Boolean(value);
+
   return (
     <div className="relative">
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={loading}
-        className="appearance-none pl-8 pr-7 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-[#03A9F4] focus:border-[#03A9F4] cursor-pointer disabled:opacity-50"
+        className={`appearance-none pl-8 pr-7 py-2 rounded-lg text-sm focus:ring-2 cursor-pointer disabled:opacity-50 transition-colors ${
+          isActive
+            ? "bg-violet-50 border border-violet-300 text-violet-900 font-medium focus:ring-[#7C3AED] focus:border-[#7C3AED]"
+            : "bg-white border border-slate-200 text-slate-700 focus:ring-[#03A9F4] focus:border-[#03A9F4]"
+        }`}
       >
         <option value="">Campaign: All</option>
         {showNoCampaign && <option value="__none__">No Campaign</option>}
@@ -51,11 +60,19 @@ export function CampaignFilter({ value, onChange, showNoCampaign = false }: Camp
           </option>
         ))}
       </select>
-      <Megaphone className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+      <Megaphone
+        className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${
+          isActive ? "text-violet-600" : "text-slate-400"
+        }`}
+      />
       {loading ? (
         <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin pointer-events-none" />
       ) : (
-        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        <ChevronDown
+          className={`absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${
+            isActive ? "text-violet-600" : "text-slate-400"
+          }`}
+        />
       )}
     </div>
   );
