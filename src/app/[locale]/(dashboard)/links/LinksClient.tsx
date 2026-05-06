@@ -341,7 +341,7 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
   };
 
   return (
-    <>
+    <div className="links-page-shell">
       <ConfirmDialog
         open={!!deleteConfirmId}
         title="Delete this link?"
@@ -745,6 +745,6 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
           <span>更新中…</span>
         </div>
       )}
-    </>
+    </div>
   );
 }

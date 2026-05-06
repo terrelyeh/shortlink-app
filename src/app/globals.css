@@ -629,6 +629,41 @@ table.data td.num {
   font-size: 14px;
 }
 table.data td.muted { color: var(--ink-500); }
+
+/* ---------- Links page: sticky toolbar + table header ----------
+   Scoped to /links so other tables (Campaigns leaderboard, etc.) keep
+   their default behavior. Sticky relies on no clipping ancestor —
+   .tbl-wrap normally has overflow-x:auto / overflow-y:hidden which
+   blocks sticky thead. On /links the desktop table fits in the layout
+   (mobile uses LinkMobileCard), so we let it overflow visibly. */
+.links-page-shell .toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--bg-app);
+  margin-top: -8px;
+  margin-bottom: 0;
+  padding: 8px 0 12px;
+}
+.links-page-shell .tbl-wrap {
+  overflow: visible;
+  -webkit-overflow-scrolling: auto;
+}
+.links-page-shell .tbl-wrap thead th {
+  position: sticky;
+  /* Toolbar collapsed height (~46px) + bottom padding (12px). When the
+     toolbar wraps onto two rows on narrower viewports, thead briefly
+     overlaps it during scroll — acceptable trade-off vs. a JS observer. */
+  top: 58px;
+  z-index: 20;
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+@media (max-width: 768px) {
+  /* Mobile uses card view — no thead — but if width briefly hits the
+     desktop branch, keep things sane. */
+  .links-page-shell .toolbar { top: 0; }
+}
+
 .campaign-name {
   font-family: var(--font-mono);
   font-size: 13.5px;
