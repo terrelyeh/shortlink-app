@@ -117,10 +117,12 @@ export async function GET(request: NextRequest) {
     // Redis cache wraps the whole query + trend groupBys. Key includes
     // workspace/user scope + all filter params + a versioned counter that
     // gets bumped on any write (POST/PATCH/DELETE under /api/links/*).
+    // v2 suffix: clicks now filter out isInternal so old v1 cache (mixed
+    // test clicks into row counts) is busted on deploy.
     const ns = linksCacheNamespace(scope.workspaceId, session.user.id);
     const version = await cacheGetVersion(ns);
     const key = cacheKey(
-      "links-list",
+      "links-list-v2",
       ns,
       version,
       page,
@@ -143,11 +145,23 @@ export async function GET(request: NextRequest) {
         prisma.shortLink.findMany({
           where,
           include: {
-            _count: { select: { clicks: true, conversions: true } },
+            // _count.clicks filtered to real-traffic only — the redirect
+            // handler already skips clickCount increment for internal
+            // clicks, so we filter the relation count to match. Both
+            // numbers stay in sync this way.
+            _count: {
+              select: {
+                clicks: { where: { isInternal: false } },
+                conversions: true,
+              },
+            },
             tags: { include: { tag: true } },
           },
+          // Order by the denormalized clickCount (real-only) instead of
+          // the relation count — equivalent semantically and uses the
+          // existing index. Saves an aggregate.
           orderBy: sortBy === "clicks"
-            ? { clicks: { _count: sortOrder as "asc" | "desc" } }
+            ? { clickCount: sortOrder as "asc" | "desc" }
             : { [sortBy]: sortOrder },
           skip: (page - 1) * limit,
           take: limit,
@@ -160,12 +174,20 @@ export async function GET(request: NextRequest) {
         ? await Promise.all([
           prisma.click.groupBy({
             by: ["shortLinkId"],
-            where: { shortLinkId: { in: linkIds }, timestamp: { gte: sevenDaysAgo } },
+            where: {
+              shortLinkId: { in: linkIds },
+              timestamp: { gte: sevenDaysAgo },
+              isInternal: false,
+            },
             _count: { _all: true },
           }),
           prisma.click.groupBy({
             by: ["shortLinkId"],
-            where: { shortLinkId: { in: linkIds }, timestamp: { gte: fourteenDaysAgo, lt: sevenDaysAgo } },
+            where: {
+              shortLinkId: { in: linkIds },
+              timestamp: { gte: fourteenDaysAgo, lt: sevenDaysAgo },
+              isInternal: false,
+            },
             _count: { _all: true },
           }),
         ])

@@ -47,16 +47,20 @@ export async function GET(request: NextRequest) {
     const rawDays = parseInt(searchParams.get("days") || String(DEFAULT_DAYS), 10);
     const days = Math.min(Math.max(Number.isFinite(rawDays) ? rawDays : DEFAULT_DAYS, 1), MAX_DAYS);
 
-    // v3 suffix: filter rule changed — buckets with no Campaign row
-    // AND no active link are now hidden ("delete campaign + pause all
-    // links" should make a campaign disappear from the leaderboard).
-    // Old v2 payloads still in Redis would re-show those ghost rows
-    // for up to 60s, so we bust them.
+    // Pre-launch testing filter — exclude clicks marked isInternal=true
+    // by default. Pass includeInternal=1 to opt back in. Same semantics
+    // as /api/analytics/raw.
+    const includeInternal = searchParams.get("includeInternal") === "1";
+
+    // v4 suffix: clicks now filtered by isInternal by default. Bump
+    // so v3 cached payloads (which mixed test clicks into the totals)
+    // don't haunt the leaderboard for up to 60s.
     const key = cacheKey(
-      "campaigns-summary-v3",
+      "campaigns-summary-v4",
       session.user.id,
       scope.workspaceId ?? "_",
       days,
+      includeInternal ? "with-internal" : "real-only",
     );
 
     const payload = await cached(key, 60, async () => {
@@ -106,11 +110,25 @@ export async function GET(request: NextRequest) {
       // overlay chart on /campaigns. Raw SQL because Prisma groupBy
       // can't bucket by day. The breakdown stays small (links × days ≤
       // 90 ≈ a few thousand rows max) so in-memory reshaping is cheap.
+      // All click queries below filter out internal/test clicks unless
+      // the caller opted in. The shared `clickFilter` keeps the flag
+      // consistent across windowClicks, dailyRaw, and lastClicks.
+      const clickFilter = includeInternal ? {} : { isInternal: false };
+      // Raw SQL companion of the same filter — used in the dailyRaw
+      // queryRaw below where we can't pass a Prisma where object.
+      const rawClickSqlFilter = includeInternal
+        ? Prisma.sql``
+        : Prisma.sql`AND is_internal = false`;
+
       const [windowClicks, windowConversions, dailyRaw, lastClicks] = linkIds.length > 0
         ? await Promise.all([
             prisma.click.groupBy({
               by: ["shortLinkId"],
-              where: { shortLinkId: { in: linkIds }, timestamp: { gte: since } },
+              where: {
+                shortLinkId: { in: linkIds },
+                timestamp: { gte: since },
+                ...clickFilter,
+              },
               _count: { _all: true },
             }),
             prisma.conversion.groupBy({
@@ -127,6 +145,7 @@ export async function GET(request: NextRequest) {
               FROM clicks
               WHERE short_link_id IN (${Prisma.join(linkIds)})
                 AND timestamp >= ${since}
+                ${rawClickSqlFilter}
               GROUP BY short_link_id, day
               ORDER BY day
             `),
@@ -136,7 +155,7 @@ export async function GET(request: NextRequest) {
             // the most interesting data point when the window is 30d.
             prisma.click.groupBy({
               by: ["shortLinkId"],
-              where: { shortLinkId: { in: linkIds } },
+              where: { shortLinkId: { in: linkIds }, ...clickFilter },
               _max: { timestamp: true },
             }),
           ])
@@ -333,6 +352,7 @@ export async function GET(request: NextRequest) {
           totalCampaigns: campaignsWithTrend.length,
           totalOrphans: orphanLinks.length,
           since: since.toISOString(),
+          includeInternal,
         },
       };
     });

@@ -277,6 +277,13 @@ model Click {
   device      String?  // mobile, tablet, desktop
   os          String?  // iOS, Android, Windows, macOS, Linux
   browser     String?  // Chrome, Safari, Firefox, etc.
+  // Marks clicks generated during pre-launch testing (URL had ?_test=1)
+  // OR by an authenticated workspace member visiting their own short
+  // link. Excluded by default in all analytics aggregations; users can
+  // opt-in via includeInternal=1 query param. Recorded but does not
+  // increment ShortLink.clickCount so the "Clicks" column on /links
+  // shows real-traffic numbers without extra bookkeeping.
+  isInternal  Boolean  @default(false) @map("is_internal")
 
   shortLink   ShortLink   @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
   conversions Conversion[]
@@ -286,6 +293,9 @@ model Click {
   @@index([shortLinkId, ipHash, timestamp])
   @@index([ipHash])
   @@index([workspaceId, timestamp])
+  // Partial-style filter on isInternal pairs with timestamp for the
+  // common "real clicks in last N days" query that drives analytics.
+  @@index([isInternal, timestamp])
   @@map("clicks")
 }
 

@@ -69,9 +69,18 @@ export default function AnalyticsPage() {
   const [selectedTagId, setSelectedTagId] = useState<string>("");
   const [shareOpen, setShareOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<string>("performance");
+  // Pre-launch test click filter. Off by default — analytics show real
+  // traffic only. Toggle to include clicks the redirect handler flagged
+  // as internal (?_test=1 or workspace-member self-clicks).
+  const [includeInternal, setIncludeInternal] = useState(false);
 
   const tagsKey = useMemo(() => ["tags"] as const, []);
-  const rawKey = useMemo(() => ["analytics-raw"] as const, []);
+  // Cache key includes the includeInternal flag so toggling it doesn't
+  // smear two different payloads into the same cache slot.
+  const rawKey = useMemo(
+    () => ["analytics-raw", includeInternal ? "with-internal" : "real-only"] as const,
+    [includeInternal],
+  );
 
   const { data: tagsData } = useQuery({
     queryKey: tagsKey,
@@ -90,7 +99,10 @@ export default function AnalyticsPage() {
   } = useQuery<RawAnalyticsData>({
     queryKey: rawKey,
     queryFn: async () => {
-      const response = await fetch("/api/analytics/raw");
+      const url = includeInternal
+        ? "/api/analytics/raw?includeInternal=1"
+        : "/api/analytics/raw";
+      const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch analytics");
       return (await response.json()) as RawAnalyticsData;
     },
@@ -353,6 +365,44 @@ export default function AnalyticsPage() {
           )}
         </div>
 
+        {/* Pre-launch test click toggle. Off by default — analytics
+            show real traffic only. Hidden behind a small toggle so it
+            doesn't take up much toolbar real estate but is one click
+            away when needed (debugging "why are my numbers different
+            from CSV export"). */}
+        <button
+          type="button"
+          onClick={() => setIncludeInternal((v) => !v)}
+          className={`input ${includeInternal ? "filter-active" : ""}`}
+          style={{
+            height: 32,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "0 10px",
+            cursor: "pointer",
+            fontSize: 12,
+          }}
+          title={t("includeTestTip")}
+        >
+          <span
+            style={{
+              width: 14,
+              height: 14,
+              border: "1.5px solid currentColor",
+              borderRadius: 3,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 10,
+              lineHeight: 1,
+            }}
+          >
+            {includeInternal ? "✓" : ""}
+          </span>
+          {t("includeTest")}
+        </button>
+
         {(selectedLinkId || selectedTagId) && (
           <button
             className="btn btn-ghost"
@@ -366,6 +416,40 @@ export default function AnalyticsPage() {
           </button>
         )}
       </div>
+
+      {/* Filter callout — visible whenever the test-click filter has
+          excluded ≥ 1 click in the window. Mirrors the link / campaign
+          filter callouts pattern: prominent enough that users know the
+          number isn't raw, but dismissable in spirit (toggle off in the
+          toolbar). */}
+      {!includeInternal && (raw?.meta.excludedInternal ?? 0) > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "10px 14px",
+            marginBottom: 16,
+            background: "var(--bg-subtle)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            fontSize: 12.5,
+            color: "var(--ink-400)",
+          }}
+        >
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>
+            {t("filteredTestClicks", { n: raw?.meta.excludedInternal ?? 0 })}
+          </span>
+          <button
+            type="button"
+            onClick={() => setIncludeInternal(true)}
+            className="btn btn-ghost"
+            style={{ marginLeft: "auto", height: 26, fontSize: 12 }}
+          >
+            {t("showAll")}
+          </button>
+        </div>
+      )}
 
       {/* Selected link callout — promoted to a clearly-noticed filter
           banner so the user always knows analytics are scoped to one

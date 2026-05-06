@@ -27,6 +27,7 @@ import {
   MousePointerClick,
   CalendarClock,
   ExternalLink,
+  FlaskConical,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -405,6 +406,20 @@ export default function EditLinkPage() {
               aria-label="Open short URL"
             >
               <ExternalLink className="w-4 h-4" />
+            </a>
+            {/* Test short URL — appends ?_test=1 so the redirect handler
+                flags the click as internal (filtered out of analytics
+                by default). Keeps QA traffic from polluting real
+                campaign numbers. */}
+            <a
+              href={`${fullShortUrl}?_test=1`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 inline-flex items-center gap-2 bg-violet-50 border border-violet-200 text-violet-700 rounded-xl hover:bg-violet-100 hover:border-violet-300 transition-colors text-sm font-medium"
+              title={t("menuTestLinkTooltip")}
+            >
+              <FlaskConical className="w-4 h-4" />
+              <span>{t("menuTestLink")}</span>
             </a>
           </div>
 

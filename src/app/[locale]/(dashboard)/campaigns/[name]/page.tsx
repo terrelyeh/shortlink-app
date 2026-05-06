@@ -62,6 +62,9 @@ export default function CampaignDetailPage() {
   const t = useTranslations("campaigns.detail");
   const tCampaigns = useTranslations("campaigns");
   const tCommon = useTranslations("common");
+  // Test-click filter strings live in the analytics namespace because
+  // the same UI shows up on /analytics — keeping one source of truth.
+  const tAnalytics = useTranslations("analytics");
   const campaignName = decodeURIComponent(params.name as string);
 
   const qc = useQueryClient();
@@ -85,10 +88,19 @@ export default function CampaignDetailPage() {
 
   const linksKey = useMemo(() => ["campaign-links", campaignName] as const, [campaignName]);
   const goalKey = useMemo(() => ["campaign-goal", campaignName] as const, [campaignName]);
+  // Pre-launch test click filter. Off by default — campaign metrics
+  // show real traffic only. Toggle to include clicks the redirect
+  // handler flagged as internal.
+  const [includeInternal, setIncludeInternal] = useState(false);
   // Raw analytics are expensive to fetch (up to 2MB) and used by many
   // pages — share the same key everywhere so only one network call
   // happens across /analytics, /campaigns/[name], /campaigns/compare.
-  const rawKey = useMemo(() => ["analytics-raw"] as const, []);
+  // The includeInternal flag becomes part of the key so toggling it
+  // doesn't smear two payloads into the same cache slot.
+  const rawKey = useMemo(
+    () => ["analytics-raw", includeInternal ? "with-internal" : "real-only"] as const,
+    [includeInternal],
+  );
 
   const { data: linksData, isLoading: loading } = useQuery({
     queryKey: linksKey,
@@ -116,7 +128,10 @@ export default function CampaignDetailPage() {
   const { data: raw, isLoading: rawLoading } = useQuery<RawAnalyticsData>({
     queryKey: rawKey,
     queryFn: async () => {
-      const response = await fetch("/api/analytics/raw");
+      const url = includeInternal
+        ? "/api/analytics/raw?includeInternal=1"
+        : "/api/analytics/raw";
+      const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to load raw analytics");
       return (await response.json()) as RawAnalyticsData;
     },
@@ -414,6 +429,68 @@ export default function CampaignDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Test-click filter — between hero and KPI row so the indicator
+          + toggle is immediately near the numbers it affects. The toggle
+          itself is a small inline checkbox; the banner only appears when
+          ≥ 1 click was excluded so it doesn't clutter the page when the
+          campaign has no test traffic. */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: 16,
+          padding: "8px 12px",
+          background: "var(--bg-subtle)",
+          border: "1px solid var(--border)",
+          borderRadius: 8,
+          fontSize: 12.5,
+          color: "var(--ink-400)",
+          flexWrap: "wrap",
+        }}
+      >
+        <span style={{ fontVariantNumeric: "tabular-nums" }}>
+          {!includeInternal && (raw?.meta.excludedInternal ?? 0) > 0
+            ? tAnalytics("filteredTestClicks", { n: raw?.meta.excludedInternal ?? 0 })
+            : includeInternal
+              ? tAnalytics("includingTestClicks")
+              : tAnalytics("realTrafficOnly")}
+        </span>
+        <button
+          type="button"
+          onClick={() => setIncludeInternal((v) => !v)}
+          className={`input ${includeInternal ? "filter-active" : ""}`}
+          style={{
+            height: 28,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "0 10px",
+            cursor: "pointer",
+            fontSize: 12,
+          }}
+          title={tAnalytics("includeTestTip")}
+        >
+          <span
+            style={{
+              width: 12,
+              height: 12,
+              border: "1.5px solid currentColor",
+              borderRadius: 3,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 9,
+              lineHeight: 1,
+            }}
+          >
+            {includeInternal ? "✓" : ""}
+          </span>
+          {tAnalytics("includeTest")}
+        </button>
+      </div>
 
       {/* KPI Row */}
       <div className="kpi-row" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>

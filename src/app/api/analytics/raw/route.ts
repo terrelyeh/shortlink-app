@@ -34,15 +34,36 @@ export async function GET(request: NextRequest) {
     since.setDate(since.getDate() - DAYS_WINDOW);
     const sinceIso = since.toISOString();
 
+    // Pre-launch testing filter — by default we exclude clicks that the
+    // redirect handler flagged as isInternal (URL had ?_test=1, or an
+    // authenticated workspace member triggered the click). Pass
+    // includeInternal=1 to opt back in.
+    const { searchParams } = new URL(request.url);
+    const includeInternal = searchParams.get("includeInternal") === "1";
+
     // Redis-cache the whole raw payload. This is the heaviest call in the
     // app (can return 1-2 MB) and the result is identical for every view of
     // the Analytics page within 60s. Massive hit-rate.
-    // v2: payload added city field. Bump key so old v1 (no city) cache
-    // doesn't poison clients that now expect city / cities aggregation.
-    const key = cacheKey("analytics-raw-v2", session.user.id, workspaceId ?? "_", sinceIso);
+    // v3: payload now reports excludedInternal counts + filters
+    // isInternal=true by default. Bump key so old v2 doesn't serve
+    // stale data with test clicks mixed in.
+    const key = cacheKey(
+      "analytics-raw-v3",
+      session.user.id,
+      workspaceId ?? "_",
+      sinceIso,
+      includeInternal ? "with-internal" : "real-only",
+    );
 
     const payload = await cached(key, 60, async () => {
-      const [links, clicks] = await Promise.all([
+      const clickWhere = {
+        timestamp: { gte: since },
+        ...(workspaceId ? { workspaceId } : {}),
+        shortLink: { deletedAt: null, ...workspaceWhere },
+        ...(includeInternal ? {} : { isInternal: false }),
+      };
+
+      const [links, clicks, excludedInternal] = await Promise.all([
         prisma.shortLink.findMany({
           where: { deletedAt: null, ...workspaceWhere },
           select: {
@@ -59,15 +80,7 @@ export async function GET(request: NextRequest) {
           orderBy: { createdAt: "desc" },
         }),
         prisma.click.findMany({
-          where: {
-            timestamp: { gte: since },
-            // Denormalized workspace filter lets Postgres use the
-            // (workspace_id, timestamp) index directly. Fall back to the
-            // joined shortLink filter for the no-workspace case (MEMBER
-            // scoped to own links).
-            ...(workspaceId ? { workspaceId } : {}),
-            shortLink: { deletedAt: null, ...workspaceWhere },
-          },
+          where: clickWhere,
           select: {
             shortLinkId: true,
             timestamp: true,
@@ -82,6 +95,19 @@ export async function GET(request: NextRequest) {
           orderBy: { timestamp: "desc" },
           take: CLICK_CAP + 1, // +1 so we can tell if we hit the cap
         }),
+        // Count of clicks we filtered out — surfaced in the UI as
+        // "已過濾 N 筆測試點擊" so users know the filter is active.
+        // Skip the count when the filter is off (would always be 0).
+        includeInternal
+          ? Promise.resolve(0)
+          : prisma.click.count({
+              where: {
+                timestamp: { gte: since },
+                ...(workspaceId ? { workspaceId } : {}),
+                shortLink: { deletedAt: null, ...workspaceWhere },
+                isInternal: true,
+              },
+            }),
       ]);
 
       const truncated = clicks.length > CLICK_CAP;
@@ -114,6 +140,8 @@ export async function GET(request: NextRequest) {
           totalClicks: trimmed.length,
           truncated,
           since: sinceIso,
+          includeInternal,
+          excludedInternal,
         },
       };
     });

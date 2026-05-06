@@ -43,6 +43,10 @@ export interface RawAnalyticsData {
     truncated: boolean;
     /** ISO date; clicks older than this are NOT in `clicks` */
     since: string;
+    /** True when test/internal clicks are mixed into the payload */
+    includeInternal?: boolean;
+    /** Count of clicks excluded by the test-click filter (0 when off) */
+    excludedInternal?: number;
   };
 }
 

@@ -19,6 +19,7 @@ import {
   Download,
   CalendarClock,
   Globe2,
+  FlaskConical,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge, StatusDot } from "@/components/ui/Badge";
@@ -334,6 +335,21 @@ export function LinkTableRow({
                   <BarChart3 className="w-3.5 h-3.5" />
                   {t("menuAnalytics")}
                 </Link>
+                {/* Test short URL — opens in new tab with ?_test=1 so the
+                    redirect handler flags the resulting click as internal
+                    (filtered out of analytics by default). Lets the team
+                    verify a link works without polluting real-traffic
+                    numbers. */}
+                <a
+                  href={`${shortUrl}?_test=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+                  onClick={() => setShowMenu(false)}
+                >
+                  <FlaskConical className="w-3.5 h-3.5" />
+                  {t("menuTestLink")}
+                </a>
                 <button
                   onClick={() => { setShowQR(!showQR); setShowMenu(false); }}
                   className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"

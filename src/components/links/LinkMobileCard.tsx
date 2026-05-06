@@ -25,6 +25,7 @@ import {
   CalendarClock,
   Globe2,
   ExternalLink,
+  FlaskConical,
 } from "lucide-react";
 import Link from "next/link";
 import { StatusDot } from "@/components/ui/Badge";
@@ -330,6 +331,16 @@ export function LinkMobileCard({
               onClick={() => setShowMenu(false)}
             >
               <ExternalLink size={14} /> Open
+            </a>
+            {/* Test short URL — see LinkTableRow for the rationale. */}
+            <a
+              href={`${shortUrl}?_test=1`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="lmc-menu-item"
+              onClick={() => setShowMenu(false)}
+            >
+              <FlaskConical size={14} /> {t("menuTestLink")}
             </a>
             <button onClick={handleClone} className="lmc-menu-item">
               <CopyPlus size={14} /> {t("clone")}

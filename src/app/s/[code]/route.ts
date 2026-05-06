@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createHash, randomBytes } from "crypto";
 import { headers } from "next/headers";
@@ -7,6 +8,12 @@ import { getGeoFromHeaders } from "@/lib/geoip";
 import { allowRedirect } from "@/lib/ratelimit";
 import { cacheEnabled, cacheSetIfAbsent } from "@/lib/cache";
 import { appendSessionParam, parseVariants, pickVariant } from "@/lib/variants";
+import { auth } from "@/lib/auth";
+
+// Query param that flags a click as internal pre-launch testing. Stripped
+// before the redirect so it doesn't leak into the destination URL or
+// pollute the landing page's GA referrer.
+const TEST_FLAG_PARAM = "_test";
 
 // Opaque session token handed to the destination page via ?_sl= so
 // later /api/track calls can attribute conversions back to this click.
@@ -145,6 +152,43 @@ export async function GET(
     const referrer = headersList.get("referer") || headersList.get("referrer");
     const geo = getGeoFromHeaders(headersList);
 
+    // ---- Internal click detection (pre-launch testing filter) ----
+    // Two paths set isInternal=true:
+    //   (1) Inbound URL has ?_test=1 — explicit test flag (from "測試短
+    //       網址" button on /links). Stripped before redirect so it doesn't
+    //       leak to destination GA.
+    //   (2) Authenticated workspace member is clicking their own link from
+    //       the same browser as the dashboard. Catches "tested by clicking
+    //       in /links list" without requiring an explicit flag.
+    const requestUrl = new URL(request.url);
+    const explicitTestFlag =
+      requestUrl.searchParams.get(TEST_FLAG_PARAM) === "1";
+
+    let isInternalClick = explicitTestFlag;
+    if (!isInternalClick && shortLink.workspaceId) {
+      // Only check session when the link belongs to a workspace — a
+      // legacy null-workspace link can't be matched to a member anyway.
+      // auth() reads the NextAuth cookie; on cross-domain (go.engenius.ai)
+      // the cookie may not be present, in which case session is null and
+      // we just skip — the explicit ?_test=1 path still works.
+      try {
+        const session = await auth();
+        if (session?.user?.id) {
+          const membership = await prisma.workspaceMember.findFirst({
+            where: {
+              userId: session.user.id,
+              workspaceId: shortLink.workspaceId,
+            },
+            select: { id: true },
+          });
+          if (membership) isInternalClick = true;
+        }
+      } catch {
+        // Auth lookup failure shouldn't block the redirect; treat as
+        // anonymous (= public click).
+      }
+    }
+
     // Geo restriction — only IPs from allowedCountries pass through.
     // Empty array / null means no restriction. Uses the same geo data we'd
     // record anyway so no extra lookup cost. Unknown country (no geo headers)
@@ -159,7 +203,22 @@ export async function GET(
     // Variant ID is stamped onto the Click for later breakdown reports.
     const variants = parseVariants(shortLink.variants);
     const chosenVariant = pickVariant(variants);
-    const rawDestination = chosenVariant?.url ?? shortLink.originalUrl;
+    let rawDestination = chosenVariant?.url ?? shortLink.originalUrl;
+
+    // Strip the test flag from the outgoing destination if present —
+    // we don't want it leaking into landing pages or downstream
+    // analytics tools.
+    if (explicitTestFlag) {
+      try {
+        const destUrl = new URL(rawDestination);
+        destUrl.searchParams.delete(TEST_FLAG_PARAM);
+        let cleaned = destUrl.toString();
+        if (cleaned.endsWith("?")) cleaned = cleaned.slice(0, -1);
+        rawDestination = cleaned;
+      } catch {
+        // Bad URL — let appendSessionParam handle / fail downstream.
+      }
+    }
 
     // Session ID for conversion attribution. Regenerated per click so each
     // conversion is scoped to one visit, not a returning user. Appended as
@@ -187,6 +246,7 @@ export async function GET(
             referrer,
             geo,
             code,
+            isInternal: isInternalClick,
           });
         } catch (err) {
           console.error("Failed to record click:", err);
@@ -212,6 +272,7 @@ async function recordClick({
   referrer,
   geo,
   code,
+  isInternal,
 }: {
   shortLinkId: string;
   workspaceId: string | null;
@@ -222,6 +283,7 @@ async function recordClick({
   referrer: string | null;
   geo: { country: string | null; city: string | null };
   code: string;
+  isInternal: boolean;
 }) {
   const ipHashed = hashIP(ip);
 
@@ -256,10 +318,11 @@ async function recordClick({
   }
 
   // Insert the click + bump the denormalized counter in one transaction so
-  // they can't drift. Note: we only `update` the counter when maxClicks is
-  // non-null would be an optimization, but unconditional is simpler and a
-  // single indexed PK update is cheap.
-  await prisma.$transaction([
+  // they can't drift. Internal (test) clicks are recorded for forensic
+  // purposes but **don't** bump clickCount — that way the "Clicks" column
+  // on /links matches what marketers actually care about (real traffic),
+  // and maxClicks isn't burned through during pre-launch testing.
+  const ops: Prisma.PrismaPromise<unknown>[] = [
     prisma.click.create({
       data: {
         shortLinkId,
@@ -274,11 +337,17 @@ async function recordClick({
         browser,
         country: geo.country,
         city: geo.city,
+        isInternal,
       },
     }),
-    prisma.shortLink.update({
-      where: { id: shortLinkId },
-      data: { clickCount: { increment: 1 } },
-    }),
-  ]);
+  ];
+  if (!isInternal) {
+    ops.push(
+      prisma.shortLink.update({
+        where: { id: shortLinkId },
+        data: { clickCount: { increment: 1 } },
+      }),
+    );
+  }
+  await prisma.$transaction(ops);
 }
