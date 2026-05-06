@@ -263,6 +263,7 @@
     "range90d": "90 天",
     "allLinks": "連結：全部",
     "clearFilter": "清除篩選",
+    "trendNew": "新",
     "includeTest": "含測試點擊",
     "includeTestTip": "預設過濾：來自「測試短網址」按鈕（?_test=1）以及登入工作區成員自己點擊產生的點擊。打開可顯示全部。",
     "filteredTestClicks": "已過濾 {n} 筆測試點擊（來自「測試短網址」或工作區成員）",

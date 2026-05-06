@@ -262,6 +262,7 @@
     "range90d": "90 Days",
     "allLinks": "Link: All",
     "clearFilter": "Clear filter",
+    "trendNew": "new",
     "includeTest": "Include test clicks",
     "includeTestTip": "By default, clicks from the 'Test link' button (?_test=1) or from logged-in workspace members visiting their own short links are excluded. Toggle on to see them.",
     "filteredTestClicks": "{n} test click(s) filtered out (from 'Test link' button or workspace members)",

@@ -273,6 +273,31 @@ export default function CampaignDetailPage() {
   const activeLinks = links.filter((l) => l.status === "ACTIVE").length;
   const totalCampaignClicks = totalClicks || 1;
 
+  // Campaign-level 7d trend — sub-line on the "Total clicks" KPI so users
+  // see "全時段 X / 最近 7 天 Y ↑Z%" without context-switching to /analytics.
+  // Independent useMemo (vs reusing perLinkMetrics) so this stays accurate
+  // even when the toggle changes raw payload — both this and the table
+  // recompute from the same source of truth.
+  const campaignTrend = useMemo(() => {
+    if (!raw) return { last7d: 0, prev7d: 0 };
+    const linkIds = new Set(links.map((l) => l.id));
+    const now = Date.now();
+    const DAY = 86400000;
+    let last7d = 0;
+    let prev7d = 0;
+    for (const c of raw.clicks) {
+      if (!linkIds.has(c.shortLinkId)) continue;
+      const ageMs = now - new Date(c.timestamp).getTime();
+      if (ageMs < 7 * DAY) last7d++;
+      else if (ageMs < 14 * DAY) prev7d++;
+    }
+    return { last7d, prev7d };
+  }, [raw, links]);
+  const campaignTrendClassified = classifyTrend(
+    campaignTrend.last7d,
+    campaignTrend.prev7d,
+  );
+
   const copyLink = async (shortUrl: string, id: string) => {
     await navigator.clipboard.writeText(shortUrl);
     setCopiedId(id);
@@ -515,7 +540,37 @@ export default function CampaignDetailPage() {
             <MousePointerClick size={12} /> {t("kpiTotalClicks")}
           </div>
           <div className="kpi-value">{totalClicks.toLocaleString()}</div>
-          <div className="kpi-sub">{t("kpiAllTime")}</div>
+          {/* Sub-line: "全時段 · 最近 7 天 N ↑X%" — the all-time number
+              is the headline, the 7-day breakdown gives recency context
+              so users don't have to bounce to /analytics for it. */}
+          <div
+            className="kpi-sub"
+            style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}
+          >
+            <span>{t("kpiAllTime")}</span>
+            <span style={{ color: "var(--ink-500)" }}>·</span>
+            <span>
+              {tAnalytics("range7d")}{" "}
+              <strong style={{ color: "var(--ink-200)", fontVariantNumeric: "tabular-nums" }}>
+                {campaignTrend.last7d.toLocaleString()}
+              </strong>
+            </span>
+            {campaignTrendClassified.trendState === "up" && campaignTrendClassified.trendPct !== null && (
+              <span style={{ color: "#16a34a", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                ↑{Math.abs(campaignTrendClassified.trendPct)}%
+              </span>
+            )}
+            {campaignTrendClassified.trendState === "down" && campaignTrendClassified.trendPct !== null && (
+              <span style={{ color: "#dc2626", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                ↓{Math.abs(campaignTrendClassified.trendPct)}%
+              </span>
+            )}
+            {campaignTrendClassified.trendState === "new" && (
+              <span style={{ color: "var(--brand-700)", fontWeight: 600 }}>
+                {tAnalytics("trendNew")}
+              </span>
+            )}
+          </div>
         </div>
         <div className="kpi">
           <div className="kpi-label">
