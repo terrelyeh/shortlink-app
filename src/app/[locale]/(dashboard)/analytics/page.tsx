@@ -692,43 +692,21 @@ export default function AnalyticsPage() {
               <section id="a-traffic" className="a-section">
                 <div className="a-section-head">
                   <h2>{t("sections.traffic")}</h2>
-                  <span className="hint">referrers, countries, top links</span>
+                  <span className="hint">countries, top links, referrers</span>
                 </div>
-                <div className="grid-2" style={{ marginBottom: 12 }}>
-                  <div className="card card-padded">
-                    <div className="section-title">{t("referrers")}</div>
-                    <p className="section-sub" style={{ lineHeight: 1.55 }}>
-                      {t("referrersHint")}
-                    </p>
-                    {data.referrers.length > 0 ? (
-                      <ProgressList rows={data.referrers} color="var(--data-cyan)" />
-                    ) : (
-                      <div
-                        style={{
-                          padding: "24px 0",
-                          textAlign: "center",
-                        }}
-                      >
-                        <div className="placeholder">{t("noData")}</div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="card card-padded">
-                    <div className="section-title">{t("countries")}</div>
-                    <p className="section-sub">&nbsp;</p>
-                    {data.countries.length > 0 ? (
-                      <ProgressList rows={data.countries} color="var(--data-violet)" pillClass="pill-country" />
-                    ) : (
-                      <div
-                        style={{
-                          padding: "24px 0",
-                          textAlign: "center",
-                        }}
-                      >
-                        <div className="placeholder">{t("noData")}</div>
-                      </div>
-                    )}
-                  </div>
+                {/* Country first — always populated, the most reliable
+                    geographic signal. Made full-width so longer country
+                    names (e.g. "United States") aren't truncated. */}
+                <div className="card card-padded" style={{ marginBottom: 12 }}>
+                  <div className="section-title">{t("countries")}</div>
+                  <p className="section-sub">&nbsp;</p>
+                  {data.countries.length > 0 ? (
+                    <ProgressList rows={data.countries} color="var(--data-violet)" pillClass="pill-country" />
+                  ) : (
+                    <div style={{ padding: "24px 0", textAlign: "center" }}>
+                      <div className="placeholder">{t("noData")}</div>
+                    </div>
+                  )}
                 </div>
 
                 {!selectedLinkId && data.topLinks.length > 0 && (
@@ -797,6 +775,24 @@ export default function AnalyticsPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Referrer — bottom of section, secondary signal.
+                    Mostly empty for EDM / chat / direct traffic; useful
+                    for spotting natural pickups (blog mentions, partner
+                    sites, leaks). See referrersHint copy. */}
+                <div className="card card-padded" style={{ marginTop: 12 }}>
+                  <div className="section-title">{t("referrers")}</div>
+                  <p className="section-sub" style={{ lineHeight: 1.55 }}>
+                    {t("referrersHint")}
+                  </p>
+                  {data.referrers.length > 0 ? (
+                    <ProgressList rows={data.referrers} color="var(--data-cyan)" />
+                  ) : (
+                    <div style={{ padding: "24px 0", textAlign: "center" }}>
+                      <div className="placeholder">{t("noData")}</div>
+                    </div>
+                  )}
+                </div>
               </section>
 
               {/* Audience */}
