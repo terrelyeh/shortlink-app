@@ -101,19 +101,22 @@ export default function TestClicksNote() {
         <div className="mock-frame">
           <div className="mock-label">範例</div>
           <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 0" }}>
-            <a
-              href="#"
-              onClick={(e) => e.preventDefault()}
+            {/* span with anchor styling — not a real <a> because this
+                file is a server component (no event handlers allowed)
+                and we don't want stray navigation if the user clicks. */}
+            <span
               style={{
                 fontFamily: "var(--font-mono)",
                 fontSize: 13,
                 color: "#03A9F4",
                 fontWeight: 500,
-                textDecoration: "none",
+                textDecoration: "underline",
+                textUnderlineOffset: 2,
+                cursor: "pointer",
               }}
             >
               /cx26-Lin-Promo-1
-            </a>
+            </span>
             <button
               type="button"
               style={{
