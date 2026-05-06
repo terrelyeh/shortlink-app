@@ -24,6 +24,7 @@ import {
   Globe2,
   Trash2,
   AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
@@ -83,6 +84,12 @@ export default function CampaignDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [pauseLinksOnDelete, setPauseLinksOnDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Reset-clicks dialog. Soft reset — flags every real click for this
+  // campaign as isInternal (test). Reversible via the toast action or
+  // by calling restore mode on the same endpoint.
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
 
@@ -347,6 +354,51 @@ export default function CampaignDetailPage() {
     setTimeout(() => setCopiedAll(false), 2000);
   };
 
+  // Soft reset — flag every real click for this campaign as test data
+  // (isInternal=true with a fresh batchId). KPI / chart drop to zero;
+  // data preserved + reversible. The "restore" path uses the same
+  // endpoint with mode: "restore".
+  const handleResetClicks = async (mode: "reset" | "restore", batchId?: string) => {
+    setResetting(true);
+    try {
+      const res = await fetch(
+        `/api/utm-campaigns/${encodeURIComponent(campaignName)}/reset-clicks`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode, ...(batchId ? { batchId } : {}) }),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === "string" ? data.error : `HTTP ${res.status}`,
+        );
+      }
+
+      // Bust everything that displays click numbers — the affected
+      // surfaces are: this page (links + raw), /campaigns leaderboard,
+      // /analytics, /links list. refetchType: "all" forces refetch
+      // even when observers are detached during navigation.
+      qc.invalidateQueries({ queryKey: ["campaign-links"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["analytics-raw"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["campaigns-summary"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["links"], refetchType: "all" });
+
+      const affected = data.affectedClicks ?? 0;
+      if (mode === "reset") {
+        success(t("resetSuccess", { n: affected }));
+        setResetOpen(false);
+      } else {
+        success(t("restoreSuccess", { n: affected }));
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to reset clicks");
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const statusBadgeClass: Record<string, string> = {
     ACTIVE: "active",
     PAUSED: "paused",
@@ -386,6 +438,18 @@ export default function CampaignDetailPage() {
             >
               <Plus size={13} /> {t("addLink")}
             </Link>
+            {/* Reset clicks — non-destructive (soft reset via isInternal
+                flag). Disabled when there are no links yet. icon-only
+                with title to keep header compact; the dialog has the
+                full explanation. */}
+            <button
+              className="btn btn-ghost"
+              onClick={() => setResetOpen(true)}
+              disabled={links.length === 0 || totalClicks === 0}
+              title={t("resetClicksTooltip")}
+            >
+              <RotateCcw size={13} />
+            </button>
             <button
               className="btn btn-ghost"
               onClick={() => {
@@ -458,6 +522,54 @@ export default function CampaignDetailPage() {
                 {pauseLinksOnDelete
                   ? t("deleteAndPauseConfirm")
                   : t("deleteConfirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset clicks dialog — soft reset; flags every real click as
+          test data so KPI numbers drop to 0 without losing data. The
+          green callout box at the bottom emphasises reversibility (the
+          part that makes this differ from "Delete"). */}
+      {resetOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => !resetting && setResetOpen(false)}
+          />
+          <div className="relative bg-white rounded-2xl shadow-xl border border-slate-200 p-6 max-w-md w-full mx-4 z-10">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 bg-amber-100">
+              <RotateCcw className="w-5 h-5 text-amber-600" />
+            </div>
+            <h3 className="text-base font-semibold text-slate-900 mb-1">
+              {t("resetDialogTitle", { name: campaignName })}
+            </h3>
+            <p className="text-sm text-slate-500 mb-4">
+              {t("resetDialogBody", { count: totalClicks, links: links.length })}
+            </p>
+
+            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 space-y-1.5">
+              <div>✓ {t("resetReversibleNote")}</div>
+              <div>✓ {t("resetDataPreservedNote")}</div>
+              <div className="text-amber-800">⚠ {t("resetKpiDropNote")}</div>
+            </div>
+
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => setResetOpen(false)}
+                disabled={resetting}
+                className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                {tCommon("cancel")}
+              </button>
+              <button
+                onClick={() => handleResetClicks("reset")}
+                disabled={resetting}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-60 inline-flex items-center justify-center gap-2"
+              >
+                {resetting ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+                {t("resetConfirm")}
               </button>
             </div>
           </div>
