@@ -841,25 +841,61 @@ export default function AnalyticsPage() {
                 </div>
 
                 {/* Decay curve — 「黃金窗口」: how concentrated are clicks in the
-                    first 24/72h after launch? Helps marketers gauge how much
-                    time they have before traffic dies. Computed in compute.ts. */}
+                    first 24/72h after launch? Only meaningful when scoped to a
+                    single campaign or link — otherwise t0 is the earliest
+                    click across N unrelated activities, and the curve is noise. */}
                 <div className="card card-padded" style={{ marginTop: 12 }}>
                   <div className="section-title" style={{ marginBottom: 4 }}>
                     {t("decayTitle")}
                   </div>
-                  <p className="section-sub" style={{ lineHeight: 1.55 }}>
-                    {(() => {
-                      const total = data.summary.totalClicks;
-                      if (total === 0) return t("decayHint");
-                      const at24 = data.decay.find((d) => d.hourFromFirst === 24);
-                      const pct24 = at24 ? Math.round((at24.cumClicks / total) * 100) : 0;
-                      return t("decayHintWithPct", { pct: pct24 });
-                    })()}
-                  </p>
-                  <DecayChart
-                    data={data.decay}
-                    totalClicks={data.summary.totalClicks}
-                  />
+                  {selectedCampaign || selectedLinkId ? (
+                    <>
+                      <p className="section-sub" style={{ lineHeight: 1.55 }}>
+                        {(() => {
+                          const total = data.summary.totalClicks;
+                          if (total === 0) return t("decayHint");
+                          const at24 = data.decay.find((d) => d.hourFromFirst === 24);
+                          const pct24 = at24 ? Math.round((at24.cumClicks / total) * 100) : 0;
+                          return t("decayHintWithPct", { pct: pct24 });
+                        })()}
+                      </p>
+                      <DecayChart
+                        data={data.decay}
+                        totalClicks={data.summary.totalClicks}
+                      />
+                    </>
+                  ) : (
+                    <div
+                      style={{
+                        padding: "32px 20px",
+                        textAlign: "center",
+                        background: "var(--bg-subtle)",
+                        borderRadius: 10,
+                        border: "1px dashed var(--border-strong)",
+                      }}
+                    >
+                      <p
+                        style={{
+                          fontSize: 13.5,
+                          color: "var(--ink-300)",
+                          margin: "0 0 6px",
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        {t("decayNeedsFilterTitle")}
+                      </p>
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "var(--ink-500)",
+                          margin: 0,
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        {t("decayNeedsFilterHint")}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </section>
 

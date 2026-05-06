@@ -265,6 +265,8 @@
     "decayTitle": "點擊衰減曲線（黃金窗口）",
     "decayHint": "從首次點擊起算的累積/每小時點擊曲線。目前無資料。",
     "decayHintWithPct": "首次點擊後 24 小時內就累積了 {pct}% 的總點擊。下方曲線顯示完整的接續模式。",
+    "decayNeedsFilterTitle": "請先選擇某個活動或連結",
+    "decayNeedsFilterHint": "這條曲線只有在「單一活動或單一連結」的視角下才有意義 — 全工作區會把不同時間發出的活動混在一起，t0 隨機，曲線只是雜訊。",
     "heatmapTitle": "點擊時段熱度圖（星期 × 小時）",
     "heatmapHint": "本期間點擊時間分佈。色塊越深 = 點擊越多。可用來找最佳 EDM / 社群貼文時段。",
     "clicksOverTime": "點擊趨勢",

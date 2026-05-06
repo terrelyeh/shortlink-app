@@ -264,6 +264,8 @@
     "decayTitle": "Click decay (golden window)",
     "decayHint": "Hour-by-hour cumulative + per-hour clicks since this campaign's first click. No data yet.",
     "decayHintWithPct": "{pct}% of total clicks happened within 24 hours of the first click. Curve below shows the full pickup pattern from t0.",
+    "decayNeedsFilterTitle": "Pick a campaign or link to see decay",
+    "decayNeedsFilterHint": "This curve only makes sense when scoped to one launch — otherwise we'd be averaging across unrelated activities at different times.",
     "heatmapTitle": "When clicks happen (day × hour)",
     "heatmapHint": "Heatmap of click times across the selected window. Darker cell = more clicks. Use to pick optimal EDM / social post timing.",
     "clicksOverTime": "Clicks Over Time",
