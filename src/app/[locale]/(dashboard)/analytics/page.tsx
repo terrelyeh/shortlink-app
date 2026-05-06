@@ -26,6 +26,7 @@ import {
   Tag as TagIcon,
   LineChart as LineChartIcon,
   BarChart3,
+  Clock,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SyncButton } from "@/components/layout/SyncButton";
@@ -147,6 +148,7 @@ export default function AnalyticsPage() {
   const sections = [
     { key: "performance", label: t("sections.campaigns"), icon: LineChartIcon },
     { key: "overview", label: t("sections.overview"), icon: BarChart3 },
+    { key: "timing", label: t("sections.timing"), icon: Clock },
     { key: "traffic", label: t("sections.traffic"), icon: Globe },
     { key: "audience", label: t("sections.audience"), icon: Users },
   ];
@@ -818,7 +820,17 @@ export default function AnalyticsPage() {
                     </div>
                   </div>
                 </div>
-                <div className="card card-padded">
+              </section>
+
+              {/* Timing — 何時點擊。Clicks-over-time、衰減曲線、熱度
+                  圖三個都是「時間維度」的 view，集中在這個 section。 */}
+              <section id="a-timing" className="a-section">
+                <div className="a-section-head">
+                  <h2>{t("sections.timing")}</h2>
+                  <span className="hint">trend, decay, hour-of-day</span>
+                </div>
+
+                <div className="card card-padded" style={{ marginBottom: 12 }}>
                   <div className="section-title" style={{ marginBottom: 10 }}>
                     <LineChartIcon size={14} style={{ color: "var(--ink-400)" }} />
                     {t("clicksOverTime")}
@@ -844,7 +856,7 @@ export default function AnalyticsPage() {
                     first 24/72h after launch? Only meaningful when scoped to a
                     single campaign or link — otherwise t0 is the earliest
                     click across N unrelated activities, and the curve is noise. */}
-                <div className="card card-padded" style={{ marginTop: 12 }}>
+                <div className="card card-padded" style={{ marginBottom: 12 }}>
                   <div className="section-title" style={{ marginBottom: 4 }}>
                     {t("decayTitle")}
                   </div>
@@ -896,6 +908,18 @@ export default function AnalyticsPage() {
                       </p>
                     </div>
                   )}
+                </div>
+
+                {/* Day × hour heatmap — moved out of Audience because
+                    it's about timing, not who the audience is. */}
+                <div className="card card-padded">
+                  <div className="section-title" style={{ marginBottom: 4 }}>
+                    {t("heatmapTitle")}
+                  </div>
+                  <p className="section-sub" style={{ lineHeight: 1.55 }}>
+                    {t("heatmapHint")}
+                  </p>
+                  <DayHourHeatmap data={data.dayHourHeatmap} />
                 </div>
               </section>
 
@@ -1027,13 +1051,14 @@ export default function AnalyticsPage() {
                 </div>
               </section>
 
-              {/* Audience */}
+              {/* Audience — purely "who clicks": device, browser, OS.
+                  Timing-related views moved to the Timing section. */}
               <section id="a-audience" className="a-section">
                 <div className="a-section-head">
                   <h2>{t("sections.audience")}</h2>
-                  <span className="hint">device, browser, OS, timing</span>
+                  <span className="hint">device, browser, OS</span>
                 </div>
-                <div className="card card-padded" style={{ marginBottom: 12 }}>
+                <div className="card card-padded">
                   <div className="grid-3">
                     <PieChartComponent data={data.devices} title={t("devices")} />
                     <PieChartComponent data={data.browsers} title={t("browsers")} />
@@ -1042,18 +1067,6 @@ export default function AnalyticsPage() {
                       title={t("operatingSystems")}
                     />
                   </div>
-                </div>
-
-                {/* Day × hour click heatmap — surfaces best send time for
-                    EDM / social posts based on historical click patterns. */}
-                <div className="card card-padded">
-                  <div className="section-title" style={{ marginBottom: 4 }}>
-                    {t("heatmapTitle")}
-                  </div>
-                  <p className="section-sub" style={{ lineHeight: 1.55 }}>
-                    {t("heatmapHint")}
-                  </p>
-                  <DayHourHeatmap data={data.dayHourHeatmap} />
                 </div>
               </section>
             </>

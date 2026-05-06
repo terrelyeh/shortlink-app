@@ -277,6 +277,7 @@
     "ofTotalClicks": "佔總點擊 {pct}%",
     "sections": {
       "overview": "概覽",
+      "timing": "時段分析",
       "audience": "受眾",
       "traffic": "流量來源",
       "campaigns": "活動成效"

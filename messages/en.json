@@ -276,6 +276,7 @@
     "ofTotalClicks": "{pct}% of total clicks",
     "sections": {
       "overview": "Overview",
+      "timing": "Timing",
       "audience": "Audience",
       "traffic": "Traffic Sources",
       "campaigns": "Campaign Performance"
