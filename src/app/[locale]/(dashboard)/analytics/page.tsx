@@ -697,7 +697,9 @@ export default function AnalyticsPage() {
                 <div className="grid-2" style={{ marginBottom: 12 }}>
                   <div className="card card-padded">
                     <div className="section-title">{t("referrers")}</div>
-                    <p className="section-sub">&nbsp;</p>
+                    <p className="section-sub" style={{ lineHeight: 1.55 }}>
+                      {t("referrersHint")}
+                    </p>
                     {data.referrers.length > 0 ? (
                       <ProgressList rows={data.referrers} color="var(--data-cyan)" />
                     ) : (
