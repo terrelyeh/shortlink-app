@@ -165,31 +165,36 @@ export default function AnalyticsPage() {
     { key: "audience", label: t("sections.audience"), icon: Users },
   ];
 
+  // Active-section highlight follows the page's natural scroll (window
+  // scroll, not a nested container). Threshold of 100px gives the
+  // section a "feels active" zone right under the top of the viewport
+  // before the next one takes over.
   useEffect(() => {
-    const scroller = document.querySelector(".analytics-scroll");
-    if (!scroller) return;
     const handler = () => {
       for (const s of sections) {
         const el = document.getElementById(`a-${s.key}`);
         if (!el) continue;
         const r = el.getBoundingClientRect();
-        if (r.top <= 80 && r.bottom > 80) {
+        if (r.top <= 100 && r.bottom > 100) {
           setActiveSection(s.key);
           break;
         }
       }
     };
-    scroller.addEventListener("scroll", handler);
-    return () => scroller.removeEventListener("scroll", handler);
+    window.addEventListener("scroll", handler, { passive: true });
+    return () => window.removeEventListener("scroll", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const jumpTo = (key: string) => {
     setActiveSection(key);
     const el = document.getElementById(`a-${key}`);
-    const scroller = document.querySelector(".analytics-scroll");
-    if (el && scroller) {
-      scroller.scrollTo({ top: (el as HTMLElement).offsetTop - 12, behavior: "smooth" });
+    if (el) {
+      // Native smooth scroll on the document — works with the browser's
+      // scrollbar (no nested scroller). 12px offset matches the original
+      // visual rhythm.
+      const top = el.getBoundingClientRect().top + window.scrollY - 12;
+      window.scrollTo({ top, behavior: "smooth" });
     }
   };
 
@@ -678,10 +683,10 @@ export default function AnalyticsPage() {
           })}
         </div>
 
-        <div
-          className="analytics-scroll"
-          style={{ maxHeight: "calc(100vh - 160px)", overflowY: "auto", paddingRight: 4 }}
-        >
+        {/* No nested scroller — page uses the browser's native scrollbar.
+            The .anchor-rail (left) is position:sticky so it stays in
+            view as the page scrolls. */}
+        <div className="analytics-content">
           {loading && !data ? (
             <div style={{ padding: 64, textAlign: "center" }}>
               <Loader2 size={24} className="animate-spin" style={{ color: "var(--ink-500)" }} />
