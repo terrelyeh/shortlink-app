@@ -26,6 +26,10 @@ import {
   SlidersHorizontal,
   X,
   Rocket,
+  Download,
+  ChevronDown,
+  CalendarRange,
+  Table2,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { MultiCampaignChart } from "@/components/analytics/MultiCampaignChart";
@@ -113,6 +117,12 @@ export default function CampaignsClient() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [sortKey, setSortKey] = useState<SortKey>("clicks");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+
+  // Export honors the currently-selected time window so the CSV matches
+  // what's on screen.
+  const exportDays =
+    (windowPresets.find((p) => p.value === window) ?? windowPresets[1]).days;
 
   const toggleSelected = useCallback((name: string) => {
     setSelected((prev) => {
@@ -205,6 +215,63 @@ export default function CampaignsClient() {
                 <SlidersHorizontal size={13} /> {t("compareN", { n: selected.size })}
               </button>
             )}
+            {/* Export CSV — dropdown with two formats. Both honor the
+                current time-window selection. Click-outside closes via
+                the fixed overlay (same pattern as link row menus). */}
+            <div style={{ position: "relative" }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setExportMenuOpen((v) => !v)}
+              >
+                <Download size={13} /> {tCommon("export")}
+                <ChevronDown size={12} style={{ opacity: 0.6 }} />
+              </button>
+              {exportMenuOpen && (
+                <>
+                  <div
+                    style={{ position: "fixed", inset: 0, zIndex: 40 }}
+                    onClick={() => setExportMenuOpen(false)}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 4px)",
+                      right: 0,
+                      zIndex: 50,
+                      width: 260,
+                      background: "#fff",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      boxShadow: "var(--shadow-md)",
+                      padding: 4,
+                    }}
+                  >
+                    <a
+                      href={`/api/export/campaigns?format=summary&days=${exportDays}`}
+                      className="export-menu-item"
+                      onClick={() => setExportMenuOpen(false)}
+                    >
+                      <Table2 size={14} />
+                      <span>
+                        <strong>{t("exportSummary")}</strong>
+                        <span className="export-menu-hint">{t("exportSummaryHint")}</span>
+                      </span>
+                    </a>
+                    <a
+                      href={`/api/export/campaigns?format=timeseries&days=${exportDays}`}
+                      className="export-menu-item"
+                      onClick={() => setExportMenuOpen(false)}
+                    >
+                      <CalendarRange size={14} />
+                      <span>
+                        <strong>{t("exportTimeseries")}</strong>
+                        <span className="export-menu-hint">{t("exportTimeseriesHint")}</span>
+                      </span>
+                    </a>
+                  </div>
+                </>
+              )}
+            </div>
             <button
               className="btn btn-secondary"
               onClick={() => router.push("/campaigns/kickstart")}

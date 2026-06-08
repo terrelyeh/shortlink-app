@@ -25,6 +25,7 @@ import {
   Trash2,
   AlertTriangle,
   RotateCcw,
+  Download,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
@@ -432,6 +433,17 @@ export default function CampaignDetailPage() {
               {copiedAll ? <Check size={13} /> : <Copy size={13} />}
               {copiedAll ? tCommon("copied") : t("copyAllLinks")}
             </button>
+            {/* Export this campaign's per-link breakdown. Honors the
+                test-click toggle so the CSV matches the on-screen numbers. */}
+            <a
+              href={`/api/export/campaigns?format=links&campaign=${encodeURIComponent(
+                campaignName,
+              )}${includeInternal ? "&includeInternal=1" : ""}`}
+              className="btn btn-secondary"
+              style={{ pointerEvents: links.length === 0 ? "none" : undefined, opacity: links.length === 0 ? 0.5 : undefined }}
+            >
+              <Download size={13} /> {tCommon("export")}
+            </a>
             <Link
               href={`/links/new?utmCampaign=${encodeURIComponent(campaignName)}`}
               className="btn btn-primary"

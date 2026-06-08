@@ -984,6 +984,33 @@ textarea.input {
   opacity: 0.7;
 }
 
+/* Export dropdown menu items (Campaigns header) */
+.export-menu-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  color: var(--ink-200);
+  text-decoration: none;
+  transition: background 0.1s var(--ease);
+}
+.export-menu-item:hover { background: var(--bg-subtle); }
+.export-menu-item svg { margin-top: 2px; color: var(--ink-400); flex-shrink: 0; }
+.export-menu-item strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-100);
+}
+.export-menu-hint {
+  display: block;
+  font-size: 11.5px;
+  color: var(--ink-500);
+  margin-top: 1px;
+  line-height: 1.4;
+}
+
 /* Analytics anchor rail */
 .anchor-rail {
   position: sticky;
