@@ -26,6 +26,9 @@ import {
   AlertTriangle,
   RotateCcw,
   Download,
+  ChevronDown,
+  Table2,
+  CalendarRange,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
@@ -91,6 +94,7 @@ export default function CampaignDetailPage() {
   // by calling restore mode on the same endpoint.
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
 
@@ -433,17 +437,68 @@ export default function CampaignDetailPage() {
               {copiedAll ? <Check size={13} /> : <Copy size={13} />}
               {copiedAll ? tCommon("copied") : t("copyAllLinks")}
             </button>
-            {/* Export this campaign's per-link breakdown. Honors the
-                test-click toggle so the CSV matches the on-screen numbers. */}
-            <a
-              href={`/api/export/campaigns?format=links&campaign=${encodeURIComponent(
-                campaignName,
-              )}${includeInternal ? "&includeInternal=1" : ""}`}
-              className="btn btn-secondary"
-              style={{ pointerEvents: links.length === 0 ? "none" : undefined, opacity: links.length === 0 ? 0.5 : undefined }}
-            >
-              <Download size={13} /> {tCommon("export")}
-            </a>
+            {/* Export this campaign — dropdown: per-link snapshot OR
+                per-link daily long format. Both honor the test-click
+                toggle so the CSV matches the on-screen numbers. */}
+            <div style={{ position: "relative" }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setExportMenuOpen((v) => !v)}
+                disabled={links.length === 0}
+              >
+                <Download size={13} /> {tCommon("export")}
+                <ChevronDown size={12} style={{ opacity: 0.6 }} />
+              </button>
+              {exportMenuOpen && (
+                <>
+                  <div
+                    style={{ position: "fixed", inset: 0, zIndex: 40 }}
+                    onClick={() => setExportMenuOpen(false)}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 4px)",
+                      right: 0,
+                      zIndex: 50,
+                      width: 260,
+                      background: "#fff",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      boxShadow: "var(--shadow-md)",
+                      padding: 4,
+                    }}
+                  >
+                    <a
+                      href={`/api/export/campaigns?format=links&campaign=${encodeURIComponent(
+                        campaignName,
+                      )}${includeInternal ? "&includeInternal=1" : ""}`}
+                      className="export-menu-item"
+                      onClick={() => setExportMenuOpen(false)}
+                    >
+                      <Table2 size={14} />
+                      <span>
+                        <strong>{t("exportLinks")}</strong>
+                        <span className="export-menu-hint">{t("exportLinksHint")}</span>
+                      </span>
+                    </a>
+                    <a
+                      href={`/api/export/campaigns?format=link-daily&days=90&campaign=${encodeURIComponent(
+                        campaignName,
+                      )}${includeInternal ? "&includeInternal=1" : ""}`}
+                      className="export-menu-item"
+                      onClick={() => setExportMenuOpen(false)}
+                    >
+                      <CalendarRange size={14} />
+                      <span>
+                        <strong>{t("exportDaily")}</strong>
+                        <span className="export-menu-hint">{t("exportDailyHint")}</span>
+                      </span>
+                    </a>
+                  </div>
+                </>
+              )}
+            </div>
             <Link
               href={`/links/new?utmCampaign=${encodeURIComponent(campaignName)}`}
               className="btn btn-primary"

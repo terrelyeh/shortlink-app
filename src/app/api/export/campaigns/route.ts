@@ -69,6 +69,14 @@ export async function GET(request: NextRequest) {
       return await exportLinks(scope, campaignName, rawInternalSql, today);
     }
 
+    if (format === "link-daily") {
+      const campaignName = searchParams.get("campaign");
+      if (!campaignName) {
+        return NextResponse.json({ error: "campaign param required" }, { status: 400 });
+      }
+      return await exportLinkDaily(scope, campaignName, days, rawInternalSql, today);
+    }
+
     if (format === "timeseries") {
       return await exportTimeseries(scope, days, rawInternalSql, today);
     }
@@ -392,4 +400,102 @@ async function exportLinks(
   // Filename-safe campaign slug
   const slug = campaignName.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 40);
   return csvResponse(buildCsv(headers, rows), `campaign-${slug}-links-${today}.csv`);
+}
+
+// ---- B-daily: single-campaign per-link daily long format ----
+// date × link long table — the single-campaign analog of the list
+// page's date × campaign timeseries. Lets analysts pivot one campaign
+// by day AND by channel (which link drove which day).
+async function exportLinkDaily(
+  scope: { where: Record<string, unknown>; workspaceId: string | null },
+  campaignName: string,
+  days: number,
+  rawInternalSql: Prisma.Sql,
+  today: string,
+) {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+
+  const campaign = await prisma.campaign.findFirst({
+    where: {
+      name: campaignName,
+      ...(scope.workspaceId ? { workspaceId: scope.workspaceId } : {}),
+    },
+    select: { id: true },
+  });
+
+  const links = await prisma.shortLink.findMany({
+    where: {
+      deletedAt: null,
+      ...scope.where,
+      OR: [
+        { utmCampaign: campaignName },
+        ...(campaign?.id ? [{ campaignId: campaign.id }] : []),
+      ],
+    },
+    select: {
+      id: true,
+      code: true,
+      title: true,
+      utmSource: true,
+      utmMedium: true,
+      utmContent: true,
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  const linkIds = links.map((l) => l.id);
+
+  const dailyRaw = linkIds.length
+    ? await prisma.$queryRaw<{ short_link_id: string; day: Date; clicks: bigint }[]>(Prisma.sql`
+        SELECT short_link_id,
+               date_trunc('day', timestamp) AS day,
+               COUNT(*)::bigint AS clicks
+        FROM clicks
+        WHERE short_link_id IN (${Prisma.join(linkIds)})
+          AND timestamp >= ${since}
+          ${rawInternalSql}
+        GROUP BY short_link_id, day
+      `)
+    : [];
+
+  const cellKey = (linkId: string, date: string) => `${linkId} ${date}`;
+  const cells = new Map<string, number>();
+  for (const row of dailyRaw) {
+    const date = new Date(row.day).toISOString().slice(0, 10);
+    cells.set(
+      cellKey(row.short_link_id, date),
+      (cells.get(cellKey(row.short_link_id, date)) ?? 0) + Number(row.clicks),
+    );
+  }
+
+  const dateAxis: string[] = [];
+  const cursor = new Date(since);
+  cursor.setUTCHours(0, 0, 0, 0);
+  const end = new Date();
+  end.setUTCHours(0, 0, 0, 0);
+  while (cursor <= end) {
+    dateAxis.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
+
+  const headers = ["Date", "Short URL", "Title", "Source", "Medium", "Content", "Clicks"];
+  const rows: (string | number)[][] = [];
+  for (const date of dateAxis) {
+    for (const l of links) {
+      rows.push([
+        date,
+        `${shortBaseUrl}/${l.code}`,
+        l.title ?? "",
+        l.utmSource ?? "",
+        l.utmMedium ?? "",
+        l.utmContent ?? "",
+        cells.get(cellKey(l.id, date)) ?? 0,
+      ]);
+    }
+  }
+
+  const slug = campaignName.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 40);
+  return csvResponse(buildCsv(headers, rows), `campaign-${slug}-daily-${today}.csv`);
 }
