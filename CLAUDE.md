@@ -343,9 +343,16 @@ Prisma schema 用 camelCase（`userId`），但 DB 欄位名是 snake_case（`us
 | 環節 | 設定 |
 |---|---|
 | Production | Vercel (`mkt-shortlink`), team `ty510s-projects` |
+| Vercel function region | **東京 `hnd1`**（`vercel.json` 釘死） |
 | DB | Supabase `MKT-ShortLink`, Tokyo (`ap-northeast-1`) |
 | Redis | Upstash Free, Tokyo |
 | Domain | `https://mkt-shortlink.vercel.app` |
+
+⚠️ **`vercel.json` 的 `regions: ["hnd1"]` 不要刪。** Vercel 預設 function 跑在
+`iad1`（美東），但 DB + Redis 都在東京。預設情況下每個 query 跨太平洋
+(~150-170ms RTT)，dashboard 一個 request 串多個 query 會疊到 600ms~1s。
+釘到 `hnd1` 跟 DB 同區後每個 round-trip 降到 ~1-5ms。Hobby plan 支援單一
+region。改 DB region 的話這裡要一起改。
 
 ### Build command
 
