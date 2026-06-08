@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveWorkspaceScope } from "@/lib/workspace";
+import { buildCsv, csvResponse } from "@/lib/utils/csv";
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,6 +13,9 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
+    // Default excludes test clicks so the exported "Clicks" column
+    // matches the real-traffic number shown on the /links page.
+    const includeInternal = searchParams.get("includeInternal") === "1";
 
     const scope = await resolveWorkspaceScope(request, session);
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -21,7 +25,11 @@ export async function GET(request: NextRequest) {
     const links = await prisma.shortLink.findMany({
       where,
       include: {
-        _count: { select: { clicks: true } },
+        _count: {
+          select: {
+            clicks: includeInternal ? true : { where: { isInternal: false } },
+          },
+        },
         tags: { include: { tag: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -29,7 +37,6 @@ export async function GET(request: NextRequest) {
 
     const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
 
-    // Build CSV
     const headers = [
       "Title", "Short URL", "Original URL", "Status", "Clicks",
       "UTM Source", "UTM Medium", "UTM Campaign", "UTM Content", "UTM Term",
@@ -37,38 +44,25 @@ export async function GET(request: NextRequest) {
     ];
 
     const rows = links.map((link) => [
-      csvEscape(link.title || ""),
-      csvEscape(`${shortBaseUrl}/${link.code}`),
-      csvEscape(link.originalUrl),
+      link.title || "",
+      `${shortBaseUrl}/${link.code}`,
+      link.originalUrl,
       link.status,
-      link._count.clicks.toString(),
-      csvEscape(link.utmSource || ""),
-      csvEscape(link.utmMedium || ""),
-      csvEscape(link.utmCampaign || ""),
-      csvEscape(link.utmContent || ""),
-      csvEscape(link.utmTerm || ""),
-      csvEscape(link.tags.map((t: { tag: { name: string } }) => t.tag.name).join(", ")),
+      link._count.clicks,
+      link.utmSource || "",
+      link.utmMedium || "",
+      link.utmCampaign || "",
+      link.utmContent || "",
+      link.utmTerm || "",
+      link.tags.map((t: { tag: { name: string } }) => t.tag.name).join(", "),
       link.createdAt.toISOString(),
       link.expiresAt?.toISOString() || "",
     ]);
 
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-
-    return new NextResponse(csv, {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="links-export-${new Date().toISOString().split("T")[0]}.csv"`,
-      },
-    });
+    const today = new Date().toISOString().split("T")[0];
+    return csvResponse(buildCsv(headers, rows), `links-export-${today}.csv`);
   } catch (error) {
     console.error("Failed to export links:", error);
     return NextResponse.json({ error: "Failed to export" }, { status: 500 });
   }
-}
-
-function csvEscape(value: string): string {
-  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
 }

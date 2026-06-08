@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveWorkspaceScope } from "@/lib/workspace";
+import { buildCsv, csvResponse } from "@/lib/utils/csv";
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,6 +14,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const range = searchParams.get("range") || "7d";
     const linkId = searchParams.get("linkId");
+    // Default excludes test clicks to match the /analytics page.
+    const includeInternal = searchParams.get("includeInternal") === "1";
 
     const now = new Date();
     let startDate: Date;
@@ -30,22 +33,33 @@ export async function GET(request: NextRequest) {
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     }
 
+    // Always resolve workspace scope first — even when a linkId is given —
+    // so a user can't export another workspace's click logs by guessing
+    // an id (IDOR). The linkId is then constrained to ids within scope.
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const userLinks = await prisma.shortLink.findMany({
+      where: { deletedAt: null, ...scope.where },
+      select: { id: true },
+    });
+    const scopedLinkIds = userLinks.map((l) => l.id);
+
+    let targetLinkIds: string[];
+    if (linkId) {
+      // Only honor the requested link if it's within the caller's scope.
+      if (!scopedLinkIds.includes(linkId)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      targetLinkIds = [linkId];
+    } else {
+      targetLinkIds = scopedLinkIds;
+    }
+
     const whereClicks: Record<string, unknown> = {
       timestamp: { gte: startDate },
+      shortLinkId: { in: targetLinkIds },
+      ...(includeInternal ? {} : { isInternal: false }),
     };
-
-    if (linkId) {
-      whereClicks.shortLinkId = linkId;
-    } else {
-      const scope = await resolveWorkspaceScope(request, session);
-      if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      const whereLinks: Record<string, unknown> = { deletedAt: null, ...scope.where };
-      const userLinks = await prisma.shortLink.findMany({
-        where: whereLinks,
-        select: { id: true },
-      });
-      whereClicks.shortLinkId = { in: userLinks.map((l: { id: string }) => l.id) };
-    }
 
     const clicks = await prisma.click.findMany({
       where: whereClicks,
@@ -71,36 +85,23 @@ export async function GET(request: NextRequest) {
       city: string | null;
     };
 
-    const rows = clicks.map((c: ClickRow) => [
+    const rows = (clicks as ClickRow[]).map((c) => [
       c.timestamp.toISOString(),
       c.shortLink.code,
-      csvEscape(c.shortLink.title || ""),
-      csvEscape(c.shortLink.originalUrl),
+      c.shortLink.title || "",
+      c.shortLink.originalUrl,
       c.device || "unknown",
       c.browser || "unknown",
       c.os || "unknown",
-      csvEscape(c.referrer || ""),
+      c.referrer || "",
       c.country || "",
       c.city || "",
     ]);
 
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-
-    return new NextResponse(csv, {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="analytics-export-${new Date().toISOString().split("T")[0]}.csv"`,
-      },
-    });
+    const today = new Date().toISOString().split("T")[0];
+    return csvResponse(buildCsv(headers, rows), `analytics-export-${today}.csv`);
   } catch (error) {
     console.error("Failed to export analytics:", error);
     return NextResponse.json({ error: "Failed to export" }, { status: 500 });
   }
-}
-
-function csvEscape(value: string): string {
-  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
 }
