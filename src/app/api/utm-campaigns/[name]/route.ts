@@ -230,15 +230,30 @@ export async function PATCH(
         data: { goalClicks },
       });
     } else {
-      campaign = await prisma.campaign.create({
-        data: {
-          name: campaignName,
-          goalClicks,
-          status: "ACTIVE",
-          createdById: session.user.id,
-          workspaceId: workspaceId || undefined,
-        },
-      });
+      try {
+        campaign = await prisma.campaign.create({
+          data: {
+            name: campaignName,
+            goalClicks,
+            status: "ACTIVE",
+            createdById: session.user.id,
+            workspaceId: workspaceId || undefined,
+          },
+        });
+      } catch (err) {
+        // Unique violation on (workspaceId, name) — a concurrent request
+        // created it between our findFirst and this insert. Take theirs
+        // and apply the goal to it. Any other error bubbles up.
+        const raced = await prisma.campaign.findFirst({
+          where: { name: campaignName, ...(workspaceId ? { workspaceId } : {}) },
+          select: { id: true },
+        });
+        if (!raced) throw err;
+        campaign = await prisma.campaign.update({
+          where: { id: raced.id },
+          data: { goalClicks },
+        });
+      }
     }
 
     return NextResponse.json({ success: true, goalClicks: campaign.goalClicks });

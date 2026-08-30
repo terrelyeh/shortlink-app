@@ -429,6 +429,13 @@ model Campaign {
   links     ShortLink[]
   tags      TagOnCampaign[]
 
+  // One campaign name per workspace. Without this, upsertCampaignForUtm()'s
+  // findFirst-then-create races: two concurrent link creates with the same
+  // utm_campaign both miss the lookup and both insert, splitting the
+  // campaign across two leaderboard rows. Postgres treats NULLs as
+  // distinct, so orphan (workspaceId = NULL) rows stay unconstrained —
+  // those are matched by name + createdById in the helper instead.
+  @@unique([workspaceId, name])
   @@index([workspaceId])
   @@index([status])
   @@map("campaigns")

@@ -110,11 +110,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = campaignSchema.parse(body);
 
-    // Check if campaign name already exists for this user
+    const scope = await resolveWorkspaceScope(request, session);
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const workspaceId = scope.workspaceId;
+
+    // Names are unique per workspace, so check that way — checking by
+    // createdById would miss a name a teammate already took and let the
+    // insert fail with a raw unique violation instead of this 409.
     const existing = await prisma.campaign.findFirst({
       where: {
         name: validated.name,
-        createdById: session.user.id,
+        ...(workspaceId ? { workspaceId } : { createdById: session.user.id, workspaceId: null }),
       },
     });
 
@@ -139,9 +145,6 @@ export async function POST(request: NextRequest) {
       tagConnections = await Promise.all(tagPromises);
     }
 
-    const scope = await resolveWorkspaceScope(request, session);
-    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    const workspaceId = scope.workspaceId;
     const campaign = await prisma.campaign.create({
       data: {
         name: validated.name,
