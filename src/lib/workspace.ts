@@ -104,6 +104,49 @@ export async function resolveWorkspaceScope(
 }
 
 /**
+ * Whether a workspace role carries admin authority over workspace-level
+ * settings (governance rules, audit log, member management).
+ *
+ * Note this is the WorkspaceMember role (OWNER / ADMIN / MEMBER / VIEWER),
+ * never the legacy global User.role (ADMIN / MANAGER / MEMBER / VIEWER).
+ * The two enums share names but are orthogonal — a workspace OWNER is
+ * routinely User.role === "MEMBER".
+ */
+export function isWorkspaceAdmin(role: string): boolean {
+  return role === "OWNER" || role === "ADMIN";
+}
+
+/**
+ * Like resolveWorkspaceScope(), but returns the caller's role in the
+ * resolved workspace instead of a query `where` clause. Use it for
+ * workspace-level permission gates that aren't tied to one resource row.
+ *
+ * Returns null when the user is not a member of the requested workspace,
+ * or has no workspace at all (caller should return 403).
+ */
+export async function resolveWorkspaceAccess(
+  request: NextRequest,
+  session: { user: { id: string } },
+): Promise<WorkspaceAccess | null> {
+  const workspaceId = getWorkspaceId(request);
+
+  if (workspaceId) {
+    return checkWorkspaceAccess(workspaceId, session.user.id);
+  }
+
+  // Same fallback as resolveWorkspaceScope: the client may fire before
+  // WorkspaceContext has populated the x-workspace-id header.
+  const member = await prisma.workspaceMember.findFirst({
+    where: { userId: session.user.id },
+    orderBy: { joinedAt: "asc" },
+    select: { workspaceId: true, role: true },
+  });
+
+  if (!member) return null;
+  return { workspaceId: member.workspaceId, role: member.role };
+}
+
+/**
  * Whether `userId` is allowed to mutate (edit / delete / clone / share)
  * a resource. Three tiers:
  *   - Creator → always yes

@@ -40,9 +40,9 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Display the workspace-level role (the one that actually controls
-  // permissions today), not the legacy global User.role. The userRole
-  // prop is still needed for /audit-log gating but never shown to user.
+  // The workspace-level role is what actually controls permissions —
+  // the legacy global User.role is orthogonal to it. Used both for
+  // display and for gating admin-only nav items.
   const { currentWorkspace } = useWorkspace();
   const displayRole = currentWorkspace?.role ?? userRole;
 
@@ -55,12 +55,12 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
       href: "/audit-log",
       labelKey: "auditLog",
       icon: <ClipboardList size={15} />,
-      roles: ["ADMIN", "MANAGER"],
+      roles: ["OWNER", "ADMIN"],
     },
   ];
 
   const filteredItems = navItems.filter(
-    (item) => !item.roles || item.roles.includes(userRole),
+    (item) => !item.roles || item.roles.includes(displayRole),
   );
 
   const initials = (userName || "U")

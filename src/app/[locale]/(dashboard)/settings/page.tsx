@@ -53,7 +53,9 @@ export default function SettingsPage() {
   const [deleteWorkspaceError, setDeleteWorkspaceError] = useState<string | null>(null);
 
   const isWorkspaceOwner = currentWorkspace?.role === "OWNER";
-  const isAdminOrManager = ["ADMIN", "MANAGER"].includes(session?.user?.role || "");
+  // Workspace role, not the legacy global User.role — the latter is
+  // "MEMBER" even for workspace owners, which hid this tab from everyone.
+  const isWorkspaceAdmin = ["OWNER", "ADMIN"].includes(currentWorkspace?.role || "");
 
   const [approvedSources, setApprovedSources] = useState<string[]>([]);
   const [approvedMediums, setApprovedMediums] = useState<string[]>([]);
@@ -62,6 +64,7 @@ export default function SettingsPage() {
   const [governanceLoading, setGovernanceLoading] = useState(false);
   const [governanceSaving, setGovernanceSaving] = useState(false);
   const [governanceSaved, setGovernanceSaved] = useState(false);
+  const [governanceError, setGovernanceError] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeTab === "governance" && currentWorkspace?.id) {
@@ -79,6 +82,7 @@ export default function SettingsPage() {
 
   const saveGovernanceSettings = async () => {
     setGovernanceSaving(true);
+    setGovernanceError(null);
     try {
       const response = await fetch("/api/workspace/utm-settings", {
         method: "PATCH",
@@ -88,9 +92,15 @@ export default function SettingsPage() {
       if (response.ok) {
         setGovernanceSaved(true);
         setTimeout(() => setGovernanceSaved(false), 2500);
+      } else {
+        // Previously this branch was missing entirely: a 403 left the
+        // button spinning down with no feedback at all.
+        const data = await response.json().catch(() => null);
+        setGovernanceError(data?.error ?? t("utmRulesSaveFailed"));
       }
     } catch (e) {
       console.error(e);
+      setGovernanceError(t("utmRulesSaveFailed"));
     } finally {
       setGovernanceSaving(false);
     }
@@ -195,8 +205,8 @@ export default function SettingsPage() {
     { id: "profile" as const, label: t("profile"), icon: User },
     { id: "members" as const, label: tWorkspace("members"), icon: Users },
     { id: "workspace" as const, label: tWorkspace("title"), icon: Building2 },
-    ...(isAdminOrManager && currentWorkspace
-      ? [{ id: "governance" as const, label: "UTM Rules", icon: ShieldCheck }]
+    ...(isWorkspaceAdmin && currentWorkspace
+      ? [{ id: "governance" as const, label: t("utmRules"), icon: ShieldCheck }]
       : []),
   ];
 
@@ -394,18 +404,37 @@ export default function SettingsPage() {
             <div className="row-between" style={{ marginBottom: 4 }}>
               <div className="section-title">
                 <ShieldCheck size={14} style={{ color: "var(--data-violet)" }} />
-                UTM Naming Governance
+                {t("utmGovernanceTitle")}
               </div>
               {governanceSaved && (
                 <span style={{ fontSize: 11, fontWeight: 500, color: "var(--ok-fg)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  <Check size={13} /> Saved
+                  <Check size={13} /> {tCommon("saved")}
                 </span>
               )}
             </div>
             <p className="section-sub" style={{ marginBottom: 20 }}>
-              Define approved UTM sources and mediums. When set, team members will see a
-              warning when entering non-approved values.
+              {t("utmGovernanceDesc")}
             </p>
+
+            {governanceError && (
+              <div
+                style={{
+                  padding: 10,
+                  background: "var(--err-bg)",
+                  border: "1px solid #F3C5CC",
+                  borderRadius: 6,
+                  color: "var(--err-fg)",
+                  fontSize: 12,
+                  marginBottom: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <AlertTriangle size={14} />
+                {governanceError}
+              </div>
+            )}
 
             {governanceLoading ? (
               <div style={{ padding: 40, display: "grid", placeItems: "center" }}>
@@ -483,7 +512,7 @@ export default function SettingsPage() {
                       }}
                       disabled={!newSource}
                     >
-                      <Plus size={12} /> Add
+                      <Plus size={12} /> {tCommon("add")}
                     </button>
                   </div>
                 </div>
@@ -558,7 +587,7 @@ export default function SettingsPage() {
                       }}
                       disabled={!newMedium}
                     >
-                      <Plus size={12} /> Add
+                      <Plus size={12} /> {tCommon("add")}
                     </button>
                   </div>
                 </div>
@@ -575,7 +604,7 @@ export default function SettingsPage() {
                     ) : (
                       <ShieldCheck size={13} />
                     )}
-                    {governanceSaving ? "Saving…" : "Save Rules"}
+                    {governanceSaving ? t("saving") : t("utmRulesSave")}
                   </button>
                 </div>
               </div>

@@ -37,7 +37,8 @@
     "minutesAgo": "{n} 分鐘前",
     "hoursAgo": "{n} 小時前",
     "daysAgo": "{n} 天前",
-    "monthsAgo": "{n} 個月前"
+    "monthsAgo": "{n} 個月前",
+    "add": "新增"
   },
   "auth": {
     "signIn": "登入",
@@ -254,7 +255,7 @@
     "browsers": "瀏覽器",
     "operatingSystems": "作業系統",
     "countries": "國家/地區",
-    "cities": "城市",
+    "cities": "城市排行",
     "noData": "此期間無數據",
     "campaignLinks": "此活動的連結：",
     "noLinksInCampaign": "此活動中沒有連結",
@@ -280,7 +281,6 @@
     "viewingCampaignAnalytics": "正在查看單一活動分析",
     "openCampaignDetail": "進入活動頁",
     "inWindowClicks": "本期 {n} 次點擊",
-    "cities": "城市排行",
     "citiesHint": "前 15 個城市點擊數（GeoIP 解析；不同地區精準度有別）。",
     "decayTitle": "點擊衰減曲線（黃金窗口）",
     "decayHint": "從首次點擊起算的累積/每小時點擊曲線。目前無資料。",
@@ -360,7 +360,12 @@
     "framework": "框架",
     "database": "資料庫",
     "role": "角色",
-    "workspaceNameMismatch": "工作區名稱不相符"
+    "workspaceNameMismatch": "工作區名稱不相符",
+    "utmRules": "UTM 規範",
+    "utmGovernanceTitle": "UTM 命名規範",
+    "utmGovernanceDesc": "設定核可的 UTM 來源 (Source) 與媒介 (Medium)。設定後，團隊成員輸入非核可值時會看到警告。",
+    "utmRulesSave": "儲存規範",
+    "utmRulesSaveFailed": "UTM 規範儲存失敗，請再試一次。"
   },
   "users": {
     "title": "使用者管理",
@@ -469,32 +474,92 @@
         "name": "新產品上市",
         "description": "新產品上市 + landing page + EDM + 社群 + PR + 付費媒體的完整組合。",
         "channels": {
-          "edm_v1": { "label": "EDM #1 — 公告", "hint": "主要公告信" },
-          "edm_v2": { "label": "EDM #2 — 跟進", "hint": "第二篇素材 — 提醒 / 案例 / FAQ" },
-          "fb_v1": { "label": "Facebook 貼文 — 公告", "hint": "" },
-          "fb_v2": { "label": "Facebook 貼文 — 跟進", "hint": "第二篇素材 / 跟進貼文" },
-          "li_v1": { "label": "LinkedIn 貼文 — 公告", "hint": "" },
-          "li_v2": { "label": "LinkedIn 貼文 — 跟進", "hint": "第二篇素材 / 跟進貼文" },
-          "pr": { "label": "PR 新聞稿", "hint": "" },
-          "intercom": { "label": "Intercom 站內訊息", "hint": "" },
-          "li_ads": { "label": "LinkedIn Ads", "hint": "" },
-          "google_ads": { "label": "Google Ads", "hint": "" }
+          "edm_v1": {
+            "label": "EDM #1 — 公告",
+            "hint": "主要公告信"
+          },
+          "edm_v2": {
+            "label": "EDM #2 — 跟進",
+            "hint": "第二篇素材 — 提醒 / 案例 / FAQ"
+          },
+          "fb_v1": {
+            "label": "Facebook 貼文 — 公告",
+            "hint": ""
+          },
+          "fb_v2": {
+            "label": "Facebook 貼文 — 跟進",
+            "hint": "第二篇素材 / 跟進貼文"
+          },
+          "li_v1": {
+            "label": "LinkedIn 貼文 — 公告",
+            "hint": ""
+          },
+          "li_v2": {
+            "label": "LinkedIn 貼文 — 跟進",
+            "hint": "第二篇素材 / 跟進貼文"
+          },
+          "pr": {
+            "label": "PR 新聞稿",
+            "hint": ""
+          },
+          "intercom": {
+            "label": "Intercom 站內訊息",
+            "hint": ""
+          },
+          "li_ads": {
+            "label": "LinkedIn Ads",
+            "hint": ""
+          },
+          "google_ads": {
+            "label": "Google Ads",
+            "hint": ""
+          }
         }
       },
       "exhibition_event": {
         "name": "展會活動",
         "description": "展覽 / 大型研討會，專屬 event landing page + 事前宣傳。",
         "channels": {
-          "edm_save_date": { "label": "EDM — Save the Date", "hint": "" },
-          "edm_reminder": { "label": "EDM — 活動提醒", "hint": "活動前 1–2 週發送" },
-          "fb_announce": { "label": "Facebook — 活動公告", "hint": "" },
-          "fb_booth": { "label": "Facebook — 展攤預告", "hint": "" },
-          "li_announce": { "label": "LinkedIn — 活動公告", "hint": "" },
-          "li_booth": { "label": "LinkedIn — 展攤預告", "hint": "" },
-          "pr_event": { "label": "PR 新聞稿", "hint": "" },
-          "intercom_event": { "label": "Intercom 站內訊息", "hint": "" },
-          "li_ads_event": { "label": "LinkedIn Ads", "hint": "" },
-          "google_ads_event": { "label": "Google Ads", "hint": "" }
+          "edm_save_date": {
+            "label": "EDM — Save the Date",
+            "hint": ""
+          },
+          "edm_reminder": {
+            "label": "EDM — 活動提醒",
+            "hint": "活動前 1–2 週發送"
+          },
+          "fb_announce": {
+            "label": "Facebook — 活動公告",
+            "hint": ""
+          },
+          "fb_booth": {
+            "label": "Facebook — 展攤預告",
+            "hint": ""
+          },
+          "li_announce": {
+            "label": "LinkedIn — 活動公告",
+            "hint": ""
+          },
+          "li_booth": {
+            "label": "LinkedIn — 展攤預告",
+            "hint": ""
+          },
+          "pr_event": {
+            "label": "PR 新聞稿",
+            "hint": ""
+          },
+          "intercom_event": {
+            "label": "Intercom 站內訊息",
+            "hint": ""
+          },
+          "li_ads_event": {
+            "label": "LinkedIn Ads",
+            "hint": ""
+          },
+          "google_ads_event": {
+            "label": "Google Ads",
+            "hint": ""
+          }
         }
       }
     },

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isWorkspaceAdmin, resolveWorkspaceAccess } from "@/lib/workspace";
 
-// GET - List audit logs (Admin and Manager only)
+// GET - List audit logs (workspace OWNER / ADMIN only)
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
@@ -10,7 +11,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!["ADMIN", "MANAGER"].includes(session.user.role)) {
+    // Workspace OWNER / ADMIN only. This used to check the legacy global
+    // User.role, which denied everyone — workspace owners are "MEMBER" there.
+    const access = await resolveWorkspaceAccess(request, session);
+    if (!access || !isWorkspaceAdmin(access.role)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
@@ -20,14 +24,23 @@ export async function GET(request: NextRequest) {
     const action = searchParams.get("action");
     const userId = searchParams.get("userId");
 
-    const where: Record<string, unknown> = {};
+    // AuditLog has no workspaceId column, so scope by authorship instead:
+    // only entries written by members of the caller's workspace. Without
+    // this the endpoint would return every workspace's history.
+    const members = await prisma.workspaceMember.findMany({
+      where: { workspaceId: access.workspaceId },
+      select: { userId: true },
+    });
+    const memberIds = members.map((m) => m.userId);
+
+    // A userId filter narrows within the workspace; asking for a non-member
+    // returns nothing rather than silently falling back to everyone.
+    const where: Record<string, unknown> = {
+      userId: userId ? (memberIds.includes(userId) ? userId : { in: [] }) : { in: memberIds },
+    };
 
     if (action) {
       where.action = action;
-    }
-
-    if (userId) {
-      where.userId = userId;
     }
 
     const [logs, total] = await Promise.all([

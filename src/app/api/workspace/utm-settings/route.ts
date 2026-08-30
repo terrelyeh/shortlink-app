@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { checkWorkspaceAccess, getWorkspaceId } from "@/lib/workspace";
+import { checkWorkspaceAccess, getWorkspaceId, isWorkspaceAdmin } from "@/lib/workspace";
 import { cacheDel, cacheKey } from "@/lib/cache";
 import { z } from "zod";
 
@@ -57,17 +57,22 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Only ADMIN / MANAGER can update governance settings
-    if (!["ADMIN", "MANAGER"].includes(session.user.role)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const workspaceId = getWorkspaceId(request);
     if (!workspaceId) {
       return NextResponse.json({ error: "Workspace required" }, { status: 400 });
     }
     const access = await checkWorkspaceAccess(workspaceId, session.user.id);
     if (!access) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    // Only workspace OWNER / ADMIN can update governance settings.
+    // This used to check the legacy global User.role, which locked the
+    // endpoint for everyone — workspace owners are User.role "MEMBER".
+    if (!isWorkspaceAdmin(access.role)) {
+      return NextResponse.json(
+        { error: "Only workspace owners and admins can change UTM rules" },
+        { status: 403 },
+      );
+    }
 
     const body = await request.json();
     const validated = utmSettingsSchema.parse(body);

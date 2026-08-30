@@ -36,7 +36,9 @@
     "minutesAgo": "{n}m ago",
     "hoursAgo": "{n}h ago",
     "daysAgo": "{n}d ago",
-    "monthsAgo": "{n}mo ago"
+    "monthsAgo": "{n}mo ago",
+    "add": "Add",
+    "saved": "Saved"
   },
   "auth": {
     "signIn": "Sign In",
@@ -253,7 +255,7 @@
     "browsers": "Browsers",
     "operatingSystems": "Operating Systems",
     "countries": "Countries",
-    "cities": "Cities",
+    "cities": "Top cities",
     "noData": "No data for this period",
     "campaignLinks": "Links in campaign:",
     "noLinksInCampaign": "No links in this campaign",
@@ -279,7 +281,6 @@
     "viewingCampaignAnalytics": "Viewing campaign analytics",
     "openCampaignDetail": "Open campaign",
     "inWindowClicks": "{n, plural, one {# click} other {# clicks}} in selected window",
-    "cities": "Top cities",
     "citiesHint": "Top 15 cities by clicks (resolved via GeoIP — accuracy varies by region).",
     "decayTitle": "Click decay (golden window)",
     "decayHint": "Hour-by-hour cumulative + per-hour clicks since this campaign's first click. No data yet.",
@@ -359,7 +360,12 @@
     "framework": "Framework",
     "database": "Database",
     "role": "Role",
-    "workspaceNameMismatch": "Workspace name does not match"
+    "workspaceNameMismatch": "Workspace name does not match",
+    "utmRules": "UTM Rules",
+    "utmGovernanceTitle": "UTM Naming Governance",
+    "utmGovernanceDesc": "Define approved UTM sources and mediums. When set, team members will see a warning when entering non-approved values.",
+    "utmRulesSave": "Save Rules",
+    "utmRulesSaveFailed": "Could not save UTM rules. Please try again."
   },
   "users": {
     "title": "User Management",
@@ -468,32 +474,92 @@
         "name": "Product Launch",
         "description": "New product launch with a landing page + EDM + social + PR + paid media.",
         "channels": {
-          "edm_v1": { "label": "EDM #1 — Announcement", "hint": "Main announcement email" },
-          "edm_v2": { "label": "EDM #2 — Follow-up", "hint": "Second piece — reminder / case study / FAQ" },
-          "fb_v1": { "label": "Facebook post — Announcement", "hint": "" },
-          "fb_v2": { "label": "Facebook post — Follow-up", "hint": "Second piece / follow-up post" },
-          "li_v1": { "label": "LinkedIn post — Announcement", "hint": "" },
-          "li_v2": { "label": "LinkedIn post — Follow-up", "hint": "Second piece / follow-up post" },
-          "pr": { "label": "PR release", "hint": "" },
-          "intercom": { "label": "Intercom in-app", "hint": "" },
-          "li_ads": { "label": "LinkedIn Ads", "hint": "" },
-          "google_ads": { "label": "Google Ads", "hint": "" }
+          "edm_v1": {
+            "label": "EDM #1 — Announcement",
+            "hint": "Main announcement email"
+          },
+          "edm_v2": {
+            "label": "EDM #2 — Follow-up",
+            "hint": "Second piece — reminder / case study / FAQ"
+          },
+          "fb_v1": {
+            "label": "Facebook post — Announcement",
+            "hint": ""
+          },
+          "fb_v2": {
+            "label": "Facebook post — Follow-up",
+            "hint": "Second piece / follow-up post"
+          },
+          "li_v1": {
+            "label": "LinkedIn post — Announcement",
+            "hint": ""
+          },
+          "li_v2": {
+            "label": "LinkedIn post — Follow-up",
+            "hint": "Second piece / follow-up post"
+          },
+          "pr": {
+            "label": "PR release",
+            "hint": ""
+          },
+          "intercom": {
+            "label": "Intercom in-app",
+            "hint": ""
+          },
+          "li_ads": {
+            "label": "LinkedIn Ads",
+            "hint": ""
+          },
+          "google_ads": {
+            "label": "Google Ads",
+            "hint": ""
+          }
         }
       },
       "exhibition_event": {
         "name": "Exhibition Event",
         "description": "Trade show / conference with a dedicated event landing page and pre-event promotion.",
         "channels": {
-          "edm_save_date": { "label": "EDM — Save the Date", "hint": "" },
-          "edm_reminder": { "label": "EDM — Event Reminder", "hint": "Sent 1–2 weeks before the event" },
-          "fb_announce": { "label": "Facebook — Announcement", "hint": "" },
-          "fb_booth": { "label": "Facebook — Booth Tease", "hint": "" },
-          "li_announce": { "label": "LinkedIn — Announcement", "hint": "" },
-          "li_booth": { "label": "LinkedIn — Booth Tease", "hint": "" },
-          "pr_event": { "label": "PR release", "hint": "" },
-          "intercom_event": { "label": "Intercom in-app", "hint": "" },
-          "li_ads_event": { "label": "LinkedIn Ads", "hint": "" },
-          "google_ads_event": { "label": "Google Ads", "hint": "" }
+          "edm_save_date": {
+            "label": "EDM — Save the Date",
+            "hint": ""
+          },
+          "edm_reminder": {
+            "label": "EDM — Event Reminder",
+            "hint": "Sent 1–2 weeks before the event"
+          },
+          "fb_announce": {
+            "label": "Facebook — Announcement",
+            "hint": ""
+          },
+          "fb_booth": {
+            "label": "Facebook — Booth Tease",
+            "hint": ""
+          },
+          "li_announce": {
+            "label": "LinkedIn — Announcement",
+            "hint": ""
+          },
+          "li_booth": {
+            "label": "LinkedIn — Booth Tease",
+            "hint": ""
+          },
+          "pr_event": {
+            "label": "PR release",
+            "hint": ""
+          },
+          "intercom_event": {
+            "label": "Intercom in-app",
+            "hint": ""
+          },
+          "li_ads_event": {
+            "label": "LinkedIn Ads",
+            "hint": ""
+          },
+          "google_ads_event": {
+            "label": "Google Ads",
+            "hint": ""
+          }
         }
       }
     },
