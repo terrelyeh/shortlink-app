@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { buildWorkspaceWhere, resolveWorkspaceScope } from "@/lib/workspace";
+import { resolveWorkspaceScope } from "@/lib/workspace";
 import { cached, cacheKey } from "@/lib/cache";
 
 interface QueryInput {
@@ -19,8 +18,7 @@ interface QueryInput {
  * wrap the whole computation with one key.
  */
 async function computeAnalytics(
-  session: Session,
-  workspaceId: string | null,
+  scopeWhere: Record<string, unknown>,
   q: QueryInput,
 ) {
   const { range, linkId, campaign, tagId, customFrom, customTo } = q;
@@ -55,14 +53,9 @@ async function computeAnalytics(
     timestamp: { gte: startDate, lte: endDate },
   };
 
-  const workspaceWhere = buildWorkspaceWhere(
-    workspaceId,
-    session.user.id,
-    session.user.role,
-  );
   const whereLinks: Record<string, unknown> = {
     deletedAt: null,
-    ...workspaceWhere,
+    ...scopeWhere,
   };
 
   if (campaign) {
@@ -77,15 +70,17 @@ async function computeAnalytics(
     whereLinks.id = { in: taggedLinks.map((t) => t.shortLinkId) };
   }
 
-  if (linkId) {
-    whereClicks.shortLinkId = linkId;
-  } else {
-    const userLinks = await prisma.shortLink.findMany({
-      where: whereLinks,
-      select: { id: true },
-    });
-    whereClicks.shortLinkId = { in: userLinks.map((l) => l.id) };
-  }
+  // Always resolve the link set through the workspace-scoped filter, even
+  // when a linkId is given — this branch used to assign the id straight to
+  // whereClicks, bypassing scoping entirely, so any signed-in user could
+  // read another workspace's click breakdown by guessing an id (IDOR).
+  // Same treatment as /api/export/analytics. An out-of-scope id simply
+  // matches nothing rather than confirming the link exists.
+  const scopedLinks = await prisma.shortLink.findMany({
+    where: linkId ? { ...whereLinks, id: linkId } : whereLinks,
+    select: { id: true },
+  });
+  whereClicks.shortLinkId = { in: scopedLinks.map((l) => l.id) };
 
   const periodMs = now.getTime() - startDate.getTime();
   const prevStartDate = new Date(startDate.getTime() - periodMs);
@@ -94,9 +89,10 @@ async function computeAnalytics(
     timestamp: { gte: prevStartDate, lt: startDate },
   };
 
-  const shortLinkIds =
-    (whereClicks.shortLinkId as { in: string[] } | undefined)?.in ??
-    (linkId ? [linkId] : []);
+  // Raw-SQL queries below take the id list directly. It's always the
+  // scoped set now — the old `?? [linkId]` fallback fed the unscoped id
+  // straight into them.
+  const shortLinkIds = scopedLinks.map((l) => l.id);
 
   // One wave of parallel DB calls
   const [
@@ -335,7 +331,7 @@ export async function GET(request: NextRequest) {
     );
 
     const payload = await cached(key, 60, () =>
-      computeAnalytics(session, workspaceId, {
+      computeAnalytics(scope.where, {
         range,
         linkId,
         campaign,

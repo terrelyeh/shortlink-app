@@ -35,29 +35,6 @@ export async function checkWorkspaceAccess(
 }
 
 /**
- * Build the workspace-aware where clause for queries.
- *
- * DEPRECATED: trusts the caller-supplied workspaceId without checking that
- * the user is actually a member. Callers should migrate to
- * resolveWorkspaceScope() which verifies membership.
- */
-export function buildWorkspaceWhere(
-  workspaceId: string | null,
-  userId: string,
-  userRole: string
-): Record<string, unknown> {
-  if (workspaceId) {
-    return { workspaceId };
-  }
-
-  if (userRole === "MEMBER" || userRole === "VIEWER") {
-    return { createdById: userId };
-  }
-
-  return {};
-}
-
-/**
  * Resolve the effective workspace scope for a request, verifying that the
  * authenticated user is actually a member of the requested workspace.
  *
