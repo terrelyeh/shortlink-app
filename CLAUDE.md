@@ -1,6 +1,6 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-08-31 — 權限模型改用 workspace 角色、Campaign unique 約束、analytics IDOR 修復；架構與檔案樹拆到 `docs/`
+> Last updated: 2026-08-31 — 權限模型改用 workspace 角色、Campaign unique 約束、analytics IDOR 修復、內部導航改用 Link；架構與檔案樹拆到 `docs/`
 
 ## Project Overview
 
@@ -111,12 +111,13 @@ Prisma schema 用 camelCase（`userId`），但 DB 欄位名是 snake_case（`us
 
 ### 使用狀況（2026-08-31 實際資料）
 
-寫程式前值得知道的規模：**1 個 workspace、4 位使用者、65 條連結、4,072 次點擊、6 個 Campaign、0 筆 Conversion**。展會檔期（Interop / Computex 2026）跑完後進入淡季 — 近 30 天只有 39 次點擊，6/02 後沒有新連結。**這是個低流量的內部工具**，不要為了想像中的規模做過度優化。
+寫程式前值得知道的規模：**1 個 workspace、4 位使用者、65 條連結、4,072 次點擊、4 個 Campaign、0 筆 Conversion**。展會檔期（Interop / Computex 2026）跑完後進入淡季 — 近 30 天只有 39 次點擊，6/02 後沒有新連結。**這是個低流量的內部工具**，不要為了想像中的規模做過度優化。
 
 ### 🔜 Next Steps / Pending
 
-- **ESLint 有 36 個問題**（23 errors / 13 warnings）— 其中最該修的是 3 處 `<a href="/...">`（`analytics/page.tsx:727,730`、`CSVImportClient.tsx:210`）。原生 `<a>` 會整頁重載，等於清空 React Query 快取，跟第 5 條架構直接牴觸。其餘多為死碼 / `no-unescaped-entities` 雜訊
-- **`prduct_launch_nvs` / `test` 等雜訊 Campaign** — 重複列已合併（`merge-duplicate-campaigns.mjs`），但仍有 0 連結的拼錯列和測試列。要清可加進 script 的 `ALIASES` 或直接刪
+- **ESLint 剩 24 個問題**（12 errors / 12 warnings）— 都是死碼、`no-unescaped-entities`、3 個 `static-components`、2 個 `set-state-in-effect`（`useMediaQuery` + kickstart）。`no-html-link-for-pages` 已歸零
+- **`social_prduct_launch` 的拼字錯誤** — utm_campaign 值拼成 `prduct`，但它有 3 條有效的 LinkedIn 連結、9 次點擊，改名會變更已發佈貼文的 utm 參數、切斷 GA 資料連續性。**建議維持現狀**，除非行銷端明確要求
+- **孤兒測試連結 `/testxxxxxxx`** — utm=`xxxxxxx`、PAUSED、0 點擊、未刪除，所以還會出現在 `/links` 列表。要清直接刪
 - **4 封逾期邀請** — 2026-04-23 發出、05-12 到期、無人接受，收件人與現有使用者是不同的人。清掉或重發
 - **`/api/user/profile` 的「最後一個 admin」保護從未生效** — 見 Pitfall #26
 - **`ALLOWED_EMAILS` env 退役** — 目前作為過渡 fallback。確認所有現存使用者都已正式有 WorkspaceMember row 後可以刪除這個 env，讓 auth 完全 DB-driven
