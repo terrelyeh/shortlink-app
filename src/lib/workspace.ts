@@ -6,6 +6,8 @@ export interface WorkspaceAccess {
   role: string;
 }
 
+export type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
+
 /**
  * Extract workspaceId from request query params or headers.
  */
@@ -32,6 +34,41 @@ export async function checkWorkspaceAccess(
   if (!member) return null;
 
   return { workspaceId, role: member.role };
+}
+
+/**
+ * Membership check for the /api/workspaces/* routes, which need the full
+ * member and workspace rows for their responses (name, slug, role) rather
+ * than just a scope filter, and which answer with a specific status code.
+ *
+ * Returns either `{ member, workspace }` or `{ error, status }` — callers
+ * discriminate with `"error" in result`.
+ *
+ * Prefer checkWorkspaceAccess() when you only need the role, and
+ * canUserActOnResource() when the question is about one resource row.
+ */
+export async function requireWorkspaceMember(
+  workspaceId: string,
+  userId: string,
+  requiredRoles?: WorkspaceRole[],
+) {
+  const member = await prisma.workspaceMember.findUnique({
+    where: {
+      workspaceId_userId: { workspaceId, userId },
+    },
+    include: { workspace: true },
+  });
+
+  // 404 rather than 403: don't confirm a workspace exists to non-members.
+  if (!member) {
+    return { error: "Workspace not found or access denied", status: 404 };
+  }
+
+  if (requiredRoles && !requiredRoles.includes(member.role as WorkspaceRole)) {
+    return { error: "Insufficient permissions", status: 403 };
+  }
+
+  return { member, workspace: member.workspace };
 }
 
 /**

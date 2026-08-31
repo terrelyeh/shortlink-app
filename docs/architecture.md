@@ -124,7 +124,7 @@ signIn 允許條件（first-match-wins）：
 
 **`events.signIn` 自動 accept**：使用者首次 OAuth 成功後，hook 找出該 email 所有 PENDING invitation 一次 accept，建好 WorkspaceMember。所以**口頭通知 + 直接登入** 跟 **點 invite link** 兩條路效果一樣 — 連結只是便利性。
 
-**權限判斷有兩個層級，都在 `lib/workspace.ts`：**
+**權限判斷全部集中在 `lib/workspace.ts`，依情境選一個：**
 
 ```
 ① Resource 層級 — canUserActOnResource(userId, { createdById, workspaceId })
@@ -135,11 +135,26 @@ signIn 允許條件（first-match-wins）：
      - workspaceId=NULL 的 orphan → 只有建立者能動
 
 ② Workspace 層級 — isWorkspaceAdmin(role) + resolveWorkspaceAccess(request, session)
-     不綁定單一資源的管理權（治理設定、稽核紀錄、成員管理）時用
-     - resolveWorkspaceAccess 回傳 { workspaceId, role }，
-       fallback 邏輯與 resolveWorkspaceScope 相同
+     不綁定單一資源的管理權（治理設定、稽核紀錄）時用。workspace 從
+     header 解析、沒有時 fallback，跟 resolveWorkspaceScope 一致
+     - resolveWorkspaceAccess 回傳 { workspaceId, role } 或 null
      - isWorkspaceAdmin(role) → role 是 OWNER 或 ADMIN
+
+③ /api/workspaces/* 專用 — requireWorkspaceMember(workspaceId, userId, roles?)
+     workspaceId 來自路由參數（不是 header），而且回應需要完整的
+     member / workspace row（名稱、slug、角色）
+     - 回傳 { member, workspace } 或 { error, status }
+     - 呼叫端用 `if ("error" in access)` 判別
+     - 非成員回 404 而非 403：不對外確認 workspace 是否存在
+
+低階原語 checkWorkspaceAccess(workspaceId, userId) → { workspaceId, role }
+只回角色，供上面幾個和 resolveWorkspaceScope 內部使用。
 ```
+
+⚠️ 2026-08-31 之前，`/api/workspaces/[id]/`、`invitations/`、`members/`
+三個 route **各自有一份完全相同的本地 `checkWorkspaceAccess` 複製**（連
+`WorkspaceRole` 型別也複製了兩份），已收斂成上面的 ③。新增 workspace
+管理 API 直接 import，不要再複製。
 
 **所有 API 的權限檢查都用這兩個。** 絕對不要用 `session.user.role` — `User.role` 是 legacy 全域旗標，跟 workspace 角色完全脫鉤。實際資料裡**每個使用者的 `User.role` 都是 `MEMBER`，包含 workspace OWNER**，所以任何 `["ADMIN","MANAGER"].includes(session.user.role)` 形式的檢查等於「拒絕所有人」。2026-08-31 修掉了 `/api/workspace/utm-settings` PATCH 和 `/api/audit-log` GET 這兩個踩到的端點（詳見 Pitfalls #21 / #26）。
 

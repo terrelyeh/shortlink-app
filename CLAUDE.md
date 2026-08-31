@@ -44,7 +44,7 @@
 4. **Campaign auto-link** — 填 `utmCampaign` 就自動 upsert Campaign row。有 `@@unique([workspaceId, name])` 防併發重複
 5. **React Query 快取** ⭐ — 整個 dashboard 的資料層。共用 query key 表在 architecture.md，**新增同類資料要沿用既有 key**
 6. **兩層 cache** — React Query（5min）→ Browser Cache-Control → Redis（60s）→ Postgres
-7. **Auth + Workspace** ⭐ — DB-driven signIn gate；權限判斷分 resource 層級（`canUserActOnResource`）與 workspace 層級（`isWorkspaceAdmin` + `resolveWorkspaceAccess`）
+7. **Auth + Workspace** ⭐ — DB-driven signIn gate；權限判斷全在 `lib/workspace.ts`：resource 層級用 `canUserActOnResource`、workspace 層級用 `isWorkspaceAdmin` + `resolveWorkspaceAccess`、`/api/workspaces/*` 用 `requireWorkspaceMember`
 8. **UTM 建構器 + 白名單** — 治理設定只有 workspace OWNER/ADMIN 能改
 9. **Custom domain** — `go.engenius.ai/<code>` internal rewrite 到 `/s/<code>`，其餘 302 到官網
 10. **Kickstart wizard** — 選 playbook 一鍵建整套追蹤連結
@@ -200,7 +200,7 @@ Prisma datasource 需 `directUrl` 才能讓 `db push` 繞過 pgbouncer — schem
 
 20. **UTM campaign 欄位用的是 CampaignCombobox 不是 datalist** — `source` / `medium` 還是用原生 `<input list="...">` datalist，但 `utm_campaign` 改成自訂 combobox（見 `UTMBuilder.tsx` 底部 `CampaignCombobox`）。理由：要讓「➕ 建立新活動」成為第一級選項，原生 datalist 無法做。如果未來想換回原生 datalist，要處理「如何在下拉中提供建立動作」。
 
-21. **權限檢查一律用 `lib/workspace.ts` 的 helper，絕不用 `User.role`** — 動單一資源用 `canUserActOnResource()`；workspace 層級的管理權（治理設定、稽核紀錄、成員）用 `isWorkspaceAdmin()` + `resolveWorkspaceAccess()`。⚠️ **實際資料裡每個使用者的 `User.role` 都是 `MEMBER`，包含 workspace OWNER** — 所以 `["ADMIN","MANAGER"].includes(session.user.role)` 這種檢查等於「拒絕所有人」，而且沒有 UI 可以改 `User.role`（`/users` 頁已砍）。`/api/workspace/utm-settings` PATCH 和 `/api/audit-log` GET 都因此對全員回 403 過（2026-08-31 修）。
+21. **權限檢查一律用 `lib/workspace.ts` 的 helper，絕不用 `User.role`** — 動單一資源用 `canUserActOnResource()`；workspace 層級的管理權（治理設定、稽核紀錄）用 `isWorkspaceAdmin()` + `resolveWorkspaceAccess()`；`/api/workspaces/*` 這種 workspaceId 來自路由參數、又需要完整 member/workspace row 的用 `requireWorkspaceMember()`。**三個都在 `lib/workspace.ts`，不要在 route 裡自己複製一份**（曾經有 3 份相同的本地副本，2026-08-31 收斂）。⚠️ **實際資料裡每個使用者的 `User.role` 都是 `MEMBER`，包含 workspace OWNER** — 所以 `["ADMIN","MANAGER"].includes(session.user.role)` 這種檢查等於「拒絕所有人」，而且沒有 UI 可以改 `User.role`（`/users` 頁已砍）。`/api/workspace/utm-settings` PATCH 和 `/api/audit-log` GET 都因此對全員回 403 過（2026-08-31 修）。
 
 22. **dashboard 之外的頁要自己包 `<SessionProvider>`** — `[locale]/layout.tsx` 只包 `NextIntlClientProvider`；只有 `(dashboard)` route group 透過 `Providers.tsx` 才有 SessionProvider。如果新加的頁面用 `useSession()` 又不在 dashboard 底下（例：`/invite/[token]`），必須**自己加一個 `layout.tsx` `"use client"` 包 `<SessionProvider>`**，不然頁面 mount 就炸 client-side exception。看 `src/app/[locale]/invite/[token]/layout.tsx` 範例。
 

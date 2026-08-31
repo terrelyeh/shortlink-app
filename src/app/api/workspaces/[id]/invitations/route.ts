@@ -1,39 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireWorkspaceMember, type WorkspaceRole } from "@/lib/workspace";
 import { auth } from "@/lib/auth";
 import crypto from "crypto";
 
-type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
 
 // Helper to check workspace access and role
-async function checkWorkspaceAccess(
-  workspaceId: string,
-  userId: string,
-  requiredRoles?: WorkspaceRole[]
-) {
-  const member = await prisma.workspaceMember.findUnique({
-    where: {
-      workspaceId_userId: {
-        workspaceId,
-        userId,
-      },
-    },
-    include: {
-      workspace: true,
-    },
-  });
-
-  if (!member) {
-    return { error: "Workspace not found or access denied", status: 404 };
-  }
-
-  if (requiredRoles && !requiredRoles.includes(member.role)) {
-    return { error: "Insufficient permissions", status: 403 };
-  }
-
-  return { member, workspace: member.workspace };
-}
 
 // GET /api/workspaces/[id]/invitations - List pending invitations
 export async function GET(
@@ -49,7 +22,7 @@ export async function GET(
     const { id } = await params;
 
     // Only OWNER and ADMIN can view invitations
-    const access = await checkWorkspaceAccess(id, session.user.id, ["OWNER", "ADMIN"]);
+    const access = await requireWorkspaceMember(id, session.user.id, ["OWNER", "ADMIN"]);
     if ("error" in access) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
@@ -112,7 +85,7 @@ export async function POST(
     const { id } = await params;
 
     // Only OWNER and ADMIN can invite
-    const access = await checkWorkspaceAccess(id, session.user.id, ["OWNER", "ADMIN"]);
+    const access = await requireWorkspaceMember(id, session.user.id, ["OWNER", "ADMIN"]);
     if ("error" in access) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
@@ -265,7 +238,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Invitation ID required" }, { status: 400 });
     }
 
-    const access = await checkWorkspaceAccess(id, session.user.id, ["OWNER", "ADMIN"]);
+    const access = await requireWorkspaceMember(id, session.user.id, ["OWNER", "ADMIN"]);
     if ("error" in access) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
@@ -323,7 +296,7 @@ export async function DELETE(
     }
 
     // Only OWNER and ADMIN can cancel invitations
-    const access = await checkWorkspaceAccess(id, session.user.id, ["OWNER", "ADMIN"]);
+    const access = await requireWorkspaceMember(id, session.user.id, ["OWNER", "ADMIN"]);
     if ("error" in access) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
