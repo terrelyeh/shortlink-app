@@ -1,6 +1,6 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-08-31 — 權限模型改用 workspace 角色、Campaign unique 約束、analytics IDOR 修復、內部導航改用 Link；架構與檔案樹拆到 `docs/`
+> Last updated: 2026-08-31 — 權限 helper 收斂進 `lib/workspace.ts`、Campaign unique 約束、analytics IDOR 修復、內部導航改用 Link、正式資料清理；架構與檔案樹拆到 `docs/`
 
 ## Project Overview
 
@@ -111,14 +111,16 @@ Prisma schema 用 camelCase（`userId`），但 DB 欄位名是 snake_case（`us
 
 ### 使用狀況（2026-08-31 實際資料）
 
-寫程式前值得知道的規模：**1 個 workspace、4 位使用者、65 條連結、4,072 次點擊、4 個 Campaign、0 筆 Conversion**。展會檔期（Interop / Computex 2026）跑完後進入淡季 — 近 30 天只有 39 次點擊，6/02 後沒有新連結。**這是個低流量的內部工具**，不要為了想像中的規模做過度優化。
+寫程式前值得知道的規模：**1 個 workspace、4 位使用者、38 條有效連結（含軟刪除共 65）、4,072 次點擊、4 個 Campaign、1 個 UTM 模板、0 筆 Conversion、0 封待處理邀請**。展會檔期（Interop / Computex 2026）跑完後進入淡季 — 近 30 天只有 39 次點擊，6/02 後沒有新連結。
+
+**這是個低流量的內部工具**，不要為了想像中的規模做過度優化。資料量小也代表：改 schema、跑 backfill、直接對正式 DB 做維運都還算安全，但每次都要先 dry-run。
 
 ### 🔜 Next Steps / Pending
 
 - **ESLint 剩 24 個問題**（12 errors / 12 warnings）— 都是死碼、`no-unescaped-entities`、3 個 `static-components`、2 個 `set-state-in-effect`（`useMediaQuery` + kickstart）。`no-html-link-for-pages` 已歸零
 - **`social_prduct_launch` 的拼字錯誤** — utm_campaign 值拼成 `prduct`，但它有 3 條有效的 LinkedIn 連結、9 次點擊，改名會變更已發佈貼文的 utm 參數、切斷 GA 資料連續性。**建議維持現狀**，除非行銷端明確要求
 - **`/api/user/profile` 的「最後一個 admin」保護從未生效** — 見 Pitfall #26
-- **`ALLOWED_EMAILS` env 退役** — 目前作為過渡 fallback。確認所有現存使用者都已正式有 WorkspaceMember row 後可以刪除這個 env，讓 auth 完全 DB-driven
+- **`ALLOWED_EMAILS` env 退役 — 前提已滿足，可執行** — 2026-08-31 查證 4 位使用者**全部**都有 WorkspaceMember row，所以 signIn gate 的條件 2 就足以放行，條件 4 已無作用。刪除步驟：先從 Vercel production env 移除（`vercel env rm ALLOWED_EMAILS production`），觀察一輪確認沒人被擋，再拿掉 `lib/auth.ts` 的 legacy 分支與本檔的相關描述。⚠️ 先確保 `BOOTSTRAP_EMAILS` 有值，那是唯一的緊急開機管道
 - **Secret rotation** — Supabase password / Google OAuth secret / Upstash token 曾貼對話裡 → 建議 rotate 一輪
 - **i18n 末端 spot-check** — LinksClient / CreateLinkForm / LinkTableRow / LinkMobileCard 仍可能有零星硬編碼字串
 - **行動裝置 card view 擴展** — 目前只有 `/links` 有手機 card view。Campaign Leaderboard / Campaign Detail Links tab 還是橫向 scroll
@@ -152,7 +154,7 @@ prisma generate && next build
 ### Env vars（Vercel production 都已設好）
 
 必填：`DATABASE_URL` (pooler) / `DIRECT_URL` / `AUTH_SECRET` / `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `NEXT_PUBLIC_APP_URL` / `NEXT_PUBLIC_SHORT_URL` / `IP_HASH_SALT` / `BOOTSTRAP_EMAILS`（緊急 admin email；至少 1 個給開機）
-選填：`ALLOWED_EMAILS`（過渡相容，未來退役）、`UPSTASH_REDIS_REST_URL`、`UPSTASH_REDIS_REST_TOKEN`
+選填：`ALLOWED_EMAILS`（過渡相容，**退役前提已滿足** — 見 Next Steps）、`UPSTASH_REDIS_REST_URL`、`UPSTASH_REDIS_REST_TOKEN`
 
 `NEXT_PUBLIC_SHORT_URL` 跟 `NEXT_PUBLIC_APP_URL` 不同時 middleware 啟動短域名守護（見 Architecture #9）。Production 短域名 = `https://go.engenius.ai`、app domain = `https://mkt-shortlink.vercel.app`。
 
@@ -211,6 +213,18 @@ Prisma datasource 需 `directUrl` 才能讓 `db push` 繞過 pgbouncer — schem
 25. **Leaderboard 的「ghost row」過濾規則**（`/api/analytics/campaigns-summary/route.ts`）：bucket 在 `b.id !== null || b.hasActiveLink` 才保留 — 已刪 Campaign 但還有 ACTIVE link 會留下顯示「僅 UTM」badge 提醒清理；已刪 Campaign + 全部 link PAUSED/ARCHIVED 直接 hide。Cache key 是 `campaigns-summary-v3`（v2 → v3 是因為這條 filter 規則改動）。改 payload shape 或 filter 都要 bump suffix。
 
 26. **`User.role` 跟 `WorkspaceMember.role` 不同層級** — `User.role` 是全域帳號旗標（ADMIN/MANAGER/MEMBER/VIEWER），**已無任何權限用途**。真正的權限走 `WorkspaceMember.role`（OWNER/ADMIN/MEMBER/VIEWER）。Sidebar 的 `/audit-log` gating、個人卡片、Settings 的「角色」欄都讀 `currentWorkspace?.role`。`session.user.role` 現在只剩 `lib/auth.ts` 寫入、以及幾處 display fallback。**⚠️ `/api/user/profile` DELETE 的「不能刪最後一個 admin」保護仍在檢查 `role === "ADMIN"`，因為沒人是 ADMIN，那道保護從未生效過** — 要不要改成「最後一個 workspace OWNER」是待決的產品問題。
+
+27. **清正式資料時照 App 自己的「軟刪除」慣例，不要硬刪 row** — 這個 schema 到處都是可還原的刪除狀態，維運腳本要對齊對應的 API handler，不要 `prisma.x.delete()`：
+
+    | 對象 | 正確做法 | 對應 API |
+    |---|---|---|
+    | ShortLink | 設 `deletedAt` + 寫 `DELETE_LINK` 稽核 | `DELETE /api/links/[id]` |
+    | WorkspaceInvitation | 設 `status: "CANCELLED"`（GET 會過濾掉） | `DELETE /api/workspaces/[id]/invitations` |
+    | Click | 設 `isInternal` + `resetBatchId`，不刪 | `POST /api/utm-campaigns/[name]/reset-clicks` |
+    | Campaign | 真的可以刪 row，但要先把 links 的 `campaignId` 解綁 | `DELETE /api/campaigns/[id]` |
+
+    維運腳本一律照 `scripts/` 的慣例：**預設 dry-run、`--apply` 才寫入、可重複執行**，並加安全閘門（例如「有任何有效連結或點擊就拒絕刪除」）。
+
 
 ## 詳細文件
 
