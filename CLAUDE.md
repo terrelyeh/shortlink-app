@@ -122,9 +122,15 @@ Prisma schema 用 camelCase（`userId`），但 DB 欄位名是 snake_case（`us
 - **`/api/user/profile` 的「最後一個 admin」保護從未生效** — 見 Pitfall #26
 - **`ALLOWED_EMAILS` env 退役 — 前提已滿足，可執行** — 2026-08-31 查證 4 位使用者**全部**都有 WorkspaceMember row，所以 signIn gate 的條件 2 就足以放行，條件 4 已無作用。刪除步驟：先從 Vercel production env 移除（`vercel env rm ALLOWED_EMAILS production`），觀察一輪確認沒人被擋，再拿掉 `lib/auth.ts` 的 legacy 分支與本檔的相關描述。⚠️ 先確保 `BOOTSTRAP_EMAILS` 有值，那是唯一的緊急開機管道
 - **Zeabur 資安事件後續（2026-08-27 事件，08-31 處理）** — 這個專案早期部署在 Zeabur，後來搬到 Vercel 但 **DB 一直是同一個 Supabase**。Zeabur 遭入侵導致該專案的 `DATABASE_URL` 外洩，而搬家時沒換過密碼 → 外洩的憑證在事件當下是有效的。
-  - ✅ 已完成：Supabase 密碼輪替、Vercel `DATABASE_URL`/`DIRECT_URL` 更新 + redeploy、清空所有 Session（17 筆）
-  - ⬜ 待辦：查 Supabase 連線紀錄有無異常來源；**刪掉已停用的 Zeabur 專案**（還放著舊憑證）；確認當時 Zeabur 專案裡還有哪些變數，若 `AUTH_SECRET` / `GOOGLE_CLIENT_SECRET` / `IP_HASH_SALT` / Upstash token 也在，一併輪替
+  - ✅ 已完成：Supabase 密碼輪替、Vercel `DATABASE_URL`/`DIRECT_URL` 更新 + redeploy、清空所有 Session（17 筆）、刪除所有 Zeabur 專案
+  - **當時 Zeabur 有哪些變數（Zeabur 專案已刪、無法再查，以下由 git history 重建）**：`zeabur.json` 加於 2026-01-18、Vercel env 建於 04-17~18，所以 Zeabur 時期的集合 = commit `bb1c1ab` 的 `.env.example` 七項：`DATABASE_URL` / `AUTH_SECRET` / `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `IP_HASH_SALT` / `NEXT_PUBLIC_APP_URL` / `NEXT_PUBLIC_SHORT_URL`。
+    **Upstash token（04-18 引入）與 `BOOTSTRAP_EMAILS`（04-23 引入）都晚於搬家，從未進過 Zeabur — 不需輪替。**
+  - ⬜ 待辦：查 Supabase 連線紀錄有無異常來源。剩下三個機密都**不符合** Zeabur 信中的比對條件（名稱清單 + AWS/GitHub/Anthropic/OpenRouter/OpenAI/Stripe 值格式），但那是**第二封、範圍已擴大過一次**的通知，不宜全信：
+    - `AUTH_SECRET` — **建議輪替**（`openssl rand -base64 32` → 更新 Vercel → redeploy）
+    - `GOOGLE_CLIENT_SECRET` — 看保守程度。Google Cloud Console 加新 secret → 更新 Vercel → 驗證登入 → 才刪舊的
+    - `IP_HASH_SALT` — 傾向不動，見下
   - ⚠️ **`IP_HASH_SALT` 若外洩要特別處理** — salt 一旦已知，4,000+ 筆 `Click.ipHash` 就能被反推回真實 IP（IPv4 只有 2^32），等於「匿名點擊紀錄」變成「可識別個人的瀏覽紀錄」。輪替 salt 會讓新舊 hash 對不起來，要接受去重統計斷一次
+  - 💡 **輪替 `AUTH_SECRET` 的最佳時機是「剛清空 session 之後」** — 它簽章 session cookie，平常換會把所有人踢出去；session 已經是空的時候換，額外成本為零
 - **i18n 末端 spot-check** — LinksClient / CreateLinkForm / LinkTableRow / LinkMobileCard 仍可能有零星硬編碼字串
 - **行動裝置 card view 擴展** — 目前只有 `/links` 有手機 card view。Campaign Leaderboard / Campaign Detail Links tab 還是橫向 scroll
 - **Mobile-only：edit link 表單 + Kickstart wizard** — 表格 + A/B variant editor 在手機操作彆扭，建議走桌面
