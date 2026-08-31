@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import Papa from "papaparse";
+import { Link } from "@/i18n/routing";
 import {
   Upload,
   Download,
@@ -207,12 +208,12 @@ export default function CSVImportClient() {
           >
             Import another file
           </button>
-          <a
+          <Link
             href="/links"
             className="px-4 py-2 bg-[#03A9F4] text-white text-sm font-medium rounded-lg hover:bg-[#0288D1] transition-colors inline-flex items-center"
           >
             Go to Links
-          </a>
+          </Link>
         </div>
       </div>
     );

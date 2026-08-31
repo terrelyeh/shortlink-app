@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { computeAnalytics, type RawAnalyticsData } from "@/lib/analytics/compute";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/routing";
 import { useQuery } from "@tanstack/react-query";
 import { ClicksChart } from "@/components/analytics/ClicksChart";
 import { PieChartComponent } from "@/components/analytics/PieChartComponent";
@@ -627,7 +628,7 @@ export default function AnalyticsPage() {
               </span>
             </div>
           </div>
-          <a
+          <Link
             href={`/campaigns/${encodeURIComponent(selectedCampaign)}`}
             className="btn btn-ghost"
             style={{
@@ -640,7 +641,7 @@ export default function AnalyticsPage() {
             title={t("openCampaignDetail")}
           >
             {t("openCampaignDetail")} →
-          </a>
+          </Link>
           <button
             className="btn btn-ghost"
             style={{ padding: "6px 10px", height: 32, alignSelf: "flex-start" }}
@@ -724,12 +725,12 @@ export default function AnalyticsPage() {
                       {t("utm.emptyState.description")}
                     </p>
                     <div className="row" style={{ justifyContent: "center" }}>
-                      <a href="/links/new" className="btn btn-primary">
+                      <Link href="/links/new" className="btn btn-primary">
                         {t("utm.emptyState.createLink")}
-                      </a>
-                      <a href="/campaigns" className="btn btn-secondary">
+                      </Link>
+                      <Link href="/campaigns" className="btn btn-secondary">
                         <Megaphone size={12} /> {t("utm.emptyState.manageCampaigns")}
-                      </a>
+                      </Link>
                     </div>
                   </div>
                 ) : (
