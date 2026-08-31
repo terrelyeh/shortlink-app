@@ -121,7 +121,10 @@ Prisma schema 用 camelCase（`userId`），但 DB 欄位名是 snake_case（`us
 - **`social_prduct_launch` 的拼字錯誤** — utm_campaign 值拼成 `prduct`，但它有 3 條有效的 LinkedIn 連結、9 次點擊，改名會變更已發佈貼文的 utm 參數、切斷 GA 資料連續性。**建議維持現狀**，除非行銷端明確要求
 - **`/api/user/profile` 的「最後一個 admin」保護從未生效** — 見 Pitfall #26
 - **`ALLOWED_EMAILS` env 退役 — 前提已滿足，可執行** — 2026-08-31 查證 4 位使用者**全部**都有 WorkspaceMember row，所以 signIn gate 的條件 2 就足以放行，條件 4 已無作用。刪除步驟：先從 Vercel production env 移除（`vercel env rm ALLOWED_EMAILS production`），觀察一輪確認沒人被擋，再拿掉 `lib/auth.ts` 的 legacy 分支與本檔的相關描述。⚠️ 先確保 `BOOTSTRAP_EMAILS` 有值，那是唯一的緊急開機管道
-- **Secret rotation** — Supabase password / Google OAuth secret / Upstash token 曾貼對話裡 → 建議 rotate 一輪
+- **Zeabur 資安事件後續（2026-08-27 事件，08-31 處理）** — 這個專案早期部署在 Zeabur，後來搬到 Vercel 但 **DB 一直是同一個 Supabase**。Zeabur 遭入侵導致該專案的 `DATABASE_URL` 外洩，而搬家時沒換過密碼 → 外洩的憑證在事件當下是有效的。
+  - ✅ 已完成：Supabase 密碼輪替、Vercel `DATABASE_URL`/`DIRECT_URL` 更新 + redeploy、清空所有 Session（17 筆）
+  - ⬜ 待辦：查 Supabase 連線紀錄有無異常來源；**刪掉已停用的 Zeabur 專案**（還放著舊憑證）；確認當時 Zeabur 專案裡還有哪些變數，若 `AUTH_SECRET` / `GOOGLE_CLIENT_SECRET` / `IP_HASH_SALT` / Upstash token 也在，一併輪替
+  - ⚠️ **`IP_HASH_SALT` 若外洩要特別處理** — salt 一旦已知，4,000+ 筆 `Click.ipHash` 就能被反推回真實 IP（IPv4 只有 2^32），等於「匿名點擊紀錄」變成「可識別個人的瀏覽紀錄」。輪替 salt 會讓新舊 hash 對不起來，要接受去重統計斷一次
 - **i18n 末端 spot-check** — LinksClient / CreateLinkForm / LinkTableRow / LinkMobileCard 仍可能有零星硬編碼字串
 - **行動裝置 card view 擴展** — 目前只有 `/links` 有手機 card view。Campaign Leaderboard / Campaign Detail Links tab 還是橫向 scroll
 - **Mobile-only：edit link 表單 + Kickstart wizard** — 表格 + A/B variant editor 在手機操作彆扭，建議走桌面
@@ -224,6 +227,9 @@ Prisma datasource 需 `directUrl` 才能讓 `db push` 繞過 pgbouncer — schem
     | Campaign | 真的可以刪 row，但要先把 links 的 `campaignId` 解綁 | `DELETE /api/campaigns/[id]` |
 
     維運腳本一律照 `scripts/` 的慣例：**預設 dry-run、`--apply` 才寫入、可重複執行**，並加安全閘門（例如「有任何有效連結或點擊就拒絕刪除」）。
+
+
+28. **換 DB 密碼不會讓已外洩的 session token 失效** — NextAuth 走 **database session**（`session({ session, user })` 的簽名可以確認，不是 JWT），`Session.sessionToken` 是**明文存在 DB** 裡的。任何人 dump 過資料庫就握有可用的登入憑證，而輪替 DB 密碼只擋住新的連線、**不會**讓那些 token 失效 —— 必須另外 `session.deleteMany({})`。憑證外洩的處理順序是：**先換密碼（切斷存取）→ 再清 session（作廢已複製的 token）**。反過來做的話，還有連線的攻擊者會直接讀到新產生的 token。
 
 
 ## 詳細文件
