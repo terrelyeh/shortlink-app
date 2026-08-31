@@ -43,6 +43,7 @@
 | 功能 | 說明 |
 |------|------|
 | **點擊追蹤** | 即時記錄每次點擊，含重複點擊去重（2 秒窗口）與 Bot 偵測 |
+| **測試點擊排除** | 團隊自己測連結的點擊可標記為「測試」而非刪除，分析預設排除、可隨時切回來看；活動層級可一鍵軟重設，同一批能整批還原 |
 | **轉換追蹤 (Conversion Tracking)** | Landing page 放一段 snippet（`/track.js`）或後端 webhook 呼叫 `/api/track`，透過 session token 歸因回來源連結；支援 event name / value / currency / externalId（idempotency） |
 | **CVR 顯示** | 連結列表 / Campaign 列表 / Compare 頁都自動算 CVR；超過 0 才顯示，避免雜訊 |
 | **趨勢圖表** | 視覺化呈現點擊數據（支援 24h / 7d / 30d / 90d / 自訂範圍） |
@@ -52,9 +53,12 @@
 | **作業系統** | iOS / Android / Windows / macOS 分佈 |
 | **地理位置** | 國家與城市層級分析（GeoIP） |
 | **時段分佈** | 24 小時內各時段的點擊熱度 |
+| **7×24 熱度圖** | 星期 × 小時的點擊分佈，找出投放的黃金時段（使用瀏覽器所在時區） |
+| **點擊衰減曲線** | 從活動第一次點擊起算的逐時累積與每小時點擊，看「黃金視窗」有多長；篩選到單一活動或連結時才顯示 |
+| **城市排行** | 點擊數前 15 名城市（GeoIP 解析，準確度依地區而異） |
 | **UTM 維度分析** | Campaign / Source / Medium / Content 交叉分析 |
 | **Campaign 篩選分析** | 選擇特定 Campaign 後，所有圖表與統計自動聚焦該活動 |
-| **匯出 CSV** | 匯出連結清單或點擊原始數據 |
+| **匯出 CSV** | 三種匯出：連結清單、點擊原始數據、活動報表（跨活動比較 / 每日長表「日期 × 連結」/ 單一活動的連結明細）。每日長表是 tidy 格式，可直接丟進樞紐分析或 Looker Studio |
 
 ### 團隊協作
 
@@ -323,6 +327,7 @@ screenshots/                   # UI 設計評估用截圖（gitignored 建議）
 | `/api/campaigns/[id]` | GET, PATCH, DELETE | 單一活動操作（DELETE 支援 `?pauseLinks=true` 連同停用所有連結） |
 | `/api/utm-campaigns` | GET | UTM Campaign 聚合統計（連結數、點擊數） |
 | `/api/utm-campaigns/[name]` | GET, PATCH, DELETE | by name 操作（PATCH 改 goal、DELETE 同 `?pauseLinks=true` 模式） |
+| `/api/utm-campaigns/[name]/reset-clicks` | POST | 軟重設活動點擊：標記為測試而非刪除，可整批還原 |
 
 ### 分析與匯出
 
@@ -333,6 +338,7 @@ screenshots/                   # UI 設計評估用截圖（gitignored 建議）
 | `/api/analytics/campaigns-summary` | GET | Campaign leaderboard + orphan links + 每活動時序資料 |
 | `/api/export/links` | GET | 匯出連結清單 CSV |
 | `/api/export/analytics` | GET | 匯出點擊原始數據 CSV |
+| `/api/export/campaigns` | GET | 匯出活動報表 CSV（跨活動比較 / 每日長表 / 單活動連結明細） |
 
 ### 轉換追蹤
 

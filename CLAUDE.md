@@ -1,6 +1,6 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-05-06 — DB-driven auth + custom domain + Kickstart wizard + mobile baseline
+> Last updated: 2026-08-31 — 權限模型改用 workspace 角色、Campaign unique 約束、analytics IDOR 修復；架構與檔案樹拆到 `docs/`
 
 ## Project Overview
 
@@ -20,256 +20,38 @@
 
 ## Directory Structure
 
-```
-src/
-├── app/
-│   ├── layout.tsx                  # ⭐ Root layout：<html>/<body> + fonts
-│   │                               #    （非 locale 頁如 /link-*、/share 也要用）
-│   ├── [locale]/
-│   │   ├── layout.tsx              # Locale 專用：NextIntlClientProvider（無 html/body）
-│   │   ├── (dashboard)/            # Route group（不是 /dashboard 路徑）
-│   │   │   ├── campaigns/
-│   │   │   │   ├── page.tsx        # 登入首頁、Leaderboard
-│   │   │   │   ├── CampaignsClient.tsx
-│   │   │   │   ├── [name]/page.tsx # 單活動駕駛艙（Overview / Traffic / Links tabs）
-│   │   │   │   ├── compare/        # /campaigns/compare?names=a,b,c
-│   │   │   │   └── kickstart/      # Wizard：選 playbook 一鍵建整套追蹤連結
-│   │   │   ├── links/
-│   │   │   │   ├── page.tsx + LinksClient.tsx
-│   │   │   │   ├── [id]/           # 編輯
-│   │   │   │   ├── new/ batch/ import/ # import 是 CSV 匯入
-│   │   │   │   └── ...
-│   │   │   ├── analytics/          # 純全站維度分析（砍了 campaign leaderboard）
-│   │   │   ├── settings/           # 含 UTM Governance tab
-│   │   │   └── audit-log/          # （/users 已砍，僅留 audit-log）
-│   │   ├── invite/[token]/
-│   │   │   ├── page.tsx            # 受邀者落地頁（讀邀請、accept、auto-redirect）
-│   │   │   └── layout.tsx          # 必須：包 SessionProvider（locale layout 沒包）
-│   │   └── page.tsx                # 根頁 → 登入時 redirect 到 /campaigns
-│   ├── auth/signin/                # NextAuth pages
-│   ├── api/
-│   │   ├── analytics/
-│   │   │   ├── route.ts            # 已聚合（留給 export/share）
-│   │   │   ├── raw/route.ts        # raw clicks，給 client-side compute
-│   │   │   └── campaigns-summary/  # Leaderboard + per-campaign 時序資料
-│   │   ├── track/route.ts          # 🎯 公開 conversion tracking endpoint（CORS *）
-│   │   ├── links/
-│   │   │   ├── route.ts + [id]/    # CRUD
-│   │   │   ├── batch/ batch-csv/   # 批次建立（CSV 是每 row 獨立 UTM）
-│   │   │   └── batch-actions/ clone/...
-│   │   └── {campaigns, tags, templates, workspace, ...}
-│   ├── s/[code]/route.ts           # 短網址轉址 + variant pick + session 附 ?_sl=
-│   ├── share/[token]/              # 公開分享報告（sharetoken 驗證）
-│   ├── track.js/route.ts           # 🎯 公開 JS snippet（landing 端引用）
-│   ├── link-expired/ link-inactive/ link-limit-reached/
-│   │   link-not-yet-active/ link-geo-blocked/  # 狀態頁
-│   └── ...
-├── components/
-│   ├── analytics/
-│   │   ├── ClicksChart.tsx PieChartComponent.tsx
-│   │   ├── MultiCampaignChart.tsx  # overlay 折線（P0 + Compare 頁共用）
-│   │   └── TrendCell.tsx           # 迷你 sparkline + ↑↓% 狀態，Campaign Detail / Leaderboard 共用
-│   ├── layout/
-│   │   ├── Sidebar.tsx PageHeader.tsx
-│   │   └── SyncButton.tsx          # 每頁 header 右上角的「同步 + 最後同步時間」
-│   ├── forms/UTMBuilder.tsx        # 含 CampaignCombobox（自訂 Linear/Slack-style，可 inline 建活動）
-│   ├── links/
-│   │   ├── LinkTableRow.tsx        # 桌面表格列（含 OG 縮圖 + schedule/geo badges）
-│   │   └── LinkMobileCard.tsx      # ≤768px 用的 card 版本（useMediaQuery 切換）
-│   ├── providers/Providers.tsx     # SessionProvider + QueryClientProvider + WorkspaceProvider + Toast
-│   │                               # （注意：dashboard 之外的頁要自己包 SessionProvider）
-│   └── ...
-├── lib/
-│   ├── analytics/compute.ts        # ⭐ Client-side 聚合（純 JS）
-│   ├── cache.ts / cache-scopes.ts  # Redis wrapper + bumpLinksCache 等 helper
-│   ├── query/client.ts             # React Query QueryClient 設定
-│   ├── ratelimit.ts                # Upstash ratelimit（redirect + /api/track）
-│   ├── auth.ts                     # NextAuth + DB-driven invitation gate + auto-accept hook
-│   ├── workspace.ts                # resolveWorkspaceScope（auto-fallback）+ canUserActOnResource
-│   ├── fetch-workspace.ts          # ⭐ patch window.fetch 自動塞 x-workspace-id header
-│   ├── hooks/useMediaQuery.ts      # SSR-safe matchMedia hook（mobile 切換用）
-│   ├── og-scraper.ts utm-governance.ts variants.ts campaign-autolink.ts
-│   ├── campaign-playbooks.ts       # Kickstart wizard 的 playbook 定義（Product Launch / Exhibition）
-│   └── utils/{utm,shortcode,format}.ts
-├── messages/{en,zh-TW}.json        # 雙語文件；每新增使用者可見字串就兩邊都要加
-└── middleware.ts                   # next-intl routing + 短域名守護（rewrite /<code> → /s/<code>）
-prisma/schema.prisma                # 含 @@index — FK 索引不自動建
-scripts/
-├── backfill-campaign-autolink.mjs  # 一次性 orphan link → Campaign 綁定
-└── backfill-workspace-id.mjs       # 補回 workspaceId=null 的 ShortLink/Campaign/UTMTemplate/Click
-```
+完整檔案樹見 [`docs/file-structure.md`](docs/file-structure.md)。關鍵入口：
+
+| 路徑 | 為什麼重要 |
+|---|---|
+| `src/app/layout.tsx` | Root layout，提供 `<html>/<body>`。非 locale 頁（`/link-*`、`/share`、`/track.js`）靠它 |
+| `src/app/[locale]/(dashboard)/` | 主要頁面。route group，不是 `/dashboard` 路徑 |
+| `src/lib/workspace.ts` | ⭐ 所有權限與範圍判斷的單一來源 |
+| `src/lib/analytics/compute.ts` | Client 端聚合（純 JS），dashboard 效能的關鍵 |
+| `src/lib/cache.ts` + `cache-scopes.ts` | Redis wrapper + invalidation 入口 |
+| `src/middleware.ts` | next-intl routing + 短域名守護 |
+| `prisma/schema.prisma` | FK 索引不會自動建，加 relation 要一併加 `@@index` |
+| `messages/{en,zh-TW}.json` | 每新增使用者可見字串就兩邊都要加 |
+| `scripts/` | 維運腳本，全部預設 dry-run，`--apply` 才寫入 |
 
 ## Architecture & Data Flow
 
-### 1. Route A — Campaign-centric navigation（心智模型）
+完整說明見 [`docs/architecture.md`](docs/architecture.md)。各節摘要：
 
-Sidebar 順序 = 使用者心智模型（高頻→低頻）：
-**Campaigns → Links → Analytics → Templates → Users / Audit Log**
-
-登入導向 **`/campaigns`**（Dashboard 已刪）。三頁各自職責：
-
-- **Campaigns 列表** = 活動管理駕駛艙。Leaderboard（clicks / conv / CVR / goal%），勾選 2-4 個 → overlay 折線 / `/campaigns/compare` side-by-side
-- **Campaign Detail**（`/campaigns/[name]`）= 單活動「指揮中心」，3 tabs：
-  - **Overview** — KPI 目標 + 30d 趨勢折線
-  - **Traffic** — top sources / mediums / devices / countries / referrers（透過 `computeAnalytics(raw, { campaign })` 過濾）
-  - **Links** — 該活動的所有連結 + 每條 conversion / CVR
-- **Analytics** = 純「全站維度分析」（device / browser / OS / geo / referrer / UTM 交叉表）。**沒有** campaign leaderboard — 那是 Campaigns 的事
-
-### 2. Conversion attribution（`/api/track` + `/track.js`）
-
-```
-/s/<code> redirect ─┐
-                    │ 1. 伺服器生成 16-char sessionId
-                    │ 2. 附到目的 URL: ?_sl=<sid>
-                    │ 3. Click row 寫入 sessionId + variantId
-                    ▼
-Landing page (任何 domain)
-  <script src="https://mkt-shortlink.../track.js" async>
-  ↓ snippet 從 URL 讀 _sl、存 sessionStorage、清掉 address bar
-  ↓ window.Shortlink.convert({ event, value, currency, externalId })
-  ↓ POST /api/track { sessionId, eventName, value, currency, externalId, metadata }
-  ▼
-/api/track
-  ↓ 找 Click by sessionId（30 天 attribution window）
-  ↓ 寫入 Conversion（unique on shortLinkId+externalId 做 idempotency）
-  ↓ Conversion.variantId 從 Click 複製 → A/B breakdown 不用 join
-```
-
-**關鍵**：sessionId 走 URL param 不走 cookie，跨任何 domain 都能歸因。
-
-### 3. A/B 變體
-
-- `ShortLink.variants: Json`（`{id, url, weight, label?}[]`）
-- `lib/variants.ts` — `parseVariants()` + `pickVariant()` weighted random
-- 轉址路徑：variants 空 → 用 `originalUrl`；有 → weighted pick + `Click.variantId` 記錄
-- Edit form 有 variant editor（label + URL + weight + 即時百分比）
-
-### 4. Campaign auto-link
-
-使用者填 `utmCampaign = "spring_sale"` → `lib/campaign-autolink.ts` 在 POST/PATCH/batch-csv 都自動 upsert Campaign row（`status=ACTIVE`）+ 設 `ShortLink.campaignId`。解掉「我填了 UTM 為什麼 Campaigns 頁空的」認知 gap（Bitly / Dub.co pattern）。Backfill script：`scripts/backfill-campaign-autolink.mjs`。
-
-### 5. Client-side Data Caching (React Query) ⭐
-
-**整個 dashboard 的資料都走 React Query。** 切換頁面瞬間完成（讀 in-memory cache），不再每次 mount 都打 API。架構：
-
-```
-使用者切頁 → useQuery(key) → 5 min 內命中 cache，零網路
-                          → 超過 staleTime → 背景重抓，同時先秀舊資料
-Mutation 完成 → qc.invalidateQueries({ queryKey }) → 相關頁下次進去才抓新資料
-SyncButton click → qc.invalidateQueries(pageKeys) → 強制重抓當頁
-```
-
-**共用 query keys（重要：保持一致才能跨頁共用 cache）**：
-
-| Key | 內容 | 使用頁 |
-|---|---|---|
-| `["analytics-raw"]` | 90d × 10k 筆 raw clicks（~2MB） | `/analytics`、Campaign Detail、Compare |
-| `["campaigns-summary", window]` | leaderboard / 時序 / orphans | `/campaigns`、Compare |
-| `["links", 500]` | 連結列表（含 trend） | `/links` |
-| `["campaign-links", name]` | 某活動下的 links | Campaign Detail |
-| `["campaign-goal", name]` | 該活動的 goalClicks | Campaign Detail |
-| `["tags"]` / `["templates"]` / `["workspace-utm-settings"]` / `["utm-campaigns"]` | 共用資源 | 多處 |
-
-**`QueryClient` 預設值**（`lib/query/client.ts`）：
-- `staleTime: 5 min`、`gcTime: 30 min`
-- `refetchOnWindowFocus / refetchOnMount / refetchOnReconnect: false`（**全關**，避免偷偷重抓）
-- `retry: 1`
-
-**Mutation 後要 invalidate 什麼**（在 CreateLinkForm、LinksClient、edit page、goal save 都有處理）：
-- 建 / 改 / 刪 link → `campaigns-summary` + `analytics-raw` + `campaign-links` + `utm-campaigns`
-- 改 goalClicks → `campaign-goal/{name}` + `campaigns-summary`
-- 新建 Campaign（combobox inline create）→ `utm-campaigns` + `campaigns-summary`
-
-**SyncButton** — 每頁 header 右側，接收 `queryKeys` prop（該頁依賴的 keys 陣列）。旁邊秀「Last synced Nm ago」從 `queryState.dataUpdatedAt` 推導。點了只 invalidate 該頁，不會干擾其他頁的 cache。
-
-⚠️ **Cache key shape 變動時要 bump 版本號** — 如果 API payload 新增欄位，舊 Redis cache 會讓 client 讀到沒有新欄位的物件、直接 crash。看 `campaigns-summary-v2` 那一段註解。
-
-### 6. 兩層 cache：Server (Redis) + Client (React Query)
-
-```
-Request → React Query in-memory (5min stale) → Browser Cache-Control → Redis (60s TTL) → Postgres
-```
-
-- **Client React Query**：切頁瞬間、無網路
-- **Browser Cache-Control**：同頁 refresh 時省掉 cold fetch
-- **Redis**（`lib/cache.ts`，無 env vars 自動 no-op）：
-  - 有 Redis cache 的 endpoint：`/api/analytics`、`/api/analytics/raw`、`/api/analytics/campaigns-summary`、`/api/links`（versioned）
-  - `/api/links` 用 versioned key：寫入時 `bumpLinksCache(workspaceId, userId)` 讓版本號 +1，舊 key 自動失效
-  - Invalidation 入口集中在 `lib/cache-scopes.ts`
-
-**Caps**：`/links` 500 條、`/analytics/raw` 10,000 clicks × 90 天，超過顯示 banner（前端 `raw.meta.truncated`）。
-
-### 6b. 列表頁做「client-side filter」
-
-`/links`、`/campaigns`、`/analytics` 都是抓一次完整資料，client 用 `useMemo` 過濾 / 排序 / 聚合 — 切 filter 零網路。結合上面的 React Query cache，就是「打 1 次 API、後續無限互動零延遲」。
-
-### 7. Auth + Workspace（DB-driven）
-
-整個 user management 已從 env-var 白名單 → 移到 DB。`ALLOWED_EMAILS` 還在但只當過渡 fallback，正式規則在 `lib/auth.ts` signIn callback：
-
-```
-signIn 允許條件（first-match-wins）：
-  1. BOOTSTRAP_EMAILS env（1–2 個緊急 admin，緊急開機用）
-  2. WorkspaceMember 存在     → 既有成員
-  3. PENDING WorkspaceInvitation + 未過期 → 被邀請的新人
-  4. ALLOWED_EMAILS env       → 過渡相容，等所有人都正式邀請進來後可刪
-```
-
-**`events.signIn` 自動 accept**：使用者首次 OAuth 成功後，hook 找出該 email 所有 PENDING invitation 一次 accept，建好 WorkspaceMember。所以**口頭通知 + 直接登入** 跟 **點 invite link** 兩條路效果一樣 — 連結只是便利性。
-
-**Permission helper — 用 `canUserActOnResource`**（`lib/workspace.ts`）：
-```
-canUserActOnResource(userId, { createdById, workspaceId }) → boolean
-  - 是建立者 → 永遠 yes
-  - 在 resource workspace 是 OWNER/ADMIN → yes（admin override）
-  - 其他 → no
-  - workspaceId=NULL 的 orphan → 只有建立者能動
-```
-**所有 API 的權限檢查都用這個。** 不要再寫 `session.user.role === "MEMBER"` 那種舊 pattern — `User.role` 是 legacy 全域旗標，跟 workspace 角色完全脫鉤，現在只剩 `/audit-log` sidebar gating 還在用。
-
-**`resolveWorkspaceScope` 的 auto-fallback**：client 沒送 `x-workspace-id` header（race condition：fetch 在 WorkspaceContext 載入前就發出）時，server 自動查使用者最早加入的 workspace 補上，不再產生 `workspaceId=NULL` 的 orphan。配合下面的 fetch patch 兩道防線。
-
-**Client 端 `lib/fetch-workspace.ts`**：在 `Providers.tsx` 模組載入時 patch `window.fetch`，對同站 `/api/*`（略過 `/api/auth/*`）自動塞 `x-workspace-id` header（從 localStorage 讀 `shortlink-current-workspace`）。Workspace 切換時下個 request 自動帶新 id，無需 remount。
-
-⚠️ 舊 helper `buildWorkspaceWhere()` 還在 `/api/analytics/route.ts` 用（已驗證 context 內），新 code 一律用 `resolveWorkspaceScope`。
-
-### 8. UTM 建構器 + 白名單
-
-- `UTMBuilder.tsx` 從 `/api/workspace/utm-settings` 讀 approved sources/mediums，放 datalist 優先順
-- 打了非白名單值 → 即時 amber warning（還是能送，server 側會回 400）
-- Server-side enforcement：`lib/utm-governance.ts::validateUtmAgainstGovernance()` 在 POST/PATCH/batch/batch-csv 都檢查
-- 欄位有值時右邊顯示 **X 清除鍵**（不是 ChevronDown）— 否則 datalist 有值會自動過濾、看起來像壞掉
-
-### 9. Custom domain (`go.engenius.ai`) + middleware
-
-`NEXT_PUBLIC_SHORT_URL` ≠ `NEXT_PUBLIC_APP_URL` 時 middleware 啟動短域名守護（`src/middleware.ts`）：
-
-| URL | 行為 |
-|---|---|
-| `go.engenius.ai/<code>` | **Internal rewrite** → `/s/<code>`（既有 redirect handler）— 短網址直接掛根目錄 |
-| `go.engenius.ai/s/*`、`/link-*`、`/track.js`、`/api/track` | 直接 pass through |
-| `go.engenius.ai/*`（其他） | **302 → engeniustech.com**（不暴露 dashboard / sign-in / API） |
-| `mkt-shortlink.vercel.app/*` | 正常走 next-intl |
-
-兩 env 相同時是 no-op（適合本機 / 還沒接 custom domain 的 staging）。
-
-### 10. Kickstart wizard（活動啟動器）
-
-`/campaigns/kickstart`：選 playbook（Product Launch / Exhibition Event）→ 自動展開 8–10 個頻道的 checklist（每個頻道一條 link，預填 source/medium/content）→ 一鍵 sequential POST `/api/links` 建完。
-
-**擴充模式**：使用者輸入既有 utm_campaign 名稱時，wizard query `/api/links?campaign=<name>` 找出已建頻道，自動 uncheck 對應列（用 `useRef` 確保只 auto-uncheck 一次，不會 stomp 使用者手動切換）。完全成功的列在 submit 後也自動 uncheck，避免 partial-failure retry 重複建立。
-
-Playbook 定義在 `lib/campaign-playbooks.ts`；name / description / channel label 走 i18n key `kickstartPlaybooks.{id}.channels.{id}.{label|hint}`。
-
-### 11. Mobile responsive baseline
-
-不是完整 mobile-first 重設計，是「行銷同事可以查 + 簡單建立」的 baseline。覆蓋：
-
-- `src/app/layout.tsx` 設 viewport meta（device-width + initialScale=1）
-- `globals.css` mobile fallback 區塊：`.table-scroll` wrapper、`.grid-resp-2`、`.tbl-wrap` 改 `overflow-x: auto`、`.page-head` / toolbar 在 ≤768px wrap、按鈕觸控 ≥40px / ghost ≥44px
-- `LinkMobileCard.tsx` + `useMediaQuery` — `/links` 在 ≤768px 切換成 card view（標題、短網址、UTM pills、status、clicks 直立排列）
-- KPI tile 用 `.kpi-row-3` className（不是 inline `gridTemplateColumns`），媒體查詢能生效
-- `SyncButton` 的「Last synced」label 用 `.sync-button-label` class，mobile 隱藏
+1. **Campaign-centric 導航** — 登入導向 `/campaigns`（Dashboard 已刪）。Campaigns = 活動駕駛艙，Analytics = 純全站維度分析，兩者職責不重疊
+2. **Conversion attribution** — sessionId 走 `?_sl=` URL param 不走 cookie，跨任何 landing domain 都能歸因。**UI 已隱藏但 infra 完整保留**
+3. **A/B 變體** — `ShortLink.variants: Json` + weighted random pick
+4. **Campaign auto-link** — 填 `utmCampaign` 就自動 upsert Campaign row。有 `@@unique([workspaceId, name])` 防併發重複
+5. **React Query 快取** ⭐ — 整個 dashboard 的資料層。共用 query key 表在 architecture.md，**新增同類資料要沿用既有 key**
+6. **兩層 cache** — React Query（5min）→ Browser Cache-Control → Redis（60s）→ Postgres
+7. **Auth + Workspace** ⭐ — DB-driven signIn gate；權限判斷分 resource 層級（`canUserActOnResource`）與 workspace 層級（`isWorkspaceAdmin` + `resolveWorkspaceAccess`）
+8. **UTM 建構器 + 白名單** — 治理設定只有 workspace OWNER/ADMIN 能改
+9. **Custom domain** — `go.engenius.ai/<code>` internal rewrite 到 `/s/<code>`，其餘 302 到官網
+10. **Kickstart wizard** — 選 playbook 一鍵建整套追蹤連結
+11. **Mobile baseline** — ≤768px `/links` 切 card view
+12. **測試點擊標記與軟重設** — `Click.isInternal` + `resetBatchId`，標記而非刪除，可整批還原
+13. **CSV 匯出** — links / analytics / campaigns 三個 endpoint 共用 `csvResponse()`
+14. **Analytics 進階指標** — 點擊衰減曲線 / 7×24 熱度圖（用 viewer 時區）/ 城市排行
 
 ## Conventions
 
@@ -327,12 +109,19 @@ Prisma schema 用 camelCase（`userId`），但 DB 欄位名是 snake_case（`us
 
 功能清單詳見 [README.md](README.md)。
 
+### 使用狀況（2026-08-31 實際資料）
+
+寫程式前值得知道的規模：**1 個 workspace、4 位使用者、65 條連結、4,072 次點擊、6 個 Campaign、0 筆 Conversion**。展會檔期（Interop / Computex 2026）跑完後進入淡季 — 近 30 天只有 39 次點擊，6/02 後沒有新連結。**這是個低流量的內部工具**，不要為了想像中的規模做過度優化。
+
 ### 🔜 Next Steps / Pending
 
-- **i18n LinksClient / CreateLinkForm / LinkTableRow / LinkMobileCard 末端 spot-check** — Campaigns / Settings / Kickstart 已完整 i18n，但這幾個列表 / form 仍可能有零星硬編碼字串（特別是新加的 LinkMobileCard）
+- **ESLint 有 36 個問題**（23 errors / 13 warnings）— 其中最該修的是 3 處 `<a href="/...">`（`analytics/page.tsx:727,730`、`CSVImportClient.tsx:210`）。原生 `<a>` 會整頁重載，等於清空 React Query 快取，跟第 5 條架構直接牴觸。其餘多為死碼 / `no-unescaped-entities` 雜訊
+- **`prduct_launch_nvs` / `test` 等雜訊 Campaign** — 重複列已合併（`merge-duplicate-campaigns.mjs`），但仍有 0 連結的拼錯列和測試列。要清可加進 script 的 `ALIASES` 或直接刪
+- **4 封逾期邀請** — 2026-04-23 發出、05-12 到期、無人接受，收件人與現有使用者是不同的人。清掉或重發
+- **`/api/user/profile` 的「最後一個 admin」保護從未生效** — 見 Pitfall #26
 - **`ALLOWED_EMAILS` env 退役** — 目前作為過渡 fallback。確認所有現存使用者都已正式有 WorkspaceMember row 後可以刪除這個 env，讓 auth 完全 DB-driven
 - **Secret rotation** — Supabase password / Google OAuth secret / Upstash token 曾貼對話裡 → 建議 rotate 一輪
-- **Campaign leaderboard filter 精修** — 自動建的 Campaign 可能讓列表雜訊多（例如 `test`）。觀察真實使用後決定要不要加 "has goal / has > N clicks" filter
+- **i18n 末端 spot-check** — LinksClient / CreateLinkForm / LinkTableRow / LinkMobileCard 仍可能有零星硬編碼字串
 - **行動裝置 card view 擴展** — 目前只有 `/links` 有手機 card view。Campaign Leaderboard / Campaign Detail Links tab 還是橫向 scroll
 - **Mobile-only：edit link 表單 + Kickstart wizard** — 表格 + A/B variant editor 在手機操作彆扭，建議走桌面
 - **Observability** — Prod 只有 `console.error`。建議 Sentry / OpenTelemetry
@@ -398,9 +187,9 @@ Prisma datasource 需 `directUrl` 才能讓 `db push` 繞過 pgbouncer — schem
 
 13. **Session ID 走 URL param（`?_sl=<sid>`）不走 cookie** — 跨任何 landing domain 都能歸因，避開 third-party cookie / ITP 問題。Landing 端 `/track.js` snippet 會清掉 address bar 的 `_sl` 避免汙染 GA referrer。
 
-14. **Campaign 自動建立是刻意的** — 填 `utmCampaign` 就會 upsert Campaign row（status=ACTIVE）。使用者改 link 的 utmCampaign 時也會 trigger。看到 Campaign 列表莫名多了一筆別當 bug，看 `lib/campaign-autolink.ts`。
+14. **Campaign 自動建立是刻意的** — 填 `utmCampaign` 就會 upsert Campaign row（status=ACTIVE）。使用者改 link 的 utmCampaign 時也會 trigger。看到 Campaign 列表莫名多了一筆別當 bug，看 `lib/campaign-autolink.ts`。**`Campaign` 有 `@@unique([workspaceId, name])`**，所以新增任何建立 Campaign 的路徑都要處理 P2002（不然使用者會看到裸的 500）。
 
-15. **`resolveWorkspaceScope()` vs `buildWorkspaceWhere()`** — 新 code 全用 `resolveWorkspaceScope()`（驗 membership，防 IDOR）。`buildWorkspaceWhere()` 是舊 helper，只能在已驗證的 context 中當 builder 用（例如 `/api/analytics` 的子函式）。新增 API route 一律用前者。
+15. **吃 id 參數的 endpoint 不能拿 id 取代 scope 過濾（IDOR）** — `linkId` / `campaignId` 這類參數要**併入** scoped 查詢當額外條件：`where: linkId ? { ...whereLinks, id: linkId } : whereLinks`。寫成 `if (linkId) whereClicks.shortLinkId = linkId` 就是繞過 workspace 過濾，任何登入者猜到 id 就能讀別人的資料。`/api/analytics` 和 `/api/export/analytics` 都踩過。Workspace scoping 只有 `resolveWorkspaceScope()` 一條路（`buildWorkspaceWhere()` 已刪除）。
 
 16. **`prisma db push` 對新加的 `String[]` / unique 欄位會警告 "data loss"** — 是誤導；既有 rows 的新 array 欄位會取 default，既有 NULL 的 unique 欄位允許多 NULL。`--accept-data-loss` 是安全的。
 
@@ -412,7 +201,7 @@ Prisma datasource 需 `directUrl` 才能讓 `db push` 繞過 pgbouncer — schem
 
 20. **UTM campaign 欄位用的是 CampaignCombobox 不是 datalist** — `source` / `medium` 還是用原生 `<input list="...">` datalist，但 `utm_campaign` 改成自訂 combobox（見 `UTMBuilder.tsx` 底部 `CampaignCombobox`）。理由：要讓「➕ 建立新活動」成為第一級選項，原生 datalist 無法做。如果未來想換回原生 datalist，要處理「如何在下拉中提供建立動作」。
 
-21. **權限檢查一律用 `canUserActOnResource`，不要用 `User.role`** — `lib/workspace.ts` 的 helper 才是真實的 workspace 角色判斷。舊 code 寫過 12 處 `session.user.role === "MEMBER" && createdById !== session.user.id` 全部清乾淨改用 helper（commit `17d8cc0`）。`User.role` 現在只剩 `/audit-log` sidebar gating 在用，profile 顯示也改讀 `currentWorkspace.role`。新加 API route 直接 follow helper pattern。
+21. **權限檢查一律用 `lib/workspace.ts` 的 helper，絕不用 `User.role`** — 動單一資源用 `canUserActOnResource()`；workspace 層級的管理權（治理設定、稽核紀錄、成員）用 `isWorkspaceAdmin()` + `resolveWorkspaceAccess()`。⚠️ **實際資料裡每個使用者的 `User.role` 都是 `MEMBER`，包含 workspace OWNER** — 所以 `["ADMIN","MANAGER"].includes(session.user.role)` 這種檢查等於「拒絕所有人」，而且沒有 UI 可以改 `User.role`（`/users` 頁已砍）。`/api/workspace/utm-settings` PATCH 和 `/api/audit-log` GET 都因此對全員回 403 過（2026-08-31 修）。
 
 22. **dashboard 之外的頁要自己包 `<SessionProvider>`** — `[locale]/layout.tsx` 只包 `NextIntlClientProvider`；只有 `(dashboard)` route group 透過 `Providers.tsx` 才有 SessionProvider。如果新加的頁面用 `useSession()` 又不在 dashboard 底下（例：`/invite/[token]`），必須**自己加一個 `layout.tsx` `"use client"` 包 `<SessionProvider>`**，不然頁面 mount 就炸 client-side exception。看 `src/app/[locale]/invite/[token]/layout.tsx` 範例。
 
@@ -422,4 +211,13 @@ Prisma datasource 需 `directUrl` 才能讓 `db push` 繞過 pgbouncer — schem
 
 25. **Leaderboard 的「ghost row」過濾規則**（`/api/analytics/campaigns-summary/route.ts`）：bucket 在 `b.id !== null || b.hasActiveLink` 才保留 — 已刪 Campaign 但還有 ACTIVE link 會留下顯示「僅 UTM」badge 提醒清理；已刪 Campaign + 全部 link PAUSED/ARCHIVED 直接 hide。Cache key 是 `campaigns-summary-v3`（v2 → v3 是因為這條 filter 規則改動）。改 payload shape 或 filter 都要 bump suffix。
 
-26. **`User.role` 跟 `WorkspaceMember.role` 不同層級** — `User.role` 是全域帳號旗標（ADMIN/MANAGER/MEMBER/VIEWER），現在**只剩 sidebar 用來決定 `/audit-log` 是否顯示**。真正的權限走 `WorkspaceMember.role`（OWNER/ADMIN/MEMBER/VIEWER）。Sidebar 個人卡片、Settings → 個人資料的「角色」欄都讀 `currentWorkspace?.role` 不要讀 `session.user.role`。
+26. **`User.role` 跟 `WorkspaceMember.role` 不同層級** — `User.role` 是全域帳號旗標（ADMIN/MANAGER/MEMBER/VIEWER），**已無任何權限用途**。真正的權限走 `WorkspaceMember.role`（OWNER/ADMIN/MEMBER/VIEWER）。Sidebar 的 `/audit-log` gating、個人卡片、Settings 的「角色」欄都讀 `currentWorkspace?.role`。`session.user.role` 現在只剩 `lib/auth.ts` 寫入、以及幾處 display fallback。**⚠️ `/api/user/profile` DELETE 的「不能刪最後一個 admin」保護仍在檢查 `role === "ADMIN"`，因為沒人是 ADMIN，那道保護從未生效過** — 要不要改成「最後一個 workspace OWNER」是待決的產品問題。
+
+## 詳細文件
+
+| 文件 | 內容 |
+|---|---|
+| [`docs/architecture.md`](docs/architecture.md) | 14 節架構與資料流完整說明（快取策略、權限模型、歸因、匯出…） |
+| [`docs/file-structure.md`](docs/file-structure.md) | 完整檔案樹與各目錄職責 |
+| [`README.md`](README.md) | 功能清單、快速開始、部署指南（給人看的） |
+| [`docs/env-setup-guide.md`](docs/env-setup-guide.md) | 環境變數逐項設定說明 |
