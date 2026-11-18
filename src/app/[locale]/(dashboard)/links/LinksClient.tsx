@@ -28,6 +28,7 @@ import {
   FileSpreadsheet,
   X,
   User as UserIcon,
+  Rocket,
 } from "lucide-react";
 import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -182,6 +183,7 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
 
   const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [batchTagLoading, setBatchTagLoading] = useState(false);
 
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
@@ -238,7 +240,7 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
       if (response.ok) {
         removeLink(id);
         invalidateDerived();
-        success("Link deleted.");
+        success(t("deletedToTrash"));
       } else toastError("Failed to delete link.");
     } catch {
       toastError("Failed to delete link.");
@@ -328,7 +330,7 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
         const count = selectedIds.size;
         setSelectedIds(new Set());
         refreshLinks();
-        success(`${count} link${count > 1 ? "s" : ""} deleted.`);
+        success(t("batchDeletedToTrash", { n: count }));
       } else toastError("Batch delete failed.");
     } catch {
       toastError("Batch delete failed.");
@@ -364,20 +366,20 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
     <div className="links-page-shell">
       <ConfirmDialog
         open={!!deleteConfirmId}
-        title="Delete this link?"
-        description="This action cannot be undone. All click data for this link will be permanently lost."
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
+        title={t("deleteDialogTitle")}
+        description={t("deleteDialogDesc")}
+        confirmLabel={tCommon("delete")}
+        cancelLabel={tCommon("cancel")}
         onConfirm={executeDelete}
         onCancel={() => setDeleteConfirmId(null)}
         variant="danger"
       />
       <ConfirmDialog
         open={batchDeleteConfirm}
-        title={`Delete ${selectedIds.size} link${selectedIds.size > 1 ? "s" : ""}?`}
-        description="This action cannot be undone. All click data for these links will be permanently lost."
-        confirmLabel="Delete All"
-        cancelLabel="Cancel"
+        title={t("batchDeleteDialogTitle", { n: selectedIds.size })}
+        description={t("deleteDialogDesc")}
+        confirmLabel={tCommon("delete")}
+        cancelLabel={tCommon("cancel")}
         onConfirm={executeBatchDelete}
         onCancel={() => setBatchDeleteConfirm(false)}
         variant="danger"
@@ -417,15 +419,64 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
             <Link href="/links/trash" className="btn btn-secondary" title={t("trashTitle")}>
               <Trash2 size={12} /> {t("trashTitle")}
             </Link>
-            <Link href="/links/new" className="btn btn-secondary">
-              <Plus size={12} /> {t("createNew")}
-            </Link>
-            <Link href="/links/import" className="btn btn-secondary">
-              <FileSpreadsheet size={12} /> Import CSV
-            </Link>
-            <Link href="/links/batch" className="btn btn-primary">
-              <Layers size={12} /> Batch create
-            </Link>
+            {/* One primary action (the common case) + the other ways to
+                create, each with a line on when to use it. Four equal
+                buttons — with "Batch create" as the primary — left users
+                guessing which one they needed. */}
+            <div style={{ display: "inline-flex" }}>
+              <Link
+                href="/links/new"
+                className="btn btn-primary"
+                style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
+              >
+                <Plus size={12} /> {t("createNew")}
+              </Link>
+              <div style={{ position: "relative" }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setShowCreateMenu((v) => !v)}
+                  aria-label={t("moreCreateOptions")}
+                  aria-expanded={showCreateMenu}
+                  style={{
+                    borderTopLeftRadius: 0,
+                    borderBottomLeftRadius: 0,
+                    borderLeft: "1px solid rgba(255,255,255,0.35)",
+                    paddingLeft: 8,
+                    paddingRight: 8,
+                  }}
+                >
+                  <ChevronDown size={13} />
+                </button>
+                {showCreateMenu && (
+                  <>
+                    <div
+                      style={{ position: "fixed", inset: 0, zIndex: 40 }}
+                      onClick={() => setShowCreateMenu(false)}
+                    />
+                    <div className="create-menu">
+                      {[
+                        { href: "/links/batch", icon: <Layers size={14} />, label: t("createMenuBatch"), desc: t("createMenuBatchDesc") },
+                        { href: "/links/import", icon: <FileSpreadsheet size={14} />, label: t("createMenuCsv"), desc: t("createMenuCsvDesc") },
+                        { href: "/campaigns/kickstart", icon: <Rocket size={14} />, label: t("createMenuKickstart"), desc: t("createMenuKickstartDesc") },
+                      ].map((item) => (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className="create-menu-item"
+                          onClick={() => setShowCreateMenu(false)}
+                        >
+                          <span className="create-menu-icon">{item.icon}</span>
+                          <span>
+                            <span className="create-menu-label">{item.label}</span>
+                            <span className="create-menu-desc">{item.desc}</span>
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </>
         }
       />

@@ -1,7 +1,7 @@
 /**
  * GET /api/analytics/raw
  *
- * Returns the last 90 days of raw clicks + all link metadata in one
+ * Returns the last ~2 years of raw clicks + all link metadata in one
  * response. The client uses this to render Analytics entirely in the
  * browser — filter switches become pure useMemo with zero network.
  *
@@ -16,7 +16,11 @@ import { prisma } from "@/lib/prisma";
 import { resolveWorkspaceScope } from "@/lib/workspace";
 import { cached, cacheKey } from "@/lib/cache";
 
-const DAYS_WINDOW = 90;
+// Two years, not 90 days: this is a seasonal tool — exhibition campaigns
+// (Computex in June) get reviewed months later, and a 90-day window made
+// those campaigns read 0 while /links showed hundreds of clicks. Total
+// volume is small (~4k clicks all-time), so CLICK_CAP still bounds it.
+const DAYS_WINDOW = 730;
 const CLICK_CAP = 10_000;
 
 export async function GET(request: NextRequest) {
@@ -30,8 +34,11 @@ export async function GET(request: NextRequest) {
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const { workspaceId, where: workspaceWhere } = scope;
 
+    // Floor to UTC midnight so the Redis key below is stable for a whole
+    // day (a millisecond timestamp in the key meant it never hit).
     const since = new Date();
-    since.setDate(since.getDate() - DAYS_WINDOW);
+    since.setUTCDate(since.getUTCDate() - DAYS_WINDOW);
+    since.setUTCHours(0, 0, 0, 0);
     const sinceIso = since.toISOString();
 
     // Pre-launch testing filter — by default we exclude clicks that the
@@ -47,8 +54,9 @@ export async function GET(request: NextRequest) {
     // v3: payload now reports excludedInternal counts + filters
     // isInternal=true by default. Bump key so old v2 doesn't serve
     // stale data with test clicks mixed in.
+    // v4: window 90 → 730 days.
     const key = cacheKey(
-      "analytics-raw-v3",
+      "analytics-raw-v4",
       session.user.id,
       workspaceId ?? "_",
       sinceIso,

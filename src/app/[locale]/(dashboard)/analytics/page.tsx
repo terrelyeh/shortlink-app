@@ -52,13 +52,19 @@ const dateRanges = [
   { value: "7d", labelKey: "range7d" },
   { value: "30d", labelKey: "range30d" },
   { value: "90d", labelKey: "range90d" },
+  { value: "all", labelKey: "rangeAll" },
   { value: "custom", labelKey: "custom" },
 ];
 
 export default function AnalyticsPage() {
   const t = useTranslations("analytics");
   const searchParams = useSearchParams();
-  const [range, setRange] = useState("7d");
+  // Opened for one link or campaign (e.g. from the clicks number on
+  // /links) → show its whole history, so the number matches the list's
+  // lifetime count instead of reading 0 in the off-season.
+  const [range, setRange] = useState(() =>
+    searchParams.get("linkId") || searchParams.get("campaign") ? "all" : "7d",
+  );
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [selectedCampaign, setSelectedCampaign] = useState<string>(
@@ -128,9 +134,15 @@ export default function AnalyticsPage() {
     const now = new Date();
     if (range === "custom" && customFrom) {
       return {
-        rangeStart: new Date(customFrom),
-        rangeEnd: customTo ? new Date(customTo) : now,
+        // Local-time day bounds (a bare "YYYY-MM-DD" would parse as UTC).
+        rangeStart: new Date(`${customFrom}T00:00:00`),
+        // The "to" date is inclusive — run to the end of that day.
+        rangeEnd: customTo ? new Date(`${customTo}T23:59:59.999`) : now,
       };
+    }
+    if (range === "all") {
+      // Everything the raw endpoint returned (its window is ~2 years).
+      return { rangeStart: raw ? new Date(raw.meta.since) : new Date(0), rangeEnd: now };
     }
     const days = range === "24h" ? 1 : range === "7d" ? 7 : range === "30d" ? 30 : range === "90d" ? 90 : 7;
     const start =
@@ -138,7 +150,7 @@ export default function AnalyticsPage() {
         ? new Date(now.getTime() - 24 * 60 * 60 * 1000)
         : new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
     return { rangeStart: start, rangeEnd: now };
-  }, [range, customFrom, customTo]);
+  }, [range, customFrom, customTo, raw]);
 
   const data = useMemo(() => {
     if (!raw) return null;
@@ -214,7 +226,11 @@ export default function AnalyticsPage() {
         onClose={() => setShareOpen(false)}
         linkId={selectedLinkId || undefined}
         campaignFilter={selectedCampaign || undefined}
-        dateRange={range}
+        scopeLabel={(() => {
+          const l = links.find((x) => x.id === selectedLinkId);
+          return l ? l.title || `/${l.code}` : undefined;
+        })()}
+        period={range === "all" ? "all" : { start: rangeStart, end: rangeEnd }}
       />
 
       <PageHeader
@@ -227,7 +243,16 @@ export default function AnalyticsPage() {
               <Share2 size={12} /> Share report
             </button>
             <a
-              href={`/api/export/analytics?range=${range}${selectedCampaign ? `&campaign=${selectedCampaign}` : ""}${selectedLinkId ? `&linkId=${selectedLinkId}` : ""}`}
+              href={`/api/export/analytics?${new URLSearchParams({
+                range,
+                ...(range === "custom" && customFrom
+                  ? { from: rangeStart.toISOString(), to: rangeEnd.toISOString() }
+                  : {}),
+                ...(selectedCampaign ? { campaign: selectedCampaign } : {}),
+                ...(selectedTagId ? { tagId: selectedTagId } : {}),
+                ...(selectedLinkId ? { linkId: selectedLinkId } : {}),
+                ...(includeInternal ? { includeInternal: "1" } : {}),
+              }).toString()}`}
               className="btn btn-secondary"
             >
               <Download size={12} /> Export CSV
@@ -267,6 +292,11 @@ export default function AnalyticsPage() {
               className="input"
               style={{ height: 32, width: 160 }}
             />
+            {raw && customFrom && new Date(customFrom) < new Date(raw.meta.since) && (
+              <span style={{ fontSize: 12, color: "var(--warn-fg)" }}>
+                {t("rangeBeforeWindow", { date: raw.meta.since.slice(0, 10) })}
+              </span>
+            )}
           </div>
         )}
 
@@ -873,7 +903,7 @@ export default function AnalyticsPage() {
                       <MousePointerClick size={12} /> {t("clicks")}
                     </div>
                     <div className="kpi-value">{data.summary.totalClicks.toLocaleString()}</div>
-                    {data.summary.clicksChange !== 0 && (
+                    {range !== "all" && data.summary.clicksChange !== 0 && (
                       <div
                         className={`kpi-sub ${data.summary.clicksChange > 0 ? "pos" : "neg"}`}
                       >

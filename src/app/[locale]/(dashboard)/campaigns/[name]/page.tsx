@@ -29,6 +29,7 @@ import {
   ChevronDown,
   Table2,
   CalendarRange,
+  Share2,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
@@ -38,6 +39,7 @@ import { TrendCell, classifyTrend, type TrendState } from "@/components/analytic
 import { formatRelativeTime } from "@/lib/utils/format";
 import { computeAnalytics, type RawAnalyticsData } from "@/lib/analytics/compute";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ShareModal } from "@/components/analytics/ShareModal";
 import { SyncButton } from "@/components/layout/SyncButton";
 
 interface CampaignLink {
@@ -70,6 +72,7 @@ export default function CampaignDetailPage() {
   // Test-click filter strings live in the analytics namespace because
   // the same UI shows up on /analytics — keeping one source of truth.
   const tAnalytics = useTranslations("analytics");
+  const tShare = useTranslations("share");
   const campaignName = decodeURIComponent(params.name as string);
 
   const qc = useQueryClient();
@@ -77,6 +80,11 @@ export default function CampaignDetailPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+  // Chart / Traffic window. Defaults to the campaign's whole history —
+  // campaigns are usually reviewed after they end (a fixed 30-day window
+  // showed exhibition campaigns as empty a few months later).
+  const [trendRange, setTrendRange] = useState<"all" | "90d" | "30d">("all");
+  const [shareOpen, setShareOpen] = useState(false);
 
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
@@ -161,10 +169,13 @@ export default function CampaignDetailPage() {
   const computed = useMemo(() => {
     if (!raw) return null;
     const rangeEnd = new Date();
-    const rangeStart = new Date();
-    rangeStart.setDate(rangeEnd.getDate() - 30);
+    const rangeStart =
+      trendRange === "all" ? new Date(raw.meta.since) : new Date();
+    if (trendRange !== "all") {
+      rangeStart.setDate(rangeEnd.getDate() - (trendRange === "90d" ? 90 : 30));
+    }
     return computeAnalytics(raw, { rangeStart, rangeEnd, campaign: campaignName });
-  }, [raw, campaignName]);
+  }, [raw, campaignName, trendRange]);
 
   // Per-link metrics from the raw click stream — single pass over all
   // clicks keyed by shortLinkId, so we don't re-scan N times per link.
@@ -412,6 +423,20 @@ export default function CampaignDetailPage() {
 
   return (
     <>
+      {/* Shares the period currently selected on this page, frozen. */}
+      <ShareModal
+        isOpen={shareOpen}
+        onClose={() => setShareOpen(false)}
+        campaignFilter={campaignName}
+        period={
+          trendRange === "all"
+            ? "all"
+            : {
+                start: new Date(Date.now() - (trendRange === "90d" ? 90 : 30) * 86_400_000),
+                end: new Date(),
+              }
+        }
+      />
       <PageHeader
         back={t("backToCampaigns")}
         onBack={() => router.push("/campaigns")}
@@ -429,6 +454,9 @@ export default function CampaignDetailPage() {
         actions={
           <>
             <SyncButton queryKeys={[[...linksKey], [...goalKey], [...rawKey]]} />
+            <button className="btn btn-secondary" onClick={() => setShareOpen(true)}>
+              <Share2 size={13} /> {tShare("shareCampaign")}
+            </button>
             <button
               className="btn btn-secondary"
               onClick={copyAllLinks}
@@ -764,7 +792,8 @@ export default function CampaignDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="tabs">
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
+      <div className="tabs" style={{ flex: 1 }}>
         <button
           className={activeTab === "overview" ? "active" : ""}
           onClick={() => setActiveTab("overview")}
@@ -783,6 +812,20 @@ export default function CampaignDetailPage() {
         >
           <Link2 size={13} /> {t("tabLinks")}
         </button>
+      </div>
+        {activeTab !== "links" && (
+          <div className="segmented" style={{ marginBottom: 22, flexShrink: 0 }}>
+            {(["all", "90d", "30d"] as const).map((r) => (
+              <button
+                key={r}
+                className={trendRange === r ? "active" : ""}
+                onClick={() => setTrendRange(r)}
+              >
+                {tAnalytics(r === "all" ? "rangeAll" : r === "90d" ? "range90d" : "range30d")}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Overview tab */}
@@ -871,9 +914,11 @@ export default function CampaignDetailPage() {
                       >
                         {reached ? t("goalReached") : t("goalPct", { pct: pct.toFixed(1) })}
                       </span>
-                      <span className="muted" style={{ fontSize: 11.5 }}>
-                        {t("clicksRemaining", { n: (goalClicks - totalClicks).toLocaleString() })}
-                      </span>
+                      {!reached && (
+                        <span className="muted" style={{ fontSize: 11.5 }}>
+                          {t("clicksRemaining", { n: (goalClicks - totalClicks).toLocaleString() })}
+                        </span>
+                      )}
                     </div>
                   </>
                 );
@@ -891,7 +936,7 @@ export default function CampaignDetailPage() {
               <LineChartIcon size={14} style={{ color: "var(--ink-400)" }} />
               {t("clicksTitle")}
               <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
-                {t("last30Days")}
+                {tAnalytics(trendRange === "all" ? "rangeAll" : trendRange === "90d" ? "range90d" : "range30d")}
               </span>
             </div>
             {rawLoading ? (
@@ -902,7 +947,7 @@ export default function CampaignDetailPage() {
               <ClicksChart data={computed.clicksByDay} />
             ) : (
               <div style={{ height: 300, display: "grid", placeItems: "center", fontSize: 13, color: "var(--ink-500)" }}>
-                {t("noClicks30d")}
+                {t("noClicksInRange")}
               </div>
             )}
           </div>
@@ -921,7 +966,7 @@ export default function CampaignDetailPage() {
               className="card"
               style={{ padding: 48, textAlign: "center", fontSize: 13, color: "var(--ink-500)" }}
             >
-              {t("noTraffic30d")}
+              {t("noClicksInRange")}
             </div>
           ) : (
             <>

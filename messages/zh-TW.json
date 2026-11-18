@@ -201,7 +201,26 @@
     "createdBy": "建立者",
     "destinationTooltip": "開啟目的網址（不帶 UTM）— 完整網址：",
     "abVariantsTooltip": "A/B 測試：流量會分到 {n} 個網址，不只這一個",
-    "mediumSource": "媒介 / 來源"
+    "mediumSource": "媒介 / 來源",
+    "viewAnalytics": "查看這條連結的數據分析",
+    "createSubtitle": "一次完成短網址與 UTM 追蹤設定",
+    "createdHeadline": "連結已建立 — 複製短網址或下載 QR Code",
+    "createAnother": "再建一條（保留 UTM 與標籤）",
+    "goToLinks": "前往連結列表",
+    "prefillCampaign": "已帶入活動「{name}」",
+    "prefillTemplate": "已套用模板「{name}」— 請填寫活動",
+    "deleteDialogTitle": "刪除這條連結？",
+    "batchDeleteDialogTitle": "刪除 {n} 條連結？",
+    "deleteDialogDesc": "短網址會立即停止運作，連結移到垃圾桶。之後可以隨時從垃圾桶還原，設定與點擊紀錄都會保留。",
+    "deletedToTrash": "已移到垃圾桶，可從垃圾桶頁還原。",
+    "batchDeletedToTrash": "{n} 條連結已移到垃圾桶。",
+    "moreCreateOptions": "更多建立方式",
+    "createMenuBatch": "批次建立",
+    "createMenuBatchDesc": "同一個目的網址、多個版本（例如每位 KOL、每則貼文一條）",
+    "createMenuCsv": "CSV 匯入",
+    "createMenuCsvDesc": "每一列各自的目的網址與 UTM，一次建幾十條",
+    "createMenuKickstart": "活動啟動器",
+    "createMenuKickstartDesc": "展會、新品發表：一次建好整套通路連結"
   },
   "utm": {
     "title": "UTM 參數",
@@ -349,18 +368,37 @@
         "createLink": "建立帶有 UTM 的連結",
         "manageCampaigns": "管理行銷活動"
       }
-    }
+    },
+    "rangeAll": "全部期間",
+    "rangeBeforeWindow": "{date} 之前的資料不在讀取範圍內"
   },
   "share": {
     "title": "分享報表",
     "createShareLink": "建立分享連結",
-    "shareDescription": "產生公開連結供外部人員查看此連結的數據",
+    "shareDescription": "產生唯讀連結，沒有帳號的人也能查看",
     "passwordProtect": "密碼保護",
     "setPassword": "設定密碼",
     "expiryDate": "連結到期日",
     "maxViews": "最大瀏覽次數",
     "shareLink": "分享連結",
-    "revokeAccess": "撤銷存取"
+    "revokeAccess": "撤銷存取",
+    "periodAll": "全部期間",
+    "scopeLink": "連結 {name}",
+    "scopeCampaign": "活動 {name}",
+    "scopeWorkspace": "整個工作區",
+    "periodFrozenHint": "報告會固定這段日期，之後再打開數字也不會變。",
+    "expiresAfter": "分享連結有效期",
+    "days": "{n} 天",
+    "customDays": "天數",
+    "optional": "選填",
+    "passwordPlaceholder": "留空表示不設密碼",
+    "unlimited": "不限",
+    "createFailed": "無法建立分享連結（HTTP {status}）。",
+    "networkError": "網路錯誤，請再試一次。",
+    "created": "分享連結已建立 ✓",
+    "passwordSet": "已設定密碼",
+    "done": "完成",
+    "shareCampaign": "分享報告"
   },
   "settings": {
     "title": "設定",
@@ -584,6 +622,14 @@
           "google_ads_event": {
             "label": "Google Ads",
             "hint": ""
+          },
+          "qr_booth_poster": {
+            "label": "QR — 展攤海報",
+            "hint": "海報導向別的網址時，在這一列填它自己的目的網址"
+          },
+          "qr_flyer": {
+            "label": "QR — 傳單 / DM",
+            "hint": ""
           }
         }
       }
@@ -734,8 +780,13 @@
       "colLastClick": "最後點擊",
       "actionAnalytics": "數據分析",
       "actionEditSettings": "編輯連結設定",
-      "actionOpenShortUrl": "開啟短網址"
-    }
+      "actionOpenShortUrl": "開啟短網址",
+      "noClicksInRange": "這段期間沒有點擊"
+    },
+    "allTime": "全部期間",
+    "clicksAllTime": "點擊數（全部期間）",
+    "kickstartRowUrlPlaceholder": "目的網址（留空 = 用上方的預設網址）",
+    "kickstartSubmitBadRowUrl": "有一列的目的網址不是 http(s):// 開頭"
   },
   "compare": {
     "title": "比較 {n} 個活動",

@@ -12,9 +12,9 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
 } from "recharts";
 import { Lock, Loader2, AlertCircle, BarChart3 } from "lucide-react";
+import { formatSharePeriod } from "@/lib/share-period";
 
 interface ScopeDescriptor {
   type: "link" | "campaign" | "range";
@@ -24,6 +24,8 @@ interface ScopeDescriptor {
   campaignName: string | null;
   rangeWindow: string | null;
 }
+
+type Row = { name: string; value: number };
 
 interface AnalyticsData {
   scope?: ScopeDescriptor;
@@ -35,40 +37,84 @@ interface AnalyticsData {
   analytics: {
     totalClicks: number;
     clicksByDay: { date: string; clicks: number }[];
-    devices: { name: string; value: number }[];
-    browsers: { name: string; value: number }[];
-    countries: { name: string; value: number }[];
+    devices: Row[];
+    browsers: Row[];
+    countries: Row[];
+    sources?: Row[];
+    mediums?: Row[];
+    topLinks?: {
+      code: string;
+      title: string | null;
+      source: string | null;
+      medium: string | null;
+      content: string | null;
+      clicks: number;
+    }[];
   };
 }
 
-function describeScope(scope?: ScopeDescriptor, fallback?: AnalyticsData["link"]) {
+// This page lives outside the [locale] tree (no next-intl provider) and is
+// read by managers / partners, so it carries its own two-language table.
+// Chinese first — the team and most report readers are in Taiwan.
+const STR = {
+  zh: {
+    shared: "分享報告", linkReport: "連結成效", campaignReport: "活動成效", workspaceReport: "整體成效",
+    allTime: "全部期間", last: (n: string) => `近 ${n.replace("d", "")} 天`,
+    totalClicks: "總點擊數", clicksOverTime: "每日點擊", channels: "通路表現",
+    medium: "媒介 (Medium)", source: "來源 (Source)", topLinks: "連結排行", link: "連結", clicks: "點擊",
+    devices: "裝置", browsers: "瀏覽器", countries: "國家", noData: "沒有資料",
+    pwTitle: "需要密碼", pwDesc: "請輸入密碼查看這份報告", pwPlaceholder: "輸入密碼", verifying: "驗證中…", view: "查看報告",
+    loadFail: "無法載入報告", realOnly: "僅計算真實流量，不含內部測試點擊", lang: "EN",
+  },
+  en: {
+    shared: "Shared report", linkReport: "Link performance", campaignReport: "Campaign performance", workspaceReport: "Overall performance",
+    allTime: "All time", last: (n: string) => `Last ${n.replace("d", "")} days`,
+    totalClicks: "Total clicks", clicksOverTime: "Clicks per day", channels: "Channels",
+    medium: "Medium", source: "Source", topLinks: "Top links", link: "Link", clicks: "Clicks",
+    devices: "Devices", browsers: "Browsers", countries: "Countries", noData: "No data",
+    pwTitle: "Password protected", pwDesc: "Enter the password to view this report", pwPlaceholder: "Password", verifying: "Verifying…", view: "View report",
+    loadFail: "Unable to load report", realOnly: "Real traffic only — internal test clicks excluded", lang: "中文",
+  },
+};
+type Lang = keyof typeof STR;
+
+function periodLabel(rangeWindow: string | null, s: (typeof STR)[Lang]): string {
+  if (rangeWindow && /^\d+d$/.test(rangeWindow)) return s.last(rangeWindow);
+  return formatSharePeriod(rangeWindow, s.allTime);
+}
+
+function describeScope(s: (typeof STR)[Lang], scope?: ScopeDescriptor, fallback?: AnalyticsData["link"]) {
   if (!scope) {
-    return {
-      title: fallback?.title || (fallback ? `/${fallback.code}` : "Shared Report"),
-      subtitle: "Analytics Report — Last 30 Days",
-    };
+    return { title: fallback?.title || (fallback ? `/${fallback.code}` : s.shared), subtitle: s.linkReport };
   }
-
-  const rangeLabel = scope.rangeWindow
-    ? `Last ${scope.rangeWindow.replace("d", " days")}`
-    : "All time";
-
+  const period = periodLabel(scope.rangeWindow, s);
   if (scope.type === "link") {
-    return {
-      title: scope.shortLinkTitle || `/${scope.shortLinkCode ?? ""}`,
-      subtitle: `Link Analytics — ${rangeLabel === "All time" ? "Last 30 Days" : rangeLabel}`,
-    };
+    return { title: scope.shortLinkTitle || `/${scope.shortLinkCode ?? ""}`, subtitle: `${s.linkReport} · ${period}` };
   }
   if (scope.type === "campaign") {
-    return {
-      title: scope.campaignName ?? "Campaign",
-      subtitle: `Campaign Analytics — ${rangeLabel}`,
-    };
+    return { title: scope.campaignName ?? s.campaignReport, subtitle: `${s.campaignReport} · ${period}` };
   }
-  return {
-    title: "Workspace Overview",
-    subtitle: `Workspace Analytics — ${rangeLabel}`,
-  };
+  return { title: s.workspaceReport, subtitle: period };
+}
+
+function BarList({ rows, empty }: { rows: Row[]; empty: string }) {
+  if (rows.length === 0) return <p className="text-gray-400 text-center py-6">{empty}</p>;
+  const max = Math.max(...rows.map((r) => r.value));
+  return (
+    <div className="space-y-3">
+      {rows.slice(0, 10).map((r) => (
+        <div key={r.name}>
+          <div className="flex justify-between text-sm mb-1">
+            <span className="text-gray-700 truncate pr-3">{r.name}</span>
+            <span className="text-gray-500 tabular-nums">{r.value.toLocaleString()}</span>
+          </div>
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(r.value / max) * 100}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
@@ -85,6 +131,16 @@ export default function SharedReportPage({
   const [requiresPassword, setRequiresPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [lang, setLang] = useState<Lang>("zh");
+  const L = STR[lang];
+  const langToggle = (
+    <button
+      onClick={() => setLang(lang === "zh" ? "en" : "zh")}
+      className="text-xs px-2.5 py-1 border border-gray-200 rounded-md text-gray-500 hover:bg-gray-50"
+    >
+      {L.lang}
+    </button>
+  );
 
   const fetchReport = async (pwd?: string) => {
     setLoading(true);
@@ -145,8 +201,8 @@ export default function SharedReportPage({
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Lock className="w-8 h-8 text-blue-600" />
             </div>
-            <h1 className="text-xl font-bold text-gray-900">Password Protected</h1>
-            <p className="text-gray-500 mt-1">Enter password to view this report</p>
+            <h1 className="text-xl font-bold text-gray-900">{L.pwTitle}</h1>
+            <p className="text-gray-500 mt-1">{L.pwDesc}</p>
           </div>
 
           <form onSubmit={handlePasswordSubmit}>
@@ -154,7 +210,7 @@ export default function SharedReportPage({
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
+              placeholder={L.pwPlaceholder}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
               autoFocus
             />
@@ -163,7 +219,7 @@ export default function SharedReportPage({
               disabled={submitting || !password}
               className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
-              {submitting ? "Verifying..." : "View Report"}
+              {submitting ? L.verifying : L.view}
             </button>
           </form>
         </div>
@@ -176,7 +232,7 @@ export default function SharedReportPage({
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
           <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-gray-900 mb-2">Unable to Load Report</h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">{L.loadFail}</h1>
           <p className="text-gray-500">{error}</p>
         </div>
       </div>
@@ -187,7 +243,7 @@ export default function SharedReportPage({
 
   const formattedClicksByDay = data.analytics.clicksByDay.map((d) => ({
     ...d,
-    date: new Date(d.date).toLocaleDateString("en-US", {
+    date: new Date(d.date).toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
       month: "short",
       day: "numeric",
     }),
@@ -199,14 +255,16 @@ export default function SharedReportPage({
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm p-6">
           {(() => {
-            const desc = describeScope(data.scope, data.link);
+            const desc = describeScope(L, data.scope, data.link);
             return (
               <>
                 <div className="flex items-center gap-3 mb-2">
-                  <BarChart3 className="w-6 h-6 text-blue-600" />
-                  <h1 className="text-2xl font-bold text-gray-900">{desc.title}</h1>
+                  <BarChart3 className="w-6 h-6 text-blue-600 shrink-0" />
+                  <h1 className="text-2xl font-bold text-gray-900 flex-1 min-w-0 break-words">{desc.title}</h1>
+                  {langToggle}
                 </div>
                 <p className="text-gray-500">{desc.subtitle}</p>
+                <p className="text-xs text-gray-400 mt-1">{L.realOnly}</p>
               </>
             );
           })()}
@@ -214,7 +272,7 @@ export default function SharedReportPage({
 
         {/* Total Clicks */}
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <p className="text-sm text-gray-500 mb-1">Total Clicks</p>
+          <p className="text-sm text-gray-500 mb-1">{L.totalClicks}</p>
           <p className="text-4xl font-bold text-gray-900">
             {data.analytics.totalClicks.toLocaleString()}
           </p>
@@ -223,7 +281,7 @@ export default function SharedReportPage({
         {/* Clicks Over Time */}
         <div className="bg-white rounded-xl shadow-sm p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Clicks Over Time
+            {L.clicksOverTime}
           </h2>
           {formattedClicksByDay.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
@@ -243,16 +301,62 @@ export default function SharedReportPage({
             </ResponsiveContainer>
           ) : (
             <div className="h-[300px] flex items-center justify-center text-gray-400">
-              No data available
+              {L.noData}
             </div>
           )}
         </div>
+
+        {/* Channels — what managers ask first: which channel worked */}
+        {(data.analytics.mediums?.length || data.analytics.sources?.length) ? (
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">{L.channels}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-3">{L.medium}</h3>
+                <BarList rows={data.analytics.mediums ?? []} empty={L.noData} />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-3">{L.source}</h3>
+                <BarList rows={data.analytics.sources ?? []} empty={L.noData} />
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {data.analytics.topLinks && data.analytics.topLinks.length > 1 && (
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">{L.topLinks}</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-gray-500 border-b border-gray-100">
+                    <th className="py-2 pr-3 font-medium">{L.link}</th>
+                    <th className="py-2 pr-3 font-medium">{L.medium} / {L.source}</th>
+                    <th className="py-2 font-medium text-right">{L.clicks}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.analytics.topLinks.map((l) => (
+                    <tr key={l.code} className="border-b border-gray-50">
+                      <td className="py-2 pr-3">
+                        <div className="text-gray-900">{l.title || `/${l.code}`}</div>
+                        {l.content && <div className="text-xs text-gray-400">{l.content}</div>}
+                      </td>
+                      <td className="py-2 pr-3 text-gray-500">{[l.medium, l.source].filter(Boolean).join(" / ") || "—"}</td>
+                      <td className="py-2 text-right tabular-nums text-gray-900">{l.clicks.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Distribution Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Devices */}
           <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Devices</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">{L.devices}</h2>
             {data.analytics.devices.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
@@ -278,14 +382,14 @@ export default function SharedReportPage({
               </ResponsiveContainer>
             ) : (
               <div className="h-[200px] flex items-center justify-center text-gray-400">
-                No data
+                {L.noData}
               </div>
             )}
           </div>
 
           {/* Browsers */}
           <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Browsers</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">{L.browsers}</h2>
             {data.analytics.browsers.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
@@ -311,7 +415,7 @@ export default function SharedReportPage({
               </ResponsiveContainer>
             ) : (
               <div className="h-[200px] flex items-center justify-center text-gray-400">
-                No data
+                {L.noData}
               </div>
             )}
           </div>
@@ -319,43 +423,13 @@ export default function SharedReportPage({
 
         {/* Countries */}
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Top Countries
-          </h2>
-          {data.analytics.countries.length > 0 ? (
-            <div className="space-y-3">
-              {data.analytics.countries.map((country, i) => {
-                const maxValue = Math.max(
-                  ...data.analytics.countries.map((c) => c.value)
-                );
-                const percentage = (country.value / maxValue) * 100;
-
-                return (
-                  <div key={i}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-700">{country.name}</span>
-                      <span className="text-gray-500">
-                        {country.value.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-blue-500 rounded-full"
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-gray-400 text-center py-8">No data available</p>
-          )}
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">{L.countries}</h2>
+          <BarList rows={data.analytics.countries} empty={L.noData} />
         </div>
 
         {/* Footer */}
         <div className="text-center text-sm text-gray-400 py-4">
-          Powered by Short Link Manager
+          EnGenius ShortLink
         </div>
       </div>
     </div>

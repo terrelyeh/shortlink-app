@@ -90,6 +90,7 @@ const windowPresets: { value: string; labelKey: string; days: number }[] = [
   { value: "7d", labelKey: "last7Days", days: 7 },
   { value: "30d", labelKey: "last30Days", days: 30 },
   { value: "90d", labelKey: "last90Days", days: 90 },
+  { value: "all", labelKey: "allTime", days: 730 },
 ];
 
 function statusClass(status: string | null): string {
@@ -299,7 +300,7 @@ export default function CampaignsClient() {
         </div>
         <div className="kpi">
           <div className="kpi-label">
-            <MousePointerClick size={12} /> {t("clicksLastNd", { days: data?.meta.days ?? 30 })}
+            <MousePointerClick size={12} /> {window === "all" ? t("clicksAllTime") : t("clicksLastNd", { days: data?.meta.days ?? 30 })}
           </div>
           <div className="kpi-value">{data ? totals.clicks.toLocaleString() : "—"}</div>
           <div className="kpi-sub">
@@ -381,7 +382,7 @@ export default function CampaignsClient() {
               <LineChartIcon size={14} style={{ color: "var(--brand-500)" }} />
               {t("compareTitle", { n: selected.size })}
               <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
-                · {t("dailyClicksSuffix", { days: data.meta.days })}
+                · {window === "all" ? t("allTime") : t("dailyClicksSuffix", { days: data.meta.days })}
               </span>
             </div>
             <div className="row" style={{ gap: 6 }}>
@@ -412,7 +413,7 @@ export default function CampaignsClient() {
           <div className="tbl-head-title">
             <Trophy size={14} style={{ color: "var(--data-amber)" }} />
             {t("leaderboard")}
-            <span className="muted">· {t("lastNd", { days: data?.meta.days ?? 30 })}</span>
+            <span className="muted">· {window === "all" ? t("allTime") : t("lastNd", { days: data?.meta.days ?? 30 })}</span>
             {selected.size > 0 && (
               <span style={{ color: "var(--brand-600)", fontSize: 11.5, marginLeft: 4 }}>
                 {t("selected", { n: selected.size })} {selected.size < 2 && t("pickMoreHint")}

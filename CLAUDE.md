@@ -53,6 +53,8 @@
 13. **CSV 匯出** — links / analytics / campaigns 三個 endpoint 共用 `csvResponse()`
 14. **Analytics 進階指標** — 點擊衰減曲線 / 7×24 熱度圖（用 viewer 時區）/ 城市排行
 15. **社群分享預覽覆寫** — `ShortLink.ogOverride{Title,Description,Image}`（全 nullable，只在編輯頁設定）。`/s/[code]` 在「有覆寫值 **且** `isPreviewCrawler(ua)`」時回 200 HTML（自訂 `og:*` + meta refresh，`private, no-store`），**不轉址也不記點擊**。邏輯在 `lib/social-preview.ts`；空欄位 fallback 到爬到的 `og*` → `title`。分支刻意放在 geo 檢查**之前**（FB/LINE 從美國機房抓）
+17. **分享報告期間** — `ShareToken.rangeWindow` 存 `all` / `YYYY-MM-DD..YYYY-MM-DD`（台灣時間、含頭尾）/ 舊的 `7d` 等滾動值，解析全在 `lib/share-period.ts`。UI 一律產生固定日期（滾動視窗會讓主管隔週打開數字變了）。報告排除 `isInternal` 點擊
+18. **QR 下載** — 一律走 `lib/qr-export.ts`（`qrcode` 套件現場產 1024px PNG / 真向量 SVG + 中央 logo），不要從畫面上的小 canvas `toDataURL`
 16. **垃圾桶** — `/links/trash` + `GET /api/links/trash`（上限 200、不走 Redis）+ `POST /api/links/[id]/restore`（`canUserActOnResource`、寫 `RESTORE_LINK`）。query key `["links-trash"]`，LinksClient 的刪除會 invalidate 它
 
 ## Conventions
@@ -194,7 +196,7 @@ Prisma datasource 需 `directUrl` 才能讓 `db push` 繞過 pgbouncer — schem
 
 6. **Prisma groupBy() 放 `Promise.all`** — analytics / campaigns-summary 都是一個 Promise.all 包多個 groupBy。新增聚合請**加進現有 Promise.all**，別另外 await。
 
-7. **Client-side filter 有資料上限** — 別忘了當資料超過 cap 時顯示 banner。`/links` cap=500，`/analytics/raw` cap=10000 clicks + 90 天。
+7. **Client-side filter 有資料上限** — 別忘了當資料超過 cap 時顯示 banner。`/links` cap=500，`/analytics/raw` cap=10000 clicks + **730 天**（2026-11 從 90 天拉長：季節性工具，展會活動常在幾個月後才回頭看；「全部期間」= raw 的 `meta.since`）。活動列表 / 活動匯出的天數上限也同步是 730。
 
 8. **Column 命名不一致** — Prisma model 欄位是 camelCase，DB column 多數是 snake_case（`@map`），**但有幾個沒 @map** 的是 camelCase quoted（如 `originalUrl`、`deletedAt`）。寫 raw SQL 前先看 schema。
 

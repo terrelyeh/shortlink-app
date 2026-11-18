@@ -13,7 +13,7 @@
  *                 clicks, unique visitors, last click. Drill-down.
  *
  * Common query params:
- *   days            lookback window for summary / timeseries (default 30, max 90)
+ *   days            lookback window for summary / timeseries (default 30, max 730)
  *   includeInternal "1" to include test clicks (default: excluded, matching the UI)
  *   campaign        required for format=links
  *
@@ -32,7 +32,7 @@ import { resolveWorkspaceScope } from "@/lib/workspace";
 import { buildCsv, csvResponse } from "@/lib/utils/csv";
 
 const DEFAULT_DAYS = 30;
-const MAX_DAYS = 90;
+const MAX_DAYS = 730; // matches the leaderboard's "all time" preset
 
 export async function GET(request: NextRequest) {
   try {

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { UTM_MEDIUMS, getSourcesForMedium } from "@/lib/utils/utm";
 import { Loader2, Download, Check, Copy, ChevronDown } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
+import { downloadBlob, qrFilename, qrPngBlob } from "@/lib/qr-export";
 
 interface CreatedLink {
   id: string;
@@ -100,19 +101,15 @@ export function BatchCreateForm() {
     link.click();
   };
 
-  const downloadAllQRCodes = () => {
-    createdLinks.forEach((link, index) => {
-      setTimeout(() => {
-        const canvas = document.getElementById(`qr-${link.id}`) as HTMLCanvasElement;
-        if (canvas) {
-          const url = canvas.toDataURL("image/png");
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `qr-${link.title || link.code}.png`;
-          a.click();
-        }
-      }, index * 100);
-    });
+  // Print-quality 1024 px PNGs, rendered fresh (lib/qr-export) rather
+  // than copied from the 120 px preview canvases. Sequential so browsers
+  // don't drop simultaneous downloads.
+  const downloadAllQRCodes = async () => {
+    for (const link of createdLinks) {
+      const blob = await qrPngBlob(link.shortUrl);
+      downloadBlob(blob, qrFilename(link.title, link.code, "png"));
+      await new Promise((r) => setTimeout(r, 150));
+    }
   };
 
   if (createdLinks.length > 0) {

@@ -31,6 +31,7 @@ import Link from "next/link";
 import { StatusDot } from "@/components/ui/Badge";
 import { useToast } from "@/components/ui/Toast";
 import { formatDestination } from "@/lib/utils/destination";
+import { QrCodePanel } from "./QrCodePanel";
 
 interface LinkTag {
   tag: { id: string; name: string; color?: string | null };
@@ -79,6 +80,7 @@ export function LinkMobileCard({
   const { success } = useToast();
   const [copied, setCopied] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showQR, setShowQR] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({
     top: 0,
@@ -203,15 +205,31 @@ export function LinkMobileCard({
         </button>
       </div>
 
-      {/* Short URL — primary action: copy */}
-      <button onClick={copyToClipboard} className="lmc-short-row">
-        <span className="lmc-short">{shortUrlDisplay}</span>
-        {copied ? (
-          <Check size={14} style={{ color: "var(--ok-fg)", flexShrink: 0 }} />
-        ) : (
-          <Copy size={14} style={{ color: "var(--ink-400)", flexShrink: 0 }} />
-        )}
-      </button>
+      {/* Short URL — primary action: copy; QR toggle beside it */}
+      <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+        <button onClick={copyToClipboard} className="lmc-short-row" style={{ flex: 1, minWidth: 0 }}>
+          <span className="lmc-short">{shortUrlDisplay}</span>
+          {copied ? (
+            <Check size={14} style={{ color: "var(--ok-fg)", flexShrink: 0 }} />
+          ) : (
+            <Copy size={14} style={{ color: "var(--ink-400)", flexShrink: 0 }} />
+          )}
+        </button>
+        <button
+          onClick={() => setShowQR((v) => !v)}
+          className="lmc-short-row"
+          style={{ width: 44, flex: "none", justifyContent: "center" }}
+          aria-label={t("qrCode")}
+          aria-expanded={showQR}
+        >
+          <QrCode size={16} style={{ color: showQR ? "var(--brand-600, #03A9F4)" : "var(--ink-400)" }} />
+        </button>
+      </div>
+      {showQR && (
+        <div style={{ padding: "4px 0" }}>
+          <QrCodePanel linkId={link.id} code={link.code} title={link.title} shortUrl={shortUrl} size={120} />
+        </div>
+      )}
 
       {/* Pills row: campaign / medium / source / tags */}
       {(link.utmCampaign ||
@@ -283,7 +301,9 @@ export function LinkMobileCard({
           )}
         </span>
         <span className="lmc-clicks">
-          <strong>{link._count.clicks.toLocaleString()}</strong>{" "}
+          <Link href={`/analytics?linkId=${link.id}`} title={t("viewAnalytics")} style={{ color: "inherit" }}>
+            <strong>{link._count.clicks.toLocaleString()}</strong>
+          </Link>{" "}
           <span style={{ color: "var(--ink-500)" }}>clicks</span>
           {hasTrend && (
             <span
@@ -322,13 +342,16 @@ export function LinkMobileCard({
             >
               <BarChart3 size={14} /> {t("menuAnalytics")}
             </Link>
-            <Link
-              href={`/links/${link.id}#qr`}
+            <button
+              type="button"
               className="lmc-menu-item"
-              onClick={() => setShowMenu(false)}
+              onClick={() => {
+                setShowQR(true);
+                setShowMenu(false);
+              }}
             >
               <QrCode size={14} /> {t("qrCode")}
-            </Link>
+            </button>
             <a
               href={shortUrl}
               target="_blank"
