@@ -350,7 +350,9 @@
         "createLink": "Create Link with UTM",
         "manageCampaigns": "Manage Campaigns"
       }
-    }
+    },
+    "rangeAll": "All time",
+    "rangeBeforeWindow": "Data before {date} isn't loaded"
   },
   "share": {
     "title": "Share Report",
@@ -735,8 +737,11 @@
       "colLastClick": "Last click",
       "actionAnalytics": "Analytics",
       "actionEditSettings": "Edit link settings",
-      "actionOpenShortUrl": "Open short URL"
-    }
+      "actionOpenShortUrl": "Open short URL",
+      "noClicksInRange": "No clicks in this period"
+    },
+    "allTime": "All time",
+    "clicksAllTime": "Clicks (all time)"
   },
   "compare": {
     "title": "Compare {n} campaigns",

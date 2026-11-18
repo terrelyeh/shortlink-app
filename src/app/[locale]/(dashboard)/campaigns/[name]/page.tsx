@@ -77,6 +77,10 @@ export default function CampaignDetailPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+  // Chart / Traffic window. Defaults to the campaign's whole history —
+  // campaigns are usually reviewed after they end (a fixed 30-day window
+  // showed exhibition campaigns as empty a few months later).
+  const [trendRange, setTrendRange] = useState<"all" | "90d" | "30d">("all");
 
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
@@ -161,10 +165,13 @@ export default function CampaignDetailPage() {
   const computed = useMemo(() => {
     if (!raw) return null;
     const rangeEnd = new Date();
-    const rangeStart = new Date();
-    rangeStart.setDate(rangeEnd.getDate() - 30);
+    const rangeStart =
+      trendRange === "all" ? new Date(raw.meta.since) : new Date();
+    if (trendRange !== "all") {
+      rangeStart.setDate(rangeEnd.getDate() - (trendRange === "90d" ? 90 : 30));
+    }
     return computeAnalytics(raw, { rangeStart, rangeEnd, campaign: campaignName });
-  }, [raw, campaignName]);
+  }, [raw, campaignName, trendRange]);
 
   // Per-link metrics from the raw click stream — single pass over all
   // clicks keyed by shortLinkId, so we don't re-scan N times per link.
@@ -764,7 +771,8 @@ export default function CampaignDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="tabs">
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
+      <div className="tabs" style={{ flex: 1 }}>
         <button
           className={activeTab === "overview" ? "active" : ""}
           onClick={() => setActiveTab("overview")}
@@ -783,6 +791,20 @@ export default function CampaignDetailPage() {
         >
           <Link2 size={13} /> {t("tabLinks")}
         </button>
+      </div>
+        {activeTab !== "links" && (
+          <div className="segmented" style={{ marginBottom: 22, flexShrink: 0 }}>
+            {(["all", "90d", "30d"] as const).map((r) => (
+              <button
+                key={r}
+                className={trendRange === r ? "active" : ""}
+                onClick={() => setTrendRange(r)}
+              >
+                {tAnalytics(r === "all" ? "rangeAll" : r === "90d" ? "range90d" : "range30d")}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Overview tab */}
@@ -891,7 +913,7 @@ export default function CampaignDetailPage() {
               <LineChartIcon size={14} style={{ color: "var(--ink-400)" }} />
               {t("clicksTitle")}
               <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
-                {t("last30Days")}
+                {tAnalytics(trendRange === "all" ? "rangeAll" : trendRange === "90d" ? "range90d" : "range30d")}
               </span>
             </div>
             {rawLoading ? (
@@ -902,7 +924,7 @@ export default function CampaignDetailPage() {
               <ClicksChart data={computed.clicksByDay} />
             ) : (
               <div style={{ height: 300, display: "grid", placeItems: "center", fontSize: 13, color: "var(--ink-500)" }}>
-                {t("noClicks30d")}
+                {t("noClicksInRange")}
               </div>
             )}
           </div>
@@ -921,7 +943,7 @@ export default function CampaignDetailPage() {
               className="card"
               style={{ padding: 48, textAlign: "center", fontSize: 13, color: "var(--ink-500)" }}
             >
-              {t("noTraffic30d")}
+              {t("noClicksInRange")}
             </div>
           ) : (
             <>

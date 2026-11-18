@@ -7,7 +7,7 @@
  * so marketers can spot tracking gaps without paging through /links.
  *
  * Query params:
- *   - days: lookback window (default 30, max 90)
+ *   - days: lookback window (default 30, max 730 = "all time")
  *
  * Design notes:
  *   - Redis-cached 60s — campaign leaderboards don't need second-by-second
@@ -30,7 +30,8 @@ import { cached, cacheKey } from "@/lib/cache";
 import { classifyTrend, type TrendState } from "@/components/analytics/TrendCell";
 
 const DEFAULT_DAYS = 30;
-const MAX_DAYS = 90;
+// 730 so the "all time" preset covers past exhibition seasons.
+const MAX_DAYS = 730;
 const ORPHAN_LIMIT = 20;
 
 export async function GET(request: NextRequest) {

@@ -350,7 +350,9 @@
         "createLink": "建立帶有 UTM 的連結",
         "manageCampaigns": "管理行銷活動"
       }
-    }
+    },
+    "rangeAll": "全部期間",
+    "rangeBeforeWindow": "{date} 之前的資料不在讀取範圍內"
   },
   "share": {
     "title": "分享報表",
@@ -735,8 +737,11 @@
       "colLastClick": "最後點擊",
       "actionAnalytics": "數據分析",
       "actionEditSettings": "編輯連結設定",
-      "actionOpenShortUrl": "開啟短網址"
-    }
+      "actionOpenShortUrl": "開啟短網址",
+      "noClicksInRange": "這段期間沒有點擊"
+    },
+    "allTime": "全部期間",
+    "clicksAllTime": "點擊數（全部期間）"
   },
   "compare": {
     "title": "比較 {n} 個活動",
