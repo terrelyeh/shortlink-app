@@ -201,7 +201,8 @@
     "createdBy": "Created by",
     "destinationTooltip": "Open destination (without UTM) — full URL:",
     "abVariantsTooltip": "A/B test: traffic is split across {n} URLs, not only this one",
-    "mediumSource": "Medium / Source"
+    "mediumSource": "Medium / Source",
+    "viewAnalytics": "View analytics for this link"
   },
   "utm": {
     "title": "UTM Parameters",

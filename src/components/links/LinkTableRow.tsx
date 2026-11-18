@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
-import { QRCodeCanvas } from "qrcode.react";
 import {
   Copy,
   Check,
@@ -16,7 +15,6 @@ import {
   CopyPlus,
   TrendingUp,
   TrendingDown,
-  Download,
   CalendarClock,
   Globe2,
   FlaskConical,
@@ -26,6 +24,7 @@ import Link from "next/link";
 import { Badge, StatusDot } from "@/components/ui/Badge";
 import { useToast } from "@/components/ui/Toast";
 import { formatDestination } from "@/lib/utils/destination";
+import { QrCodePanel } from "./QrCodePanel";
 
 const LOGIN_WALL_TITLE = /\b(log ?in|sign ?in)\b|登入/i;
 
@@ -132,28 +131,6 @@ export function LinkTableRow({
     setShowMenu(false);
   };
 
-  const downloadQR = (format: "png" | "svg") => {
-    const canvas = document.getElementById(`qr-${link.id}`) as HTMLCanvasElement;
-    if (!canvas) return;
-    if (format === "png") {
-      const url = canvas.toDataURL("image/png");
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `qr-${link.code}.png`;
-      a.click();
-    } else {
-      const dataUrl = canvas.toDataURL("image/png");
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="white"/><image href="${dataUrl}" width="200" height="200"/></svg>`;
-      const blob = new Blob([svg], { type: "image/svg+xml" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `qr-${link.code}.svg`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-  };
-
   // Trend display
   const trendPct = link.trendPct ?? null;
   const hasTrend = trendPct !== null;
@@ -230,6 +207,15 @@ export function LinkTableRow({
                   ) : (
                     <Copy className="w-3 h-3 text-slate-400" />
                   )}
+                </button>
+                <button
+                  onClick={() => setShowQR((v) => !v)}
+                  className={`shrink-0 p-0.5 rounded transition-colors ${showQR ? "bg-sky-100 text-[#03A9F4]" : "text-slate-400 hover:bg-slate-100"}`}
+                  title={t("qrCode")}
+                  aria-label={t("qrCode")}
+                  aria-expanded={showQR}
+                >
+                  <QrCode className="w-3 h-3" />
                 </button>
               </div>
               {/* Destination on its own line so long short codes can't
@@ -365,9 +351,13 @@ export function LinkTableRow({
 
         {/* Clicks + 7d trend */}
         <td className="py-2 pr-3 text-right whitespace-nowrap">
-          <span className="text-[15px] font-medium text-slate-900 tabular-nums">
+          <Link
+            href={`/analytics?linkId=${link.id}`}
+            className="text-[15px] font-medium text-slate-900 tabular-nums hover:text-[#03A9F4] hover:underline underline-offset-2"
+            title={t("viewAnalytics")}
+          >
             {link._count.clicks.toLocaleString()}
-          </span>
+          </Link>
           {hasTrend && trendPct !== 0 && (
             <div className={`flex items-center justify-end gap-0.5 text-[11px] font-medium ${trendPct! > 0 ? "text-emerald-600" : "text-red-500"}`}>
               {trendPct! > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
@@ -466,44 +456,7 @@ export function LinkTableRow({
       {showQR && (
         <tr className="border-b border-slate-50 bg-slate-50/30">
           <td colSpan={9} className="px-4 py-4">
-            <div className="flex items-center gap-4">
-              <div className="p-2 bg-white rounded-lg border border-slate-200">
-                <QRCodeCanvas
-                  id={`qr-${link.id}`}
-                  value={shortUrl}
-                  size={96}
-                  level="H"
-                  fgColor="#0F172A"
-                  bgColor="#FFFFFF"
-                  marginSize={2}
-                  imageSettings={{
-                    src: "/icon.svg",
-                    x: undefined,
-                    y: undefined,
-                    height: 20,
-                    width: 20,
-                    excavate: true,
-                  }}
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => downloadQR("png")}
-                  className="inline-flex items-center gap-1.5 text-sm text-[#03A9F4] hover:text-[#0288D1] font-medium"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  {t("downloadPng")}
-                </button>
-                <span className="text-slate-300">|</span>
-                <button
-                  onClick={() => downloadQR("svg")}
-                  className="inline-flex items-center gap-1.5 text-sm text-[#03A9F4] hover:text-[#0288D1] font-medium"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  {t("downloadSvg")}
-                </button>
-              </div>
-            </div>
+            <QrCodePanel linkId={link.id} code={link.code} shortUrl={shortUrl} />
           </td>
         </tr>
       )}

@@ -201,7 +201,8 @@
     "createdBy": "建立者",
     "destinationTooltip": "開啟目的網址（不帶 UTM）— 完整網址：",
     "abVariantsTooltip": "A/B 測試：流量會分到 {n} 個網址，不只這一個",
-    "mediumSource": "媒介 / 來源"
+    "mediumSource": "媒介 / 來源",
+    "viewAnalytics": "查看這條連結的數據分析"
   },
   "utm": {
     "title": "UTM 參數",
