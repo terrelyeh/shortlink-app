@@ -914,9 +914,11 @@ export default function CampaignDetailPage() {
                       >
                         {reached ? t("goalReached") : t("goalPct", { pct: pct.toFixed(1) })}
                       </span>
-                      <span className="muted" style={{ fontSize: 11.5 }}>
-                        {t("clicksRemaining", { n: (goalClicks - totalClicks).toLocaleString() })}
-                      </span>
+                      {!reached && (
+                        <span className="muted" style={{ fontSize: 11.5 }}>
+                          {t("clicksRemaining", { n: (goalClicks - totalClicks).toLocaleString() })}
+                        </span>
+                      )}
                     </div>
                   </>
                 );

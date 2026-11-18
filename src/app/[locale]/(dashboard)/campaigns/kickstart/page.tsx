@@ -41,6 +41,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 interface PlanRow extends PlaybookChannel {
   include: boolean;
   title: string;
+  /** Optional per-row destination; blank = the shared landing URL. */
+  destinationUrl?: string;
 }
 
 interface RowResult {
@@ -253,10 +255,18 @@ export default function KickstartPage() {
     (r) => !r.utmSource.trim() || !r.utmMedium.trim() || !r.utmContent.trim(),
   );
 
+  // Exhibition QR posters often point at different pages (LinkedIn,
+  // Calendly, product page), so a row may carry its own destination. The
+  // shared landing URL is only required for rows that don't.
+  const rowUrl = (r: PlanRow) => r.destinationUrl?.trim() || landingUrl.trim();
+  const hasBadRowUrl = includedRows.some(
+    (r) => Boolean(r.destinationUrl?.trim()) && !/^https?:\/\//i.test(r.destinationUrl!.trim()),
+  );
   const canCreate =
     Boolean(selected) &&
     canonicalCampaign.length >= 3 &&
-    /^https?:\/\//i.test(landingUrl.trim()) &&
+    includedRows.every((r) => /^https?:\/\//i.test(rowUrl(r))) &&
+    !hasBadRowUrl &&
     includedRows.length > 0 &&
     !hasIncompleteRow &&
     !creating;
@@ -272,7 +282,7 @@ export default function KickstartPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            originalUrl: landingUrl.trim(),
+            originalUrl: rowUrl(row),
             title: row.title,
             utmSource: row.utmSource,
             utmMedium: row.utmMedium,
@@ -664,6 +674,24 @@ export default function KickstartPage() {
                           }}
                           disabled={!row.include}
                         />
+                        <input
+                          type="url"
+                          value={row.destinationUrl ?? ""}
+                          onChange={(e) =>
+                            updateRow(row.id, { destinationUrl: e.target.value })
+                          }
+                          placeholder={t("kickstartRowUrlPlaceholder")}
+                          className="input"
+                          style={{
+                            width: "100%",
+                            fontSize: 12,
+                            padding: "3px 8px",
+                            height: 26,
+                            marginTop: 4,
+                            fontFamily: "var(--font-mono)",
+                          }}
+                          disabled={!row.include}
+                        />
                         {localizedHint && !existingCode && (
                           <div
                             style={{
@@ -800,7 +828,9 @@ export default function KickstartPage() {
                     })
                   : hasIncompleteRow
                     ? t("kickstartSubmitIncompleteRow")
-                    : t("kickstartSubmitNeedFields")}
+                    : hasBadRowUrl
+                      ? t("kickstartSubmitBadRowUrl")
+                      : t("kickstartSubmitNeedFields")}
               </div>
               <button
                 className="btn btn-primary"

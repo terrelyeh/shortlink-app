@@ -179,6 +179,25 @@ const EXHIBITION_EVENT: Playbook = {
       utmMedium: "social",
       utmContent: "booth_tease",
     },
+    // On-site QR codes — how this team actually drives booth traffic
+    // (posters / standees pointing at LinkedIn, Calendly, product pages).
+    // Each usually has its own destination: set it per row in the wizard.
+    {
+      id: "qr_booth_poster",
+      label: "QR — Booth poster",
+      utmSource: "poster",
+      utmMedium: "qr",
+      utmContent: "booth_poster",
+      hint: "Set this row's own destination if the poster points elsewhere",
+    },
+    {
+      id: "qr_flyer",
+      label: "QR — Flyer / DM",
+      utmSource: "flyer",
+      utmMedium: "qr",
+      utmContent: "flyer",
+      defaultInclude: false,
+    },
     {
       id: "pr_event",
       label: "PR release",

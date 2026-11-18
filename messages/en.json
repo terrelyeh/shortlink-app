@@ -213,7 +213,14 @@
     "batchDeleteDialogTitle": "Delete {n} links?",
     "deleteDialogDesc": "The short URL stops working right away and the link moves to Trash. You can restore it from Trash at any time — settings and click history are kept.",
     "deletedToTrash": "Moved to Trash. You can restore it from the Trash page.",
-    "batchDeletedToTrash": "{n} links moved to Trash."
+    "batchDeletedToTrash": "{n} links moved to Trash.",
+    "moreCreateOptions": "More ways to create",
+    "createMenuBatch": "Batch create",
+    "createMenuBatchDesc": "Same destination, many variants (e.g. one link per KOL or post)",
+    "createMenuCsv": "Import CSV",
+    "createMenuCsvDesc": "Each row its own destination and UTM — dozens of links at once",
+    "createMenuKickstart": "Campaign kickstart",
+    "createMenuKickstartDesc": "Exhibition or product launch: a full set of channel links in one go"
   },
   "utm": {
     "title": "UTM Parameters",
@@ -615,6 +622,14 @@
           "google_ads_event": {
             "label": "Google Ads",
             "hint": ""
+          },
+          "qr_booth_poster": {
+            "label": "QR — Booth poster",
+            "hint": "Set this row's own destination if the poster points elsewhere"
+          },
+          "qr_flyer": {
+            "label": "QR — Flyer / DM",
+            "hint": ""
           }
         }
       }
@@ -769,7 +784,9 @@
       "noClicksInRange": "No clicks in this period"
     },
     "allTime": "All time",
-    "clicksAllTime": "Clicks (all time)"
+    "clicksAllTime": "Clicks (all time)",
+    "kickstartRowUrlPlaceholder": "Destination (blank = default landing URL above)",
+    "kickstartSubmitBadRowUrl": "A row's destination must start with http(s)://"
   },
   "compare": {
     "title": "Compare {n} campaigns",

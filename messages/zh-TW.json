@@ -213,7 +213,14 @@
     "batchDeleteDialogTitle": "刪除 {n} 條連結？",
     "deleteDialogDesc": "短網址會立即停止運作，連結移到垃圾桶。之後可以隨時從垃圾桶還原，設定與點擊紀錄都會保留。",
     "deletedToTrash": "已移到垃圾桶，可從垃圾桶頁還原。",
-    "batchDeletedToTrash": "{n} 條連結已移到垃圾桶。"
+    "batchDeletedToTrash": "{n} 條連結已移到垃圾桶。",
+    "moreCreateOptions": "更多建立方式",
+    "createMenuBatch": "批次建立",
+    "createMenuBatchDesc": "同一個目的網址、多個版本（例如每位 KOL、每則貼文一條）",
+    "createMenuCsv": "CSV 匯入",
+    "createMenuCsvDesc": "每一列各自的目的網址與 UTM，一次建幾十條",
+    "createMenuKickstart": "活動啟動器",
+    "createMenuKickstartDesc": "展會、新品發表：一次建好整套通路連結"
   },
   "utm": {
     "title": "UTM 參數",
@@ -615,6 +622,14 @@
           "google_ads_event": {
             "label": "Google Ads",
             "hint": ""
+          },
+          "qr_booth_poster": {
+            "label": "QR — 展攤海報",
+            "hint": "海報導向別的網址時，在這一列填它自己的目的網址"
+          },
+          "qr_flyer": {
+            "label": "QR — 傳單 / DM",
+            "hint": ""
           }
         }
       }
@@ -769,7 +784,9 @@
       "noClicksInRange": "這段期間沒有點擊"
     },
     "allTime": "全部期間",
-    "clicksAllTime": "點擊數（全部期間）"
+    "clicksAllTime": "點擊數（全部期間）",
+    "kickstartRowUrlPlaceholder": "目的網址（留空 = 用上方的預設網址）",
+    "kickstartSubmitBadRowUrl": "有一列的目的網址不是 http(s):// 開頭"
   },
   "compare": {
     "title": "比較 {n} 個活動",
