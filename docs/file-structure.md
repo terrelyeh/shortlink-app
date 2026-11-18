@@ -66,7 +66,8 @@ src/
 │   ├── links/
 │   │   ├── LinkTableRow.tsx        # 桌面表格列（含 OG 縮圖 + schedule/geo badges）
 │   │   ├── LinkMobileCard.tsx      # ≤768px 用的 card 版本（useMediaQuery 切換）
-│   │   └── SocialPreviewSection.tsx # 編輯頁的社群分享預覽覆寫 + 卡片預覽
+│   │   ├── SocialPreviewSection.tsx # 編輯頁的社群分享預覽覆寫 + 卡片預覽
+│   │   └── QrCodePanel.tsx         # QR 預覽 + 高解析下載（列表 / 手機卡片 / 建立成功頁共用）
 │   ├── providers/Providers.tsx     # SessionProvider + QueryClientProvider + WorkspaceProvider + Toast
 │   │                               # （注意：dashboard 之外的頁要自己包 SessionProvider）
 │   └── ...
@@ -83,6 +84,10 @@ src/
 │   ├── hooks/useMediaQuery.ts      # SSR-safe matchMedia hook（mobile 切換用）
 │   ├── og-scraper.ts utm-governance.ts variants.ts campaign-autolink.ts
 │   ├── social-preview.ts           # 預覽爬蟲判斷 + 自訂 og:* HTML（/s/[code] 用）
+│   ├── qr-export.ts                # 1024px PNG / 向量 SVG QR 下載（qrcode 套件）
+│   ├── share-period.ts             # 分享報告期間格式（all / 固定日期 / 舊滾動值）
+│   ├── link-creators.ts            # createdById → 建立者名字（無 relation，批次查）
+│   ├── utils/destination.ts        # 列表顯示用的目的網址（去 UTM、只允許 http(s) href）
 │   ├── campaign-playbooks.ts       # Kickstart wizard 的 playbook 定義（Product Launch / Exhibition）
 │   └── utils/{utm,shortcode,format}.ts
 ├── messages/{en,zh-TW}.json        # 雙語文件；每新增使用者可見字串就兩邊都要加

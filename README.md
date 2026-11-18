@@ -8,17 +8,18 @@
 
 | 功能 | 說明 |
 |------|------|
-| **短網址管理** | 建立、編輯、刪除短連結，支援自訂代碼或自動生成 7 位 Base62 代碼 |
+| **短網址管理** | 建立、編輯、刪除短連結，支援自訂代碼或自動生成 7 位 Base62 代碼。建立成功後直接顯示短網址 + QR，可「再建一條（保留 UTM 與標籤）」；從活動頁 / 模板頁進來會自動帶入活動或模板 |
+| **連結列表** | 第一欄「標題 / 短碼 → 目的網址（不含 UTM）」一眼對應；建立者欄與建立者篩選；短碼旁複製與 QR；點擊數直接連到該連結的分析；⋮ 欄固定在右側 |
 | **UTM 參數建構器** | 內建 UTM 參數編輯器，預設常用來源（Facebook、Instagram、Google Ads 等）；Campaign 欄位是自訂 combobox — 輸入時下拉既有活動，找不到符合的就可以「➕ 建立新活動 'xxx'」inline 直接建立 |
 | **UTM 白名單 Governance** | Workspace 層級設定核准的 source / medium；違反時伺服器拒絕 + UI 即時警告 |
-| **UTM 模板系統** | 儲存常用 UTM 組合為模板（通路級預設，如「EDM 週報」「FB 付費廣告」）；快速套用到新連結。**不綁定 campaign** — 同一個模板可橫跨多個活動 |
+| **UTM 模板（選用）** | 儲存常用 UTM 組合為模板（通路級預設，如「EDM 週報」「FB 付費廣告」）；快速套用到新連結。**不綁定 campaign** — 同一個模板可橫跨多個活動。非必要，側欄放在下方「設定」旁 |
 | **批次建立（固定 URL + 多 content）** | 一次建立多個短網址變體（如多位 KOL 的追蹤連結） |
 | **CSV 匯入批次建立** | 每 row 獨立 URL / UTM / tags / 排程 / 地區限制，上限 500 row |
-| **活動啟動器 Kickstart** | `/campaigns/kickstart` 選 playbook（Product Launch / Exhibition Event）→ 一鍵展開 8–10 個頻道的追蹤連結；偵測到既有活動時自動切擴充模式只建缺的，避免重複 |
+| **活動啟動器 Kickstart** | `/campaigns/kickstart` 選 playbook（Product Launch / Exhibition Event）→ 一鍵展開 8–12 個頻道的追蹤連結；展會範本含 QR 海報 / 傳單通路，每一列可填自己的目的網址；偵測到既有活動時自動切擴充模式只建缺的，避免重複。`/links` 的「建立新連結 ▾」選單可進入批次建立 / CSV 匯入 / 活動啟動器 |
 | **社群分享預覽覆寫** | 編輯頁可自訂分享到 FB / LINE / LinkedIn / Threads 時的標題、描述、圖片；`/s/[code]` 對預覽爬蟲回一頁帶自訂 `og:*` 的 HTML，真人照常轉址。留空欄位沿用目的頁原本的 OG |
 | **垃圾桶與還原** | 刪除的連結進 `/links/trash`，建立者或 workspace OWNER/ADMIN 可一鍵還原，短網址與點擊紀錄不變 |
 | **OG 縮圖自動抓取** | 建連結後背景抓目標頁的 `og:image` / `og:title` 作為預覽縮圖 |
-| **QR Code 產生** | 自動為每個短網址產生 QR Code，支援 PNG 下載與複製到剪貼簿 |
+| **QR Code 產生** | 每個短網址都有 QR Code（中央品牌 logo）；下載 1024px PNG 或真向量 SVG，檔名用連結標題。列表短碼旁、建立成功畫面、手機卡片都能直接取得 |
 | **連結分組與標籤** | 使用群組和標籤整理連結，支援多標籤篩選 |
 | **連結複製** | 一鍵複製既有連結設定，快速建立變體 |
 | **A/B 多目的地** | 單一短網址可設定 2–4 個目的 URL + 權重，後端加權隨機分流，`Click.variantId` 記錄每次走哪條 |
@@ -33,9 +34,9 @@
 | **Campaign 自動綁定** | 建連結時填 `utm_campaign` 自動建 Campaign row；填同名就綁同一個 — 使用者不用額外「建 Campaign」 |
 | **活動狀態生命週期** | Draft → Active → Completed → Archived 四階段管理 |
 | **KPI 目標追蹤** | 每個 Campaign 可設 `goalClicks` 目標，Detail 頁顯示進度條 + 達標慶祝 |
-| **活動排行榜** | Campaigns 列表顯示每個活動的 clicks / 7 天趨勢（sparkline + ±%）/ 最後活動時間 / goal 達成率，可排序 |
+| **活動排行榜** | Campaigns 列表顯示每個活動的 clicks / 7 天趨勢（sparkline + ±%）/ 最後活動時間 / goal 達成率，可排序；期間可選 7 / 30 / 90 天或全部期間 |
 | **多 Campaign 比較** | 列表勾選 2-4 個 → 上方顯示 daily clicks overlay 折線；進 `/campaigns/compare` 看 side-by-side 深度比較（winner cards + 每活動 top source/medium/link） |
-| **Campaign Detail 三 tabs** | Overview（KPI + 30d 趨勢）/ Traffic（來源/裝置/地區拆解）/ Links（活動內每條連結 + 獨立訪客數 + 佔比 + 7 天趨勢 + 最後點擊） |
+| **Campaign Detail 三 tabs** | Overview（目標 + 趨勢）/ Traffic（來源/裝置/地區拆解）/ Links（活動內每條連結 + 獨立訪客數 + 佔比 + 7 天趨勢 + 最後點擊）；趨勢與流量可切全部期間 / 90 / 30 天（預設全部期間）；頁首可直接「新增連結」（帶入活動）與「分享報告」 |
 | **活動標籤** | 為活動加上標籤分類，方便搜尋篩選 |
 | **跨頁面 Campaign 篩選** | 在連結、分析頁面皆可依 Campaign 篩選 |
 | **Orphan Links 提醒** | Campaigns 頁自動列出沒綁 Campaign 的連結（含目的網址 + 最後點擊時間），一鍵跳去補綁 |
@@ -48,7 +49,7 @@
 | **測試點擊排除** | 團隊自己測連結的點擊可標記為「測試」而非刪除，分析預設排除、可隨時切回來看；活動層級可一鍵軟重設，同一批能整批還原 |
 | **轉換追蹤 (Conversion Tracking)** | Landing page 放一段 snippet（`/track.js`）或後端 webhook 呼叫 `/api/track`，透過 session token 歸因回來源連結；支援 event name / value / currency / externalId（idempotency） |
 | **CVR 顯示** | 連結列表 / Campaign 列表 / Compare 頁都自動算 CVR；超過 0 才顯示，避免雜訊 |
-| **趨勢圖表** | 視覺化呈現點擊數據（支援 24h / 7d / 30d / 90d / 自訂範圍） |
+| **趨勢圖表** | 視覺化呈現點擊數據（支援 24h / 7d / 30d / 90d / 全部期間 / 自訂範圍；分析資料保留約兩年） |
 | **來源分析** | 追蹤流量來源（Referrer） |
 | **裝置分析** | Mobile / Tablet / Desktop 分佈 |
 | **瀏覽器分析** | Chrome / Safari / Firefox 等統計 |
@@ -60,7 +61,7 @@
 | **城市排行** | 點擊數前 15 名城市（GeoIP 解析，準確度依地區而異） |
 | **UTM 維度分析** | Campaign / Source / Medium / Content 交叉分析 |
 | **Campaign 篩選分析** | 選擇特定 Campaign 後，所有圖表與統計自動聚焦該活動 |
-| **匯出 CSV** | 三種匯出：連結清單、點擊原始數據、活動報表（跨活動比較 / 每日長表「日期 × 連結」/ 單一活動的連結明細）。每日長表是 tidy 格式，可直接丟進樞紐分析或 Looker Studio |
+| **匯出 CSV** | 三種匯出：連結清單（含建立者）、點擊原始數據（照分析頁目前的期間 / 活動 / 標籤 / 連結篩選，附 UTM 欄）、活動報表（跨活動比較 / 每日長表「日期 × 連結」/ 單一活動的連結明細）。每日長表是 tidy 格式，可直接丟進樞紐分析或 Looker Studio |
 
 ### 團隊協作
 
@@ -70,7 +71,7 @@
 | **工作區角色** | Owner / Admin / Member / Viewer 四級。OWNER/ADMIN 可管成員 + 跨人編輯任何資料；MEMBER/VIEWER 只能改自己建的，但都看得到工作區全員資料 |
 | **成員邀請（Targeted Invite Link）** | 不寄 email — 產生帶 token 的連結，自己貼 Slack/Email 給對方；對方 Google 登入後 hook 自動加入工作區。連結 7 天到期，UI 留著過期記錄 + 一鍵重發 |
 | **Campaign 刪除模式** | 「只刪 Campaign」連結保留可用；「刪除並停用所有連結」連結同步 PAUSED — 給整批清測試專案用 |
-| **共享報告** | 產生公開分享連結，支援密碼保護、到期時間、最大瀏覽次數；scope 可選單一連結 / 整個 Campaign / 工作區某時段 |
+| **共享報告** | 產生公開分享連結，支援密碼保護、到期時間、最大瀏覽次數；scope 可選單一連結 / 整個 Campaign / 整個工作區。報告固定在產生當下的日期範圍（或全部期間），只算真實流量，含通路表現與連結排行，預設中文可切英文 |
 | **審計日誌** | 記錄所有操作（建立、更新、刪除、分享、邀請成員等） |
 
 ### 其他特色

@@ -1,6 +1,6 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-11-18 — 對標商用工具 PicSee 後上線「社群分享預覽覆寫」與「垃圾桶還原」（PR #65）
+> Last updated: 2026-11-18 — PR #65–#68：社群預覽覆寫、垃圾桶、列表建立者欄、UX 審查三批改善（全部期間 / 可印刷 QR / 建立流程 / 分享報告固定日期）、側欄精簡
 
 ## Project Overview
 
@@ -53,9 +53,11 @@
 13. **CSV 匯出** — links / analytics / campaigns 三個 endpoint 共用 `csvResponse()`
 14. **Analytics 進階指標** — 點擊衰減曲線 / 7×24 熱度圖（用 viewer 時區）/ 城市排行
 15. **社群分享預覽覆寫** — `ShortLink.ogOverride{Title,Description,Image}`（全 nullable，只在編輯頁設定）。`/s/[code]` 在「有覆寫值 **且** `isPreviewCrawler(ua)`」時回 200 HTML（自訂 `og:*` + meta refresh，`private, no-store`），**不轉址也不記點擊**。邏輯在 `lib/social-preview.ts`；空欄位 fallback 到爬到的 `og*` → `title`。分支刻意放在 geo 檢查**之前**（FB/LINE 從美國機房抓）
+16. **垃圾桶** — `/links/trash` + `GET /api/links/trash`（上限 200、不走 Redis）+ `POST /api/links/[id]/restore`（`canUserActOnResource`、寫 `RESTORE_LINK`）。query key `["links-trash"]`，LinksClient 的刪除會 invalidate 它
 17. **分享報告期間** — `ShareToken.rangeWindow` 存 `all` / `YYYY-MM-DD..YYYY-MM-DD`（台灣時間、含頭尾）/ 舊的 `7d` 等滾動值，解析全在 `lib/share-period.ts`。UI 一律產生固定日期（滾動視窗會讓主管隔週打開數字變了）。報告排除 `isInternal` 點擊
 18. **QR 下載** — 一律走 `lib/qr-export.ts`（`qrcode` 套件現場產 1024px PNG / 真向量 SVG + 中央 logo），不要從畫面上的小 canvas `toDataURL`
-16. **垃圾桶** — `/links/trash` + `GET /api/links/trash`（上限 200、不走 Redis）+ `POST /api/links/[id]/restore`（`canUserActOnResource`、寫 `RESTORE_LINK`）。query key `["links-trash"]`，LinksClient 的刪除會 invalidate 它
+19. **列表建立者** — `ShortLink.createdById` **沒有 Prisma relation**，`lib/link-creators.ts` 用一次 `user.findMany` 批次查名字，`/api/links`（Redis key `links-list-v3`）與 `/api/export/links` 共用。要在別處顯示建立者就用它，別每列各查一次
+20. **建立連結流程** — `/links/new` 是 server page，讀 `?utmCampaign=` / `?template=`（模板依 workspace 成員資格查）後把 `prefill` 傳給 `CreateLinkForm`；建立成功**留在原頁**顯示短網址 + QR，不再 redirect 回 `/links`。其他入口（活動頁「新增連結」、模板頁「使用」）都靠這兩個參數
 
 ## Conventions
 
@@ -123,7 +125,15 @@ Prisma schema 用 camelCase（`userId`），但 DB 欄位名是 snake_case（`us
 
 ### 🔜 Next Steps / Pending
 
-- **PR #65 兩個畫面待使用者實測** — 轉址邏輯已在本機連正式 DB 驗過，但編輯頁「社群分享預覽」區塊與 `/links/trash` 需要登入，尚未有人實際點過。建議順手給 `KLVbR43`（Computex 海報 LinkedIn QR）設覆寫 — 它爬到的預覽是「LinkedIn Login, Sign in」
+- **需要登入的流程還沒人在正式環境實測**（畫面已用 harness 驗過，見 Pitfall #31）：編輯頁「社群分享預覽」、`/links/trash` 還原、建立分享連結（活動頁 / 分析頁）並用無痕開、分析匯出 CSV 內容是否只含篩選範圍。另外：舊的滾動期間分享 token（`7d` 等）理論相容但沒拿真 token 測過。建議給 `KLVbR43`（Computex 海報 LinkedIn QR）設預覽覆寫 — 它爬到的是「LinkedIn Login, Sign in」
+- **UX 審查剩餘項目**（2026-11-18 審查，高影響已全做）：
+  - Batch create 的活動欄是自由輸入（應改用 `CampaignCombobox`，打錯會多出新活動）
+  - 編輯存檔後 `/links` 篩選全被重設（篩選只有 campaign 進 URL；可同步到 URL + `router.back()`）
+  - 列表搜尋只比對短碼 / 網址 / 標題，找不到 UTM 欄位與標籤
+  - 社群預覽區塊可加「開 Facebook Sharing Debugger / LinkedIn Post Inspector」按鈕（帶短網址）
+  - 301 選項沒警語（瀏覽器會快取，之後改目的地不生效、重複點擊不記錄）
+  - 登入首頁：沒活動時的空白頁沒引導、「孤兒連結」用詞
+  - 刪除後 toast 想加「復原」，但 `components/ui/Toast` 不支援 action，要先擴充
 - **對標 PicSee 的後續候選（先確認需求再做）**：
   - 轉址前掛 Meta Pixel / GTM（再行銷受眾）— 要先問行銷端有沒有在投 FB/Google 廣告；會多一層中介頁 ~300–500ms，要做成每條連結可選
   - Workspace API key + 建連結 endpoint → 之後 Chrome 擴充 / Google Sheets 都只是薄殼
@@ -144,7 +154,7 @@ Prisma schema 用 camelCase（`userId`），但 DB 欄位名是 snake_case（`us
     - `IP_HASH_SALT` — 傾向不動，見下
   - ⚠️ **`IP_HASH_SALT` 若外洩要特別處理** — salt 一旦已知，4,000+ 筆 `Click.ipHash` 就能被反推回真實 IP（IPv4 只有 2^32），等於「匿名點擊紀錄」變成「可識別個人的瀏覽紀錄」。輪替 salt 會讓新舊 hash 對不起來，要接受去重統計斷一次
   - 💡 **輪替 `AUTH_SECRET` 的最佳時機是「剛清空 session 之後」** — 它簽章 session cookie，平常換會把所有人踢出去；session 已經是空的時候換，額外成本為零
-- **i18n 末端 spot-check** — LinksClient（PageHeader 標題、toast、Import CSV / Batch create 按鈕）/ CreateLinkForm / LinkTableRow / LinkMobileCard / 編輯頁 A/B variants 區塊仍有硬編碼英文；`analytics/page.tsx` 的 `"click volume and uniques"` 也是
+- **i18n 末端 spot-check** — 仍有硬編碼英文：LinksClient（PageHeader 標題「Link Management」、`N of N links`、批次操作 toast）、LinkTableRow / LinkMobileCard 的 Scheduled / regions badge、編輯頁 A/B variants 區塊、`analytics/page.tsx` 的「Share report」按鈕（**操作指南照畫面寫 Share report，改中文時手冊要一起改**）與 `"click volume and uniques"`、Tag 篩選的「All Tags」
 - **行動裝置 card view 擴展** — 目前只有 `/links` 有手機 card view。Campaign Leaderboard / Campaign Detail Links tab 還是橫向 scroll
 - **Mobile-only：edit link 表單 + Kickstart wizard** — 表格 + A/B variant editor 在手機操作彆扭，建議走桌面
 - **Observability** — Prod 只有 `console.error`。建議 Sentry / OpenTelemetry
@@ -254,12 +264,14 @@ Prisma datasource 需 `directUrl` 才能讓 `db push` 繞過 pgbouncer — schem
 
 30. **PR 預覽部署不能拿來實測** — Vercel 的 `DATABASE_URL` 等變數只設在 **Production** scope，預覽環境連不到 DB；而且預覽網址有 Vercel SSO 保護，curl 會被 302 到登入頁。要驗證轉址類邏輯就在 worktree 跑 `next dev`（暫時複製主資料夾 `.env`，用完刪掉）——**注意它連的是正式 DB**：要改資料就挑一條連結、測完立刻還原；真人 UA 的測試請求加 `?_test=1`，點擊會標成 isInternal。
 
+31. **要看需要登入的畫面：本機 harness + mock API，不要動正式 Session** — dashboard 頁的 server layout 會 `auth()` 擋掉，Google OAuth 也無法自動登入。做法：在 worktree 暫建 `src/app/[locale]/zz-preview/page.tsx`，用 `<Providers session={假 session}>` 包要看的 client 元件（`LinksClient`、`campaigns/[name]/page` 的 default export…），`next dev` 起來後用 `playwright-cli run-code` 的 `page.route('**/api/**')` 回 mock JSON（資料可用唯讀 prisma script 從正式 DB 匯出到 scratchpad）。**harness 目錄絕不能 commit**；刪掉後也要 `rm -rf .next`，不然 `tsc` 會因 `.next/dev/types` 殘留報錯。下載類功能可用 `page.waitForEvent('download')` 取檔，QR 可在頁面裡用 `BarcodeDetector` 解碼驗證
+
 
 ## 詳細文件
 
 | 文件 | 內容 |
 |---|---|
-| [`docs/architecture.md`](docs/architecture.md) | 14 節架構與資料流完整說明（快取策略、權限模型、歸因、匯出…） |
+| [`docs/architecture.md`](docs/architecture.md) | 14 節架構與資料流完整說明（快取策略、權限模型、歸因、匯出…）；#15 之後的新項目目前只寫在本檔 Architecture 摘要 |
 | [`docs/file-structure.md`](docs/file-structure.md) | 完整檔案樹與各目錄職責 |
 | [`README.md`](README.md) | 功能清單、快速開始、部署指南（給人看的） |
 | [`docs/env-setup-guide.md`](docs/env-setup-guide.md) | 環境變數逐項設定說明 |
