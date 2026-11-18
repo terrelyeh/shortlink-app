@@ -126,6 +126,7 @@ Prisma schema 用 camelCase（`userId`），但 DB 欄位名是 snake_case（`us
 ### 🔜 Next Steps / Pending
 
 - **需要登入的流程還沒人在正式環境實測**（畫面已用 harness 驗過，見 Pitfall #31）：編輯頁「社群分享預覽」、`/links/trash` 還原、建立分享連結（活動頁 / 分析頁）並用無痕開、分析匯出 CSV 內容是否只含篩選範圍。另外：舊的滾動期間分享 token（`7d` 等）理論相容但沒拿真 token 測過。建議給 `KLVbR43`（Computex 海報 LinkedIn QR）設預覽覆寫 — 它爬到的是「LinkedIn Login, Sign in」
+- **活動規劃 skill → 未來併入活動啟動器** — `skills/campaign-link-planner/` 是給行銷同事用的跨 agent skill（Claude.ai / Claude Code / Codex / Hermes），問答後產出 CSV 匯入檔 + Markdown 成效衡量計畫，涵蓋新品上市 / 展會 / 電商促銷（Amazon Attribution）與多市場多語系。**它的 references/ 就是將來擴充 `/campaigns/kickstart` 的規格書**：補電商促銷範本、「市場」欄一次展開多國、排程生效 / 自訂短碼 / 標籤、建立後在活動頁產生衡量計畫分頁。改匯入格式（`api/links/batch-csv`）或 UTM 清單（`lib/utils/utm.ts`）時，要同步改 skill 的 `references/csv-format.md`、`utm-rules.md` 與 `scripts/validate_links_csv.py`。分享用 zip 用 `cd skills && zip -r campaign-link-planner.zip campaign-link-planner` 產生
 - **UX 審查剩餘項目**（2026-11-18 審查，高影響已全做）：
   - Batch create 的活動欄是自由輸入（應改用 `CampaignCombobox`，打錯會多出新活動）
   - 編輯存檔後 `/links` 篩選全被重設（篩選只有 campaign 進 URL；可同步到 URL + `router.back()`）
