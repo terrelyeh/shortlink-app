@@ -218,6 +218,15 @@ model ShortLink {
   ogDescription String? @map("og_description") @db.Text
   ogFetchedAt   DateTime? @map("og_fetched_at")
 
+  // Social-preview override, set by marketers on the edit page. When any
+  // of these is set, link-preview crawlers (Facebook, LINE, LinkedIn…)
+  // get a small HTML page with these og:* tags instead of the redirect,
+  // so the shared card shows our copy instead of the destination's.
+  // Each field falls back to the scraped og* value above when empty.
+  ogOverrideTitle       String? @map("og_override_title")
+  ogOverrideDescription String? @map("og_override_description") @db.Text
+  ogOverrideImage       String? @map("og_override_image") @db.Text
+
   // Metadata (optional for migration, will be required after data migration)
   workspaceId String?  @map("workspace_id")
   createdById String?  @map("created_by_id") // User who created the link

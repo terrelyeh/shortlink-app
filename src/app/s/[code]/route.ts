@@ -9,6 +9,7 @@ import { allowRedirect } from "@/lib/ratelimit";
 import { cacheEnabled, cacheSetIfAbsent } from "@/lib/cache";
 import { appendSessionParam, parseVariants, pickVariant } from "@/lib/variants";
 import { auth } from "@/lib/auth";
+import { hasPreviewOverride, isPreviewCrawler, renderPreviewHtml } from "@/lib/social-preview";
 
 // Query param that flags a click as internal pre-launch testing. Stripped
 // before the redirect so it doesn't leak into the destination URL or
@@ -149,6 +150,26 @@ export async function GET(
 
     // Extract data before after() — headers are not available inside after()
     const userAgent = headersList.get("user-agent");
+
+    // Social-preview override: answer link-preview crawlers with our own
+    // og:* tags instead of redirecting. Sits before the geo check on
+    // purpose — Facebook/LINE crawl from US data centres, so a TW-only
+    // link would otherwise show a "geo blocked" card. Crawlers are bots,
+    // so no click is recorded (same as the redirect path).
+    if (hasPreviewOverride(shortLink) && isPreviewCrawler(userAgent)) {
+      const shortBase = (process.env.NEXT_PUBLIC_SHORT_URL || new URL(request.url).origin + "/s")
+        .replace(/\/$/, "");
+      return new NextResponse(renderPreviewHtml(shortLink, `${shortBase}/${code}`), {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          // Varies by User-Agent — never let a shared cache hand this
+          // page to a human or the redirect to a crawler.
+          "Cache-Control": "private, no-store",
+          "X-Robots-Tag": "noindex",
+        },
+      });
+    }
     const referrer = headersList.get("referer") || headersList.get("referrer");
     const geo = getGeoFromHeaders(headersList);
 

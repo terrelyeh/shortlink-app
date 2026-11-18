@@ -51,6 +51,7 @@ export interface LinkMobileCardProps {
     clicksLast7d?: number;
     trendPct?: number | null;
     ogImage?: string | null;
+    ogOverrideImage?: string | null;
     ogTitle?: string | null;
     _count: { clicks: number; conversions?: number };
     tags?: LinkTag[];
@@ -161,10 +162,10 @@ export function LinkMobileCard({
           )}
         </button>
 
-        {link.ogImage ? (
+        {(link.ogOverrideImage || link.ogImage) ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={link.ogImage}
+            src={(link.ogOverrideImage || link.ogImage)!}
             alt=""
             loading="lazy"
             referrerPolicy="no-referrer"

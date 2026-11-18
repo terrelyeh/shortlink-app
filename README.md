@@ -15,6 +15,8 @@
 | **批次建立（固定 URL + 多 content）** | 一次建立多個短網址變體（如多位 KOL 的追蹤連結） |
 | **CSV 匯入批次建立** | 每 row 獨立 URL / UTM / tags / 排程 / 地區限制，上限 500 row |
 | **活動啟動器 Kickstart** | `/campaigns/kickstart` 選 playbook（Product Launch / Exhibition Event）→ 一鍵展開 8–10 個頻道的追蹤連結；偵測到既有活動時自動切擴充模式只建缺的，避免重複 |
+| **社群分享預覽覆寫** | 編輯頁可自訂分享到 FB / LINE / LinkedIn / Threads 時的標題、描述、圖片；`/s/[code]` 對預覽爬蟲回一頁帶自訂 `og:*` 的 HTML，真人照常轉址。留空欄位沿用目的頁原本的 OG |
+| **垃圾桶與還原** | 刪除的連結進 `/links/trash`，建立者或 workspace OWNER/ADMIN 可一鍵還原，短網址與點擊紀錄不變 |
 | **OG 縮圖自動抓取** | 建連結後背景抓目標頁的 `og:image` / `og:title` 作為預覽縮圖 |
 | **QR Code 產生** | 自動為每個短網址產生 QR Code，支援 PNG 下載與複製到剪貼簿 |
 | **連結分組與標籤** | 使用群組和標籤整理連結，支援多標籤篩選 |

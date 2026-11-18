@@ -45,6 +45,7 @@ interface LinkTableRowProps {
     clicksLast7d?: number;
     trendPct?: number | null;
     ogImage?: string | null;
+    ogOverrideImage?: string | null;
     ogTitle?: string | null;
     _count: { clicks: number; conversions?: number };
     tags?: LinkTag[];
@@ -168,10 +169,10 @@ export function LinkTableRow({
                 the scrape failed / hasn't run yet. Plain <img> (not
                 next/image) avoids needing every destination domain in
                 next.config's remotePatterns list. */}
-            {link.ogImage ? (
+            {(link.ogOverrideImage || link.ogImage) ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={link.ogImage}
+                src={(link.ogOverrideImage || link.ogImage)!}
                 alt=""
                 loading="lazy"
                 referrerPolicy="no-referrer"

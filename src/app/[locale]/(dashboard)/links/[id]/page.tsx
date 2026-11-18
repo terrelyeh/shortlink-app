@@ -29,6 +29,7 @@ import {
   ExternalLink,
   FlaskConical,
 } from "lucide-react";
+import { SocialPreviewSection } from "@/components/links/SocialPreviewSection";
 import Link from "next/link";
 
 interface TagOption {
@@ -64,6 +65,12 @@ interface LinkData {
   createdAt: string;
   _count: { clicks: number };
   tags: { tag: TagOption }[];
+  ogTitle?: string | null;
+  ogDescription?: string | null;
+  ogImage?: string | null;
+  ogOverrideTitle?: string | null;
+  ogOverrideDescription?: string | null;
+  ogOverrideImage?: string | null;
 }
 
 export default function EditLinkPage() {
@@ -99,6 +106,9 @@ export default function EditLinkPage() {
   const [utmContent, setUtmContent] = useState("");
   const [utmTerm, setUtmTerm] = useState("");
   const [selectedTags, setSelectedTags] = useState<TagOption[]>([]);
+  const [ogOverrideTitle, setOgOverrideTitle] = useState("");
+  const [ogOverrideDescription, setOgOverrideDescription] = useState("");
+  const [ogOverrideImage, setOgOverrideImage] = useState("");
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showUTM, setShowUTM] = useState(false);
@@ -174,6 +184,9 @@ export default function EditLinkPage() {
     setUtmContent(linkData.utmContent || "");
     setUtmTerm(linkData.utmTerm || "");
     setSelectedTags(linkData.tags.map((t) => t.tag));
+    setOgOverrideTitle(linkData.ogOverrideTitle || "");
+    setOgOverrideDescription(linkData.ogOverrideDescription || "");
+    setOgOverrideImage(linkData.ogOverrideImage || "");
 
     if (linkData.startsAt) {
       setStartsAt(new Date(linkData.startsAt).toISOString().slice(0, 16));
@@ -237,6 +250,11 @@ export default function EditLinkPage() {
       return;
     }
 
+    if (ogOverrideImage.trim() && !/^https?:\/\/\S+$/i.test(ogOverrideImage.trim())) {
+      setError(`${t("socialPreviewImage")}: ${tErrors("invalidUrl")}`);
+      return;
+    }
+
     setSaving(true);
     try {
       // Drop empty / malformed variants before sending. Weights default to 1.
@@ -272,6 +290,9 @@ export default function EditLinkPage() {
         utmContent: utmContent || null,
         utmTerm: utmTerm || null,
         tags: selectedTags.map((t) => t.id),
+        ogOverrideTitle: ogOverrideTitle.trim() || null,
+        ogOverrideDescription: ogOverrideDescription.trim() || null,
+        ogOverrideImage: ogOverrideImage.trim() || null,
       };
 
       const response = await fetch(`/api/links/${linkId}`, {
@@ -562,6 +583,26 @@ export default function EditLinkPage() {
               </div>
             )}
           </div>
+
+          {/* Social preview override */}
+          <SocialPreviewSection
+            title={ogOverrideTitle}
+            description={ogOverrideDescription}
+            image={ogOverrideImage}
+            onTitleChange={setOgOverrideTitle}
+            onDescriptionChange={setOgOverrideDescription}
+            onImageChange={setOgOverrideImage}
+            scraped={{
+              title: linkData?.ogTitle ?? null,
+              description: linkData?.ogDescription ?? null,
+              image: linkData?.ogImage ?? null,
+            }}
+            fallbackTitle={title || code}
+            destinationUrl={originalUrl}
+            defaultOpen={Boolean(
+              linkData?.ogOverrideTitle || linkData?.ogOverrideDescription || linkData?.ogOverrideImage,
+            )}
+          />
 
           {/* A/B Variants */}
           <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
