@@ -280,7 +280,13 @@
     "invalidName": "Invalid name",
     "sourceGovernanceWarning": "\"{value}\" is not on the workspace approved source list ({list}) — will be rejected on save.",
     "mediumGovernanceWarning": "\"{value}\" is not on the workspace approved medium list ({list}) — will be rejected on save.",
-    "templatesOnlyChannelPreset": "Templates are channel presets — campaign is set per-link when creating."
+    "templatesOnlyChannelPreset": "Templates are channel presets — campaign is set per-link when creating.",
+    "optionalShortcut": "optional",
+    "templateSelectorHintOptional": "Fills medium / source / content in one click. Not required — you can pick them below.",
+    "templatesIntroTitle": "What is a UTM template? (optional)",
+    "templatesIntroBody": "A saved set of medium / source / content for a channel you use over and over — e.g. 'Weekly EDM' = email / newsletter_weekly, or 'Booth QR' = qr / poster. It only saves typing and keeps everyone's spelling the same.",
+    "templatesIntroOptional": "You don't need it. When creating a link you can choose medium and source directly in the UTM section.",
+    "templatesIntroHowTo": "To use one: click 'Use' on a template here, or pick it at the top of the UTM section when creating a link. Templates never include the campaign — you fill that in per link."
   },
   "analytics": {
     "title": "Analytics",

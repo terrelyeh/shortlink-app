@@ -46,22 +46,28 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
   const { currentWorkspace } = useWorkspace();
   const displayRole = currentWorkspace?.role ?? userRole;
 
+  // Main menu = the three daily jobs. UTM templates (an optional
+  // shortcut) and the audit log (admin housekeeping) sit in the footer
+  // group next to Settings — in the main menu they read as required
+  // steps and confused new teammates.
   const navItems: NavItem[] = [
     { href: "/campaigns", labelKey: "campaigns", icon: <Megaphone size={15} /> },
     { href: "/links", labelKey: "links", icon: <Link2 size={15} /> },
     { href: "/analytics", labelKey: "analytics", icon: <BarChart3 size={15} /> },
-    { href: "/templates", labelKey: "templates", icon: <FileText size={15} /> },
+  ];
+  const secondaryItems: NavItem[] = [
+    { href: "/templates", labelKey: "templates", icon: <FileText size={14} /> },
     {
       href: "/audit-log",
       labelKey: "auditLog",
-      icon: <ClipboardList size={15} />,
+      icon: <ClipboardList size={14} />,
       roles: ["OWNER", "ADMIN"],
     },
   ];
 
-  const filteredItems = navItems.filter(
-    (item) => !item.roles || item.roles.includes(displayRole),
-  );
+  const byRole = (item: NavItem) => !item.roles || item.roles.includes(displayRole);
+  const filteredItems = navItems.filter(byRole);
+  const filteredSecondary = secondaryItems.filter(byRole);
 
   const initials = (userName || "U")
     .split(" ")
@@ -122,6 +128,17 @@ export function Sidebar({ userRole, userName, userImage }: SidebarProps) {
             </div>
           </div>
         </div>
+        {filteredSecondary.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`nav-item ${pathname === item.href ? "active" : ""}`}
+            onClick={() => setMobileOpen(false)}
+          >
+            {item.icon}
+            <span>{t(item.labelKey)}</span>
+          </Link>
+        ))}
         <Link
           href="/settings"
           className={`nav-item ${pathname === "/settings" ? "active" : ""}`}
