@@ -59,6 +59,7 @@ interface ShortLink {
   clicksLast7d?: number;
   trendPct?: number | null;
   ogImage?: string | null;
+  ogOverrideImage?: string | null;
   ogTitle?: string | null;
   _count: { clicks: number; conversions?: number };
   tags?: LinkTag[];
@@ -146,6 +147,7 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
     qc.invalidateQueries({ queryKey: ["analytics-raw"], refetchType: "all" });
     qc.invalidateQueries({ queryKey: ["campaign-links"], refetchType: "all" });
     qc.invalidateQueries({ queryKey: ["utm-campaigns"] });
+    qc.invalidateQueries({ queryKey: ["links-trash"] });
   }, [qc]);
 
   // Pulls fresh data for this page AND busts derived caches. Uses
@@ -395,6 +397,9 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
             >
               <Download size={12} /> {tCommon("export")}
             </a>
+            <Link href="/links/trash" className="btn btn-secondary" title={t("trashTitle")}>
+              <Trash2 size={12} /> {t("trashTitle")}
+            </Link>
             <Link href="/links/new" className="btn btn-secondary">
               <Plus size={12} /> {t("createNew")}
             </Link>

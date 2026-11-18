@@ -36,6 +36,16 @@ const updateLinkSchema = z.object({
   utmContent: z.string().optional().nullable(),
   utmTerm: z.string().optional().nullable(),
   tags: z.array(z.string()).optional(), // Array of tag IDs
+  // Social-preview override. Empty string / null clears the field.
+  ogOverrideTitle: z.string().trim().max(200).optional().nullable(),
+  ogOverrideDescription: z.string().trim().max(500).optional().nullable(),
+  ogOverrideImage: z
+    .union([
+      z.literal(""),
+      z.string().trim().url().max(2000).regex(/^https?:\/\//i, "Image URL must start with http(s)://"),
+    ])
+    .optional()
+    .nullable(),
 });
 
 // GET - Get single link
@@ -133,6 +143,9 @@ export async function PATCH(
     }
     if (validated.variants !== undefined) {
       updateData.variants = validated.variants;
+    }
+    for (const key of ["ogOverrideTitle", "ogOverrideDescription", "ogOverrideImage"] as const) {
+      if (validated[key] !== undefined) updateData[key] = validated[key] || null;
     }
 
     // Auto-link Campaign when utmCampaign is being set/changed and no

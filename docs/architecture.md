@@ -73,6 +73,7 @@ SyncButton click → qc.invalidateQueries(pageKeys) → 強制重抓當頁
 | `["analytics-raw"]` | 90d × 10k 筆 raw clicks（~2MB） | `/analytics`、Campaign Detail、Compare |
 | `["campaigns-summary", window]` | leaderboard / 時序 / orphans | `/campaigns`、Compare |
 | `["links", 500]` | 連結列表（含 trend） | `/links` |
+| `["links-trash"]` | 已軟刪除的連結（上限 200） | `/links/trash`；刪除後由 LinksClient invalidate |
 | `["campaign-links", name]` | 某活動下的 links | Campaign Detail |
 | `["campaign-goal", name]` | 該活動的 goalClicks | Campaign Detail |
 | `["tags"]` / `["templates"]` / `["workspace-utm-settings"]` / `["utm-campaigns"]` | 共用資源 | 多處 |
@@ -83,7 +84,8 @@ SyncButton click → qc.invalidateQueries(pageKeys) → 強制重抓當頁
 - `retry: 1`
 
 **Mutation 後要 invalidate 什麼**（在 CreateLinkForm、LinksClient、edit page、goal save 都有處理）：
-- 建 / 改 / 刪 link → `campaigns-summary` + `analytics-raw` + `campaign-links` + `utm-campaigns`
+- 建 / 改 / 刪 link → `campaigns-summary` + `analytics-raw` + `campaign-links` + `utm-campaigns`（刪除另加 `links-trash`）
+- 還原 link → 上面四個 + `links`
 - 改 goalClicks → `campaign-goal/{name}` + `campaigns-summary`
 - 新建 Campaign（combobox inline create）→ `utm-campaigns` + `campaigns-summary`
 
