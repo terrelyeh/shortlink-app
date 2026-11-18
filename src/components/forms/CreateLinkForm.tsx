@@ -5,10 +5,11 @@ import { useRouter } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { UTMBuilder } from "./UTMBuilder";
-import { Link2, ChevronDown, ChevronUp, Loader2, Settings2, Target, AlertCircle, CheckCircle, Tag, Check, X as XIcon } from "lucide-react";
+import { Link2, ChevronDown, ChevronUp, Loader2, Settings2, Target, AlertCircle, CheckCircle, Tag, Check, X as XIcon, Copy, Info, Plus, List } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
 import { TagInput } from "@/components/tags/TagInput";
 import { useToast } from "@/components/ui/Toast";
+import { QrCodePanel } from "@/components/links/QrCodePanel";
 
 interface TagOption {
   id: string;
@@ -44,7 +45,25 @@ const initialFormData: FormData = {
   utmTerm: "",
 };
 
-export function CreateLinkForm() {
+export interface CreateLinkPrefill {
+  utmCampaign?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  /** Set when the prefill came from a UTM template — shown in a notice. */
+  templateName?: string;
+}
+
+interface CreatedLink {
+  id: string;
+  code: string;
+  title: string | null;
+}
+
+const SHORT_BASE = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
+
+export function CreateLinkForm({ prefill = {} }: { prefill?: CreateLinkPrefill }) {
   const router = useRouter();
   const t = useTranslations("links");
   const tCommon = useTranslations("common");
@@ -53,7 +72,18 @@ export function CreateLinkForm() {
   const toast = useToast();
   const qc = useQueryClient();
 
-  const [formData, setFormData] = useState<FormData>(initialFormData);
+  const [formData, setFormData] = useState<FormData>(() => ({
+    ...initialFormData,
+    utmCampaign: prefill.utmCampaign ?? "",
+    utmSource: prefill.utmSource ?? "",
+    utmMedium: prefill.utmMedium ?? "",
+    utmContent: prefill.utmContent ?? "",
+    utmTerm: prefill.utmTerm ?? "",
+  }));
+  // After a successful create we stay on this page and show the short URL
+  // + QR (the thing the user came for) instead of bouncing to /links.
+  const [created, setCreated] = useState<CreatedLink | null>(null);
+  const [copiedShort, setCopiedShort] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   // Default expanded so new users immediately see the Campaign field —
   // it's the single most important UTM for downstream management.
@@ -81,30 +111,6 @@ export function CreateLinkForm() {
       })
       .catch(() => setCodeStatus("idle"));
   }, [debouncedCode]);
-
-  // UTM governance — approved sources/mediums for the current workspace
-  const [approvedSources, setApprovedSources] = useState<string[]>([]);
-  const [approvedMediums, setApprovedMediums] = useState<string[]>([]);
-
-  useEffect(() => {
-    fetch("/api/workspace/utm-settings")
-      .then((r) => r.json())
-      .then((data) => {
-        setApprovedSources(data.approvedSources || []);
-        setApprovedMediums(data.approvedMediums || []);
-      })
-      .catch(() => {}); // silently ignore — no workspace = no governance
-  }, []);
-
-  const sourceWarning =
-    approvedSources.length > 0 &&
-    formData.utmSource &&
-    !approvedSources.includes(formData.utmSource.toLowerCase());
-
-  const mediumWarning =
-    approvedMediums.length > 0 &&
-    formData.utmMedium &&
-    !approvedMediums.includes(formData.utmMedium.toLowerCase());
 
   const handleChange = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -189,10 +195,10 @@ export function CreateLinkForm() {
       qc.invalidateQueries({ queryKey: ["campaign-links"], refetchType: "all" });
       qc.invalidateQueries({ queryKey: ["utm-campaigns"] });
 
-      // Use replace to prevent the form page from being in browser history
-      // This ensures clean navigation back to links list
+      const link = (await response.json()) as CreatedLink;
       toast.success(t("createSuccess"));
-      router.replace("/links");
+      setCreated({ id: link.id, code: link.code, title: link.title });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create link");
     } finally {
@@ -200,8 +206,79 @@ export function CreateLinkForm() {
     }
   };
 
+  // "Create another" keeps the UTM set, tags and advanced options — the
+  // common case is several links for the same campaign/channel.
+  const createAnother = () => {
+    setFormData((prev) => ({ ...prev, originalUrl: "", customCode: "", title: "" }));
+    setCodeStatus("idle");
+    setCreated(null);
+    setCopiedShort(false);
+  };
+
+  if (created) {
+    const shortUrl = `${SHORT_BASE}/${created.code}`;
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800">
+          <CheckCircle className="w-5 h-5 flex-shrink-0" />
+          <span className="text-sm font-medium">{t("createdHeadline")}</span>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">{t("shortUrl")}</label>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 min-w-0 truncate px-4 py-3 bg-sky-50 border border-sky-100 rounded-xl text-[#0288D1] font-medium">
+              {shortUrl.replace(/^https?:\/\//, "")}
+            </code>
+            <button
+              type="button"
+              onClick={async () => {
+                await navigator.clipboard.writeText(shortUrl);
+                setCopiedShort(true);
+                setTimeout(() => setCopiedShort(false), 2000);
+              }}
+              className="flex items-center gap-1.5 px-4 py-3 bg-[#03A9F4] text-white rounded-xl hover:bg-[#0288D1] font-medium text-sm whitespace-nowrap"
+            >
+              {copiedShort ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copiedShort ? tCommon("copied") : tCommon("copy")}
+            </button>
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">{t("qrCode")}</label>
+          <QrCodePanel linkId={created.id} code={created.code} title={created.title} shortUrl={shortUrl} size={120} />
+        </div>
+        <div className="flex gap-3 pt-2 flex-wrap">
+          <button
+            type="button"
+            onClick={createAnother}
+            className="flex items-center gap-1.5 px-5 py-3 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm"
+          >
+            <Plus className="w-4 h-4" /> {t("createAnother")}
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/links")}
+            className="flex items-center gap-1.5 px-5 py-3 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm"
+          >
+            <List className="w-4 h-4" /> {t("goToLinks")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {(prefill.utmCampaign || prefill.templateName) && (
+        <div className="flex items-center gap-2 p-3 bg-sky-50 border border-sky-100 rounded-xl text-sky-800 text-sm">
+          <Info className="w-4 h-4 flex-shrink-0" />
+          <span>
+            {prefill.templateName
+              ? t("prefillTemplate", { name: prefill.templateName })
+              : t("prefillCampaign", { name: prefill.utmCampaign ?? "" })}
+          </span>
+        </div>
+      )}
       {/* Error Message */}
       {error && (
         <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-xl text-red-700">
@@ -238,7 +315,7 @@ export function CreateLinkForm() {
         </label>
         <div className="flex items-center gap-3">
           <span className="text-slate-400 text-sm bg-slate-100 px-3 py-2 rounded-lg whitespace-nowrap">
-            {process.env.NEXT_PUBLIC_SHORT_URL || "domain.com"}/s/
+            {SHORT_BASE.replace(/^https?:\/\//, "")}/
           </span>
           <div className="flex-1 relative">
             <input
@@ -340,34 +417,6 @@ export function CreateLinkForm() {
               onChange={handleUTMChange}
               originalUrl={formData.originalUrl}
             />
-
-            {/* UTM Governance Warnings */}
-            {(sourceWarning || mediumWarning) && (
-              <div className="mt-3 flex flex-col gap-1.5">
-                {sourceWarning && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span>
-                      <span className="font-medium">{formData.utmSource}</span> is not in the approved sources list.
-                      {approvedSources.length > 0 && (
-                        <> Approved: {approvedSources.slice(0, 5).join(", ")}{approvedSources.length > 5 ? "…" : ""}</>
-                      )}
-                    </span>
-                  </div>
-                )}
-                {mediumWarning && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span>
-                      <span className="font-medium">{formData.utmMedium}</span> is not in the approved mediums list.
-                      {approvedMediums.length > 0 && (
-                        <> Approved: {approvedMediums.slice(0, 5).join(", ")}{approvedMediums.length > 5 ? "…" : ""}</>
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         )}
       </div>

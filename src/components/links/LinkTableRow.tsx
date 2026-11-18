@@ -456,7 +456,7 @@ export function LinkTableRow({
       {showQR && (
         <tr className="border-b border-slate-50 bg-slate-50/30">
           <td colSpan={9} className="px-4 py-4">
-            <QrCodePanel linkId={link.id} code={link.code} shortUrl={shortUrl} />
+            <QrCodePanel linkId={link.id} code={link.code} title={link.title} shortUrl={shortUrl} />
           </td>
         </tr>
       )}

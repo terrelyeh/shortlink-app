@@ -202,7 +202,18 @@
     "destinationTooltip": "Open destination (without UTM) — full URL:",
     "abVariantsTooltip": "A/B test: traffic is split across {n} URLs, not only this one",
     "mediumSource": "Medium / Source",
-    "viewAnalytics": "View analytics for this link"
+    "viewAnalytics": "View analytics for this link",
+    "createSubtitle": "Short link + UTM tracking in one step",
+    "createdHeadline": "Link created — copy the short URL or download the QR code",
+    "createAnother": "Create another (keep UTM & tags)",
+    "goToLinks": "Go to link list",
+    "prefillCampaign": "Campaign \"{name}\" is pre-filled",
+    "prefillTemplate": "Template \"{name}\" applied — fill in the campaign",
+    "deleteDialogTitle": "Delete this link?",
+    "batchDeleteDialogTitle": "Delete {n} links?",
+    "deleteDialogDesc": "The short URL stops working right away and the link moves to Trash. You can restore it from Trash at any time — settings and click history are kept.",
+    "deletedToTrash": "Moved to Trash. You can restore it from the Trash page.",
+    "batchDeletedToTrash": "{n} links moved to Trash."
   },
   "utm": {
     "title": "UTM Parameters",

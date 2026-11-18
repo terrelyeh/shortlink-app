@@ -238,7 +238,7 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
       if (response.ok) {
         removeLink(id);
         invalidateDerived();
-        success("Link deleted.");
+        success(t("deletedToTrash"));
       } else toastError("Failed to delete link.");
     } catch {
       toastError("Failed to delete link.");
@@ -328,7 +328,7 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
         const count = selectedIds.size;
         setSelectedIds(new Set());
         refreshLinks();
-        success(`${count} link${count > 1 ? "s" : ""} deleted.`);
+        success(t("batchDeletedToTrash", { n: count }));
       } else toastError("Batch delete failed.");
     } catch {
       toastError("Batch delete failed.");
@@ -364,20 +364,20 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
     <div className="links-page-shell">
       <ConfirmDialog
         open={!!deleteConfirmId}
-        title="Delete this link?"
-        description="This action cannot be undone. All click data for this link will be permanently lost."
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
+        title={t("deleteDialogTitle")}
+        description={t("deleteDialogDesc")}
+        confirmLabel={tCommon("delete")}
+        cancelLabel={tCommon("cancel")}
         onConfirm={executeDelete}
         onCancel={() => setDeleteConfirmId(null)}
         variant="danger"
       />
       <ConfirmDialog
         open={batchDeleteConfirm}
-        title={`Delete ${selectedIds.size} link${selectedIds.size > 1 ? "s" : ""}?`}
-        description="This action cannot be undone. All click data for these links will be permanently lost."
-        confirmLabel="Delete All"
-        cancelLabel="Cancel"
+        title={t("batchDeleteDialogTitle", { n: selectedIds.size })}
+        description={t("deleteDialogDesc")}
+        confirmLabel={tCommon("delete")}
+        cancelLabel={tCommon("cancel")}
         onConfirm={executeBatchDelete}
         onCancel={() => setBatchDeleteConfirm(false)}
         variant="danger"

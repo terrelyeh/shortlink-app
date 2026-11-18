@@ -227,7 +227,7 @@ export function LinkMobileCard({
       </div>
       {showQR && (
         <div style={{ padding: "4px 0" }}>
-          <QrCodePanel linkId={link.id} code={link.code} shortUrl={shortUrl} size={120} />
+          <QrCodePanel linkId={link.id} code={link.code} title={link.title} shortUrl={shortUrl} size={120} />
         </div>
       )}
 

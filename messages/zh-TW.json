@@ -202,7 +202,18 @@
     "destinationTooltip": "開啟目的網址（不帶 UTM）— 完整網址：",
     "abVariantsTooltip": "A/B 測試：流量會分到 {n} 個網址，不只這一個",
     "mediumSource": "媒介 / 來源",
-    "viewAnalytics": "查看這條連結的數據分析"
+    "viewAnalytics": "查看這條連結的數據分析",
+    "createSubtitle": "一次完成短網址與 UTM 追蹤設定",
+    "createdHeadline": "連結已建立 — 複製短網址或下載 QR Code",
+    "createAnother": "再建一條（保留 UTM 與標籤）",
+    "goToLinks": "前往連結列表",
+    "prefillCampaign": "已帶入活動「{name}」",
+    "prefillTemplate": "已套用模板「{name}」— 請填寫活動",
+    "deleteDialogTitle": "刪除這條連結？",
+    "batchDeleteDialogTitle": "刪除 {n} 條連結？",
+    "deleteDialogDesc": "短網址會立即停止運作，連結移到垃圾桶。之後可以隨時從垃圾桶還原，設定與點擊紀錄都會保留。",
+    "deletedToTrash": "已移到垃圾桶，可從垃圾桶頁還原。",
+    "batchDeletedToTrash": "{n} 條連結已移到垃圾桶。"
   },
   "utm": {
     "title": "UTM 參數",
