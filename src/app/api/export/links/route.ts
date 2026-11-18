@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveWorkspaceScope } from "@/lib/workspace";
 import { buildCsv, csvResponse } from "@/lib/utils/csv";
+import { loadLinkCreators } from "@/lib/link-creators";
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,11 +37,12 @@ export async function GET(request: NextRequest) {
     });
 
     const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
+    const creators = await loadLinkCreators(links.map((l) => l.createdById));
 
     const headers = [
       "Title", "Short URL", "Original URL", "Status", "Clicks",
       "UTM Source", "UTM Medium", "UTM Campaign", "UTM Content", "UTM Term",
-      "Tags", "Created At", "Expires At",
+      "Tags", "Created By", "Created At", "Expires At",
     ];
 
     const rows = links.map((link) => [
@@ -55,6 +57,7 @@ export async function GET(request: NextRequest) {
       link.utmContent || "",
       link.utmTerm || "",
       link.tags.map((t: { tag: { name: string } }) => t.tag.name).join(", "),
+      (link.createdById && creators.get(link.createdById)?.name) || "",
       link.createdAt.toISOString(),
       link.expiresAt?.toISOString() || "",
     ]);

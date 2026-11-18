@@ -12,6 +12,7 @@ import {
 } from "@/lib/utm-governance";
 import { fetchOpenGraph } from "@/lib/og-scraper";
 import { upsertCampaignForUtm } from "@/lib/campaign-autolink";
+import { loadLinkCreators, type LinkCreator } from "@/lib/link-creators";
 import { z } from "zod";
 
 /**
@@ -123,10 +124,11 @@ export async function GET(request: NextRequest) {
     // gets bumped on any write (POST/PATCH/DELETE under /api/links/*).
     // v2 suffix: clicks now filter out isInternal so old v1 cache (mixed
     // test clicks into row counts) is busted on deploy.
+    // v3: rows now carry `createdBy` (creator column on /links).
     const ns = linksCacheNamespace(scope.workspaceId, session.user.id);
     const version = await cacheGetVersion(ns);
     const key = cacheKey(
-      "links-list-v2",
+      "links-list-v3",
       ns,
       version,
       page,
@@ -184,7 +186,7 @@ export async function GET(request: NextRequest) {
       ]);
 
       const linkIds = links.map((l: { id: string }) => l.id);
-      const [clicks7d, clicksPrev7d] = linkIds.length > 0
+      const [clicks7d, clicksPrev7d, creators] = linkIds.length > 0
         ? await Promise.all([
           prisma.click.groupBy({
             by: ["shortLinkId"],
@@ -204,17 +206,19 @@ export async function GET(request: NextRequest) {
             },
             _count: { _all: true },
           }),
+          loadLinkCreators(links.map((l) => l.createdById)),
         ])
-        : [[], []];
+        : [[], [], new Map<string, LinkCreator>()];
 
       const clicks7dMap = new Map((clicks7d as { shortLinkId: string; _count: { _all: number } }[]).map((r) => [r.shortLinkId, r._count._all]));
       const clicksPrev7dMap = new Map((clicksPrev7d as { shortLinkId: string; _count: { _all: number } }[]).map((r) => [r.shortLinkId, r._count._all]));
 
-      const enrichedLinks = links.map((link: { id: string }) => {
+      const enrichedLinks = links.map((link) => {
         const c7 = clicks7dMap.get(link.id) ?? 0;
         const cp = clicksPrev7dMap.get(link.id) ?? 0;
         const trendPct = cp > 0 ? Math.round(((c7 - cp) / cp) * 100) : null;
-        return { ...link, clicksLast7d: c7, trendPct };
+        const createdBy = link.createdById ? creators.get(link.createdById) ?? null : null;
+        return { ...link, clicksLast7d: c7, trendPct, createdBy };
       });
 
       return {

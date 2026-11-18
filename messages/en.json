@@ -196,7 +196,12 @@
     "socialPreviewFromPage": "From destination page: {value}",
     "socialPreviewCard": "Card preview",
     "socialPreviewCacheNote": "Platforms cache previews. After changing an already-shared link, refresh it in Facebook Sharing Debugger / LinkedIn Post Inspector.",
-    "socialPreviewNoImage": "No image"
+    "socialPreviewNoImage": "No image",
+    "linkColumn": "Link → Destination",
+    "createdBy": "Created by",
+    "destinationTooltip": "Open destination (without UTM) — full URL:",
+    "abVariantsTooltip": "A/B test: traffic is split across {n} URLs, not only this one",
+    "mediumSource": "Medium / Source"
   },
   "utm": {
     "title": "UTM Parameters",

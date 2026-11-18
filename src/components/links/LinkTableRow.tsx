@@ -20,10 +20,14 @@ import {
   CalendarClock,
   Globe2,
   FlaskConical,
+  ArrowRight,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge, StatusDot } from "@/components/ui/Badge";
 import { useToast } from "@/components/ui/Toast";
+import { formatDestination } from "@/lib/utils/destination";
+
+const LOGIN_WALL_TITLE = /\b(log ?in|sign ?in)\b|登入/i;
 
 interface LinkTag {
   tag: { id: string; name: string; color?: string | null };
@@ -49,6 +53,8 @@ interface LinkTableRowProps {
     ogTitle?: string | null;
     _count: { clicks: number; conversions?: number };
     tags?: LinkTag[];
+    createdBy?: { id: string; name: string | null; image: string | null } | null;
+    variants?: unknown;
   };
   shortBaseUrl: string;
   selected: boolean;
@@ -89,6 +95,16 @@ export function LinkTableRow({
   }, [showMenu]);
 
   const shortUrl = `${shortBaseUrl}/${link.code}`;
+  const dest = formatDestination(link.originalUrl);
+  // Untitled links fall back to the scraped page title — unless the
+  // scrape hit a login wall (LinkedIn company pages scrape as "LinkedIn
+  // Login, Sign in"), which would misdescribe the link.
+  const displayTitle =
+    link.title ||
+    (link.ogTitle && !LOGIN_WALL_TITLE.test(link.ogTitle) ? link.ogTitle : dest.host);
+  // With A/B variants the redirect picks among them, so the URL above
+  // isn't the whole story — flag it.
+  const variantCount = Array.isArray(link.variants) ? link.variants.length : 0;
   const statusLabel =
     link.status === "ACTIVE" ? t("active") : link.status === "PAUSED" ? t("paused") : t("archived");
 
@@ -162,8 +178,11 @@ export function LinkTableRow({
           </button>
         </td>
 
-        {/* Title + Original URL + OG thumbnail */}
-        <td className="py-2 pr-3 min-w-[160px] max-w-[220px]">
+        {/* Title, then "short code → destination" on one line so the
+            mapping reads at a glance. UTM params are stripped from the
+            destination (they have their own columns); hover shows the
+            full URL. */}
+        <td className="py-2 pr-3 min-w-[240px] max-w-[340px]">
           <div className="flex items-start gap-2 min-w-0">
             {/* OG image thumbnail — falls back to a letter avatar when
                 the scrape failed / hasn't run yet. Plain <img> (not
@@ -188,11 +207,60 @@ export function LinkTableRow({
             )}
             <div className="min-w-0 flex-1">
               <p className="text-[15px] font-semibold text-slate-900 truncate" title={link.ogTitle ?? undefined}>
-                {link.title || `/${link.code}`}
+                {displayTitle}
               </p>
-              <p className="text-[12.5px] text-slate-400 truncate" title={link.originalUrl}>
-                {link.originalUrl.replace(/^https?:\/\/(www\.)?/, "").substring(0, 50)}
-              </p>
+              <div className="flex items-center gap-1.5 min-w-0 text-[12.5px] mt-0.5">
+                <a
+                  href={`${shortUrl}?_test=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="min-w-0 truncate font-mono font-medium text-[#03A9F4] hover:underline"
+                  title={t("clickToTest")}
+                >
+                  /{link.code}
+                </a>
+                <button
+                  onClick={copyToClipboard}
+                  className="shrink-0 p-0.5 rounded hover:bg-slate-100 transition-colors"
+                  title={t("copyLink")}
+                  aria-label={t("copyLink")}
+                >
+                  {copied ? (
+                    <Check className="w-3 h-3 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-3 h-3 text-slate-400" />
+                  )}
+                </button>
+              </div>
+              {/* Destination on its own line so long short codes can't
+                  squeeze it down to "e…". */}
+              <div className="flex items-center gap-1.5 min-w-0 text-[12.5px] mt-0.5">
+                <ArrowRight className="shrink-0 w-3 h-3 text-slate-300" aria-hidden />
+                {dest.cleanUrl ? (
+                  <a
+                    href={dest.cleanUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="min-w-0 truncate text-slate-500 hover:text-slate-800 hover:underline"
+                    title={`${t("destinationTooltip")}\n${link.originalUrl}`}
+                  >
+                    <span className="font-medium text-slate-600">{dest.host}</span>
+                    {dest.rest}
+                  </a>
+                ) : (
+                  <span className="min-w-0 truncate text-slate-500" title={link.originalUrl}>
+                    {link.originalUrl}
+                  </span>
+                )}
+                {variantCount > 0 && (
+                  <span
+                    className="shrink-0 text-[11px] px-1.5 py-px rounded bg-amber-50 text-amber-700 border border-amber-100"
+                    title={t("abVariantsTooltip", { n: variantCount })}
+                  >
+                    A/B ×{variantCount}
+                  </span>
+                )}
+              </div>
               {/* Schedule / geo indicators — these affect whether the link
                   actually redirects, so worth surfacing at a glance. */}
               {(link.startsAt || (link.allowedCountries && link.allowedCountries.length > 0)) && (
@@ -232,51 +300,21 @@ export function LinkTableRow({
           )}
         </td>
 
-        {/* Medium */}
-        <td className="py-2.5 pr-3">
-          {link.utmMedium ? (
-            <span className="pill pill-medium">{link.utmMedium}</span>
-          ) : (
-            <span className="text-[13px] text-slate-300">—</span>
-          )}
-        </td>
-
-        {/* Source */}
-        <td className="py-2.5 pr-3">
-          {link.utmSource ? (
-            <span className="pill pill-source">{link.utmSource}</span>
-          ) : (
-            <span className="text-[13px] text-slate-300">—</span>
-          )}
-        </td>
-
-        {/* Short URL — click to open in new tab as a test (?_test=1) so
-            the redirect handler flags the click as internal, keeping
-            test traffic out of analytics. The copy button next to it
-            still copies the clean URL (without ?_test=1). */}
-        <td className="py-2 pr-3 whitespace-nowrap">
-          <div className="flex items-center gap-1">
-            <a
-              href={`${shortUrl}?_test=1`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[13px] text-[#03A9F4] font-medium hover:underline"
-              title={t("clickToTest")}
-            >
-              <code>/{link.code}</code>
-            </a>
-            <button
-              onClick={copyToClipboard}
-              className="p-1 rounded hover:bg-slate-100 transition-colors"
-              title={t("copyLink")}
-            >
-              {copied ? (
-                <Check className="w-3 h-3 text-emerald-600" />
-              ) : (
-                <Copy className="w-3 h-3 text-slate-400" />
+        {/* Medium / Source — stacked to keep the table within the
+            content width (two separate columns pushed it past 1,300px). */}
+        <td className="py-2 pr-3">
+          {link.utmMedium || link.utmSource ? (
+            <div className="flex flex-col items-start gap-1">
+              {link.utmMedium && (
+                <span className="pill pill-medium" title="utm_medium">{link.utmMedium}</span>
               )}
-            </button>
-          </div>
+              {link.utmSource && (
+                <span className="pill pill-source" title="utm_source">{link.utmSource}</span>
+              )}
+            </div>
+          ) : (
+            <span className="text-[13px] text-slate-300">—</span>
+          )}
         </td>
 
         {/* Tags */}
@@ -290,6 +328,30 @@ export function LinkTableRow({
                 <span className="text-[11px] text-slate-400">+{link.tags.length - 2}</span>
               )}
             </div>
+          )}
+        </td>
+
+        {/* Creator */}
+        <td className="py-2 pr-3 max-w-[120px]">
+          {link.createdBy ? (
+            <span className="inline-flex items-center gap-1.5 min-w-0 text-[13px] text-slate-600" title={link.createdBy.name ?? undefined}>
+              {link.createdBy.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={link.createdBy.image}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  className="w-5 h-5 rounded-full shrink-0 bg-slate-100"
+                />
+              ) : (
+                <span className="w-5 h-5 rounded-full shrink-0 bg-slate-200 text-[10px] font-semibold text-slate-500 flex items-center justify-center">
+                  {(link.createdBy.name || "?").charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="truncate">{link.createdBy.name || "—"}</span>
+            </span>
+          ) : (
+            <span className="text-[13px] text-slate-300">—</span>
           )}
         </td>
 
@@ -315,7 +377,7 @@ export function LinkTableRow({
         </td>
 
         {/* Actions */}
-        <td className="py-2 pr-3 text-right w-10">
+        <td className="col-actions py-2 pr-3 text-right w-10">
           <button
             ref={menuBtnRef}
             onClick={() => setShowMenu(!showMenu)}
@@ -403,7 +465,7 @@ export function LinkTableRow({
       {/* QR Code expandable row */}
       {showQR && (
         <tr className="border-b border-slate-50 bg-slate-50/30">
-          <td colSpan={11} className="px-4 py-4">
+          <td colSpan={9} className="px-4 py-4">
             <div className="flex items-center gap-4">
               <div className="p-2 bg-white rounded-lg border border-slate-200">
                 <QRCodeCanvas
