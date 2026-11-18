@@ -320,6 +320,8 @@ screenshots/                   # UI 設計評估用截圖（gitignored 建議）
 | `/api/links/[id]` | GET, PATCH, DELETE | 單一連結操作（PATCH 支援 A/B variants / 排程 / 地區） |
 | `/api/links/[id]/clone` | POST | 複製連結 |
 | `/api/links/[id]/preview` | GET | 預覽目標網址資訊 |
+| `/api/links/[id]/restore` | POST | 還原已刪除的連結 |
+| `/api/links/trash` | GET | 列出已刪除（垃圾桶）的連結 |
 
 ### 行銷活動
 

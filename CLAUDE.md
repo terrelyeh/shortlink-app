@@ -1,6 +1,6 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-08-31 — 權限 helper 收斂進 `lib/workspace.ts`、Campaign unique 約束、analytics IDOR 修復、內部導航改用 Link、正式資料清理；架構與檔案樹拆到 `docs/`
+> Last updated: 2026-11-18 — 對標商用工具 PicSee 後上線「社群分享預覽覆寫」與「垃圾桶還原」（PR #65）
 
 ## Project Overview
 
@@ -52,6 +52,8 @@
 12. **測試點擊標記與軟重設** — `Click.isInternal` + `resetBatchId`，標記而非刪除，可整批還原
 13. **CSV 匯出** — links / analytics / campaigns 三個 endpoint 共用 `csvResponse()`
 14. **Analytics 進階指標** — 點擊衰減曲線 / 7×24 熱度圖（用 viewer 時區）/ 城市排行
+15. **社群分享預覽覆寫** — `ShortLink.ogOverride{Title,Description,Image}`（全 nullable，只在編輯頁設定）。`/s/[code]` 在「有覆寫值 **且** `isPreviewCrawler(ua)`」時回 200 HTML（自訂 `og:*` + meta refresh，`private, no-store`），**不轉址也不記點擊**。邏輯在 `lib/social-preview.ts`；空欄位 fallback 到爬到的 `og*` → `title`。分支刻意放在 geo 檢查**之前**（FB/LINE 從美國機房抓）
+16. **垃圾桶** — `/links/trash` + `GET /api/links/trash`（上限 200、不走 Redis）+ `POST /api/links/[id]/restore`（`canUserActOnResource`、寫 `RESTORE_LINK`）。query key `["links-trash"]`，LinksClient 的刪除會 invalidate 它
 
 ## Conventions
 
@@ -115,8 +117,17 @@ Prisma schema 用 camelCase（`userId`），但 DB 欄位名是 snake_case（`us
 
 **這是個低流量的內部工具**，不要為了想像中的規模做過度優化。資料量小也代表：改 schema、跑 backfill、直接對正式 DB 做維運都還算安全，但每次都要先 dry-run。
 
+**流量來源要看 UTM，不要看 referrer**（2026-11-18 查）— 4,163 次點擊裡 82% 沒有 referrer（email 2,301/2,765、social 736/974、qr 56/56 全無），能從 UA 認出 LINE/FB/LinkedIn App 內建瀏覽器的只有 11 筆。做 referrer 分類（PicSee 那種 LINE / Direct / AI Agent）大部分只會落進 Direct，不值得做。
+
 ### 🔜 Next Steps / Pending
 
+- **PR #65 兩個畫面待使用者實測** — 轉址邏輯已在本機連正式 DB 驗過，但編輯頁「社群分享預覽」區塊與 `/links/trash` 需要登入，尚未有人實際點過。建議順手給 `KLVbR43`（Computex 海報 LinkedIn QR）設覆寫 — 它爬到的預覽是「LinkedIn Login, Sign in」
+- **對標 PicSee 的後續候選（先確認需求再做）**：
+  - 轉址前掛 Meta Pixel / GTM（再行銷受眾）— 要先問行銷端有沒有在投 FB/Google 廣告；會多一層中介頁 ~300–500ms，要做成每條連結可選
+  - Workspace API key + 建連結 endpoint → 之後 Chrome 擴充 / Google Sheets 都只是薄殼
+  - 依裝置導向（iOS / Android / 桌機）— 有 App 下載需求才做，可沿用 `variants` 結構
+  - 預覽圖**上傳**（目前只能貼 URL）— 專案沒裝 Supabase SDK、沒用 Storage，要加需新增 `SUPABASE_URL` + service role key（Zeabur 事件後多一把高權限 key 要慎重）
+  - 建立表單沒有預覽覆寫區塊（刻意：預覽是建立後才爬，先看結果再改）
 - **ESLint 剩 24 個問題**（12 errors / 12 warnings）— 都是死碼、`no-unescaped-entities`、3 個 `static-components`、2 個 `set-state-in-effect`（`useMediaQuery` + kickstart）。`no-html-link-for-pages` 已歸零
 - **`social_prduct_launch` 的拼字錯誤** — utm_campaign 值拼成 `prduct`，但它有 3 條有效的 LinkedIn 連結、9 次點擊，改名會變更已發佈貼文的 utm 參數、切斷 GA 資料連續性。**建議維持現狀**，除非行銷端明確要求
 - **`/api/user/profile` 的「最後一個 admin」保護從未生效** — 見 Pitfall #26
@@ -131,7 +142,7 @@ Prisma schema 用 camelCase（`userId`），但 DB 欄位名是 snake_case（`us
     - `IP_HASH_SALT` — 傾向不動，見下
   - ⚠️ **`IP_HASH_SALT` 若外洩要特別處理** — salt 一旦已知，4,000+ 筆 `Click.ipHash` 就能被反推回真實 IP（IPv4 只有 2^32），等於「匿名點擊紀錄」變成「可識別個人的瀏覽紀錄」。輪替 salt 會讓新舊 hash 對不起來，要接受去重統計斷一次
   - 💡 **輪替 `AUTH_SECRET` 的最佳時機是「剛清空 session 之後」** — 它簽章 session cookie，平常換會把所有人踢出去；session 已經是空的時候換，額外成本為零
-- **i18n 末端 spot-check** — LinksClient / CreateLinkForm / LinkTableRow / LinkMobileCard 仍可能有零星硬編碼字串
+- **i18n 末端 spot-check** — LinksClient（PageHeader 標題、toast、Import CSV / Batch create 按鈕）/ CreateLinkForm / LinkTableRow / LinkMobileCard / 編輯頁 A/B variants 區塊仍有硬編碼英文；`analytics/page.tsx` 的 `"click volume and uniques"` 也是
 - **行動裝置 card view 擴展** — 目前只有 `/links` 有手機 card view。Campaign Leaderboard / Campaign Detail Links tab 還是橫向 scroll
 - **Mobile-only：edit link 表單 + Kickstart wizard** — 表格 + A/B variant editor 在手機操作彆扭，建議走桌面
 - **Observability** — Prod 只有 `console.error`。建議 Sentry / OpenTelemetry
@@ -236,6 +247,10 @@ Prisma datasource 需 `directUrl` 才能讓 `db push` 繞過 pgbouncer — schem
 
 
 28. **換 DB 密碼不會讓已外洩的 session token 失效** — NextAuth 走 **database session**（`session({ session, user })` 的簽名可以確認，不是 JWT），`Session.sessionToken` 是**明文存在 DB** 裡的。任何人 dump 過資料庫就握有可用的登入憑證，而輪替 DB 密碼只擋住新的連線、**不會**讓那些 token 失效 —— 必須另外 `session.deleteMany({})`。憑證外洩的處理順序是：**先換密碼（切斷存取）→ 再清 session（作廢已複製的 token）**。反過來做的話，還有連線的攻擊者會直接讀到新產生的 token。
+
+29. **加 schema 欄位：先對正式 DB `db push`，再合併 PR** — Vercel build 只跑 `prisma generate`，不會改 DB。新程式一上線，所有不帶 `select` 的 `shortLink.findUnique/findMany`（含 `/s/[code]` 轉址）都會讀新欄位 → 欄位不存在就整站轉址失敗。反過來先加 nullable 欄位則安全（舊程式不讀它）。流程：`prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --script` 印出 SQL 給使用者確認 → `db push` → 再跑一次 diff 確認是 empty migration → 合併。worktree 沒有 `.env`，用 `node --env-file=../shortlink-app/.env node_modules/.bin/prisma ...`。
+
+30. **PR 預覽部署不能拿來實測** — Vercel 的 `DATABASE_URL` 等變數只設在 **Production** scope，預覽環境連不到 DB；而且預覽網址有 Vercel SSO 保護，curl 會被 302 到登入頁。要驗證轉址類邏輯就在 worktree 跑 `next dev`（暫時複製主資料夾 `.env`，用完刪掉）——**注意它連的是正式 DB**：要改資料就挑一條連結、測完立刻還原；真人 UA 的測試請求加 `?_test=1`，點擊會標成 isInternal。
 
 
 ## 詳細文件

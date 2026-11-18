@@ -20,6 +20,7 @@ src/
 │   │   │   │   ├── page.tsx + LinksClient.tsx
 │   │   │   │   ├── [id]/           # 編輯
 │   │   │   │   ├── new/ batch/ import/ # import 是 CSV 匯入
+│   │   │   │   ├── trash/          # 垃圾桶：已軟刪除連結 + 還原
 │   │   │   │   └── ...
 │   │   │   ├── analytics/          # 純全站維度分析（砍了 campaign leaderboard）
 │   │   │   ├── settings/           # 含 UTM Governance tab
@@ -37,7 +38,8 @@ src/
 │   │   │   └── campaigns-summary/  # Leaderboard + per-campaign 時序資料
 │   │   ├── track/route.ts          # 🎯 公開 conversion tracking endpoint（CORS *）
 │   │   ├── links/
-│   │   │   ├── route.ts + [id]/    # CRUD
+│   │   │   ├── route.ts + [id]/    # CRUD（[id]/restore 還原軟刪除）
+│   │   │   ├── trash/              # 列出已軟刪除連結
 │   │   │   ├── batch/ batch-csv/   # 批次建立（CSV 是每 row 獨立 UTM）
 │   │   │   └── batch-actions/ clone/...
 │   │   ├── export/
@@ -63,7 +65,8 @@ src/
 │   ├── forms/UTMBuilder.tsx        # 含 CampaignCombobox（自訂 Linear/Slack-style，可 inline 建活動）
 │   ├── links/
 │   │   ├── LinkTableRow.tsx        # 桌面表格列（含 OG 縮圖 + schedule/geo badges）
-│   │   └── LinkMobileCard.tsx      # ≤768px 用的 card 版本（useMediaQuery 切換）
+│   │   ├── LinkMobileCard.tsx      # ≤768px 用的 card 版本（useMediaQuery 切換）
+│   │   └── SocialPreviewSection.tsx # 編輯頁的社群分享預覽覆寫 + 卡片預覽
 │   ├── providers/Providers.tsx     # SessionProvider + QueryClientProvider + WorkspaceProvider + Toast
 │   │                               # （注意：dashboard 之外的頁要自己包 SessionProvider）
 │   └── ...
@@ -79,6 +82,7 @@ src/
 │   ├── fetch-workspace.ts          # ⭐ patch window.fetch 自動塞 x-workspace-id header
 │   ├── hooks/useMediaQuery.ts      # SSR-safe matchMedia hook（mobile 切換用）
 │   ├── og-scraper.ts utm-governance.ts variants.ts campaign-autolink.ts
+│   ├── social-preview.ts           # 預覽爬蟲判斷 + 自訂 og:* HTML（/s/[code] 用）
 │   ├── campaign-playbooks.ts       # Kickstart wizard 的 playbook 定義（Product Launch / Exhibition）
 │   └── utils/{utm,shortcode,format}.ts
 ├── messages/{en,zh-TW}.json        # 雙語文件；每新增使用者可見字串就兩邊都要加
