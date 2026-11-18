@@ -134,8 +134,10 @@ export default function AnalyticsPage() {
     const now = new Date();
     if (range === "custom" && customFrom) {
       return {
-        rangeStart: new Date(customFrom),
-        rangeEnd: customTo ? new Date(customTo) : now,
+        // Local-time day bounds (a bare "YYYY-MM-DD" would parse as UTC).
+        rangeStart: new Date(`${customFrom}T00:00:00`),
+        // The "to" date is inclusive — run to the end of that day.
+        rangeEnd: customTo ? new Date(`${customTo}T23:59:59.999`) : now,
       };
     }
     if (range === "all") {
@@ -224,7 +226,11 @@ export default function AnalyticsPage() {
         onClose={() => setShareOpen(false)}
         linkId={selectedLinkId || undefined}
         campaignFilter={selectedCampaign || undefined}
-        dateRange={range}
+        scopeLabel={(() => {
+          const l = links.find((x) => x.id === selectedLinkId);
+          return l ? l.title || `/${l.code}` : undefined;
+        })()}
+        period={range === "all" ? "all" : { start: rangeStart, end: rangeEnd }}
       />
 
       <PageHeader
@@ -237,7 +243,16 @@ export default function AnalyticsPage() {
               <Share2 size={12} /> Share report
             </button>
             <a
-              href={`/api/export/analytics?range=${range}${selectedCampaign ? `&campaign=${selectedCampaign}` : ""}${selectedLinkId ? `&linkId=${selectedLinkId}` : ""}`}
+              href={`/api/export/analytics?${new URLSearchParams({
+                range,
+                ...(range === "custom" && customFrom
+                  ? { from: rangeStart.toISOString(), to: rangeEnd.toISOString() }
+                  : {}),
+                ...(selectedCampaign ? { campaign: selectedCampaign } : {}),
+                ...(selectedTagId ? { tagId: selectedTagId } : {}),
+                ...(selectedLinkId ? { linkId: selectedLinkId } : {}),
+                ...(includeInternal ? { includeInternal: "1" } : {}),
+              }).toString()}`}
               className="btn btn-secondary"
             >
               <Download size={12} /> Export CSV

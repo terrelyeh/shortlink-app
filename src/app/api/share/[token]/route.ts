@@ -4,6 +4,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import bcrypt from "bcryptjs";
 import { headers } from "next/headers";
 import type { Prisma } from "@prisma/client";
+import { sharePeriodBounds } from "@/lib/share-period";
 
 /** Resolve the Click.where filter from the ShareToken's scope fields. */
 function buildClickFilter(token: {
@@ -12,7 +13,9 @@ function buildClickFilter(token: {
   rangeWindow: string | null;
   workspaceId: string | null;
 }): Prisma.ClickWhereInput {
-  const where: Prisma.ClickWhereInput = {};
+  // Real traffic only — same default as every dashboard view. Test clicks
+  // (?_test=1) used to leak into reports sent to managers.
+  const where: Prisma.ClickWhereInput = { isInternal: false };
 
   if (token.shortLinkId) {
     where.shortLinkId = token.shortLinkId;
@@ -27,10 +30,8 @@ function buildClickFilter(token: {
     }
   }
 
-  if (token.rangeWindow) {
-    const days = parseInt(token.rangeWindow.replace("d", ""), 10) || 30;
-    where.timestamp = { gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000) };
-  }
+  const bounds = sharePeriodBounds(token.rangeWindow);
+  if (bounds.gte || bounds.lte) where.timestamp = bounds;
 
   return where;
 }
@@ -95,7 +96,7 @@ export async function POST(
 
     const clickWhere = buildClickFilter(shareToken);
 
-    const [clicksByDayRaw, deviceStats, browserStats, countryStats, totalClicks] =
+    const [clicksByDayRaw, deviceStats, browserStats, countryStats, totalClicks, byLink] =
       await Promise.all([
         prisma.click.groupBy({
           by: ["timestamp"],
@@ -120,7 +121,42 @@ export async function POST(
           take: 10,
         }),
         prisma.click.count({ where: clickWhere }),
+        // Per-link counts → top links + source / medium breakdown (the
+        // "which channel worked" question a manager actually asks).
+        prisma.click.groupBy({
+          by: ["shortLinkId"],
+          where: clickWhere,
+          _count: true,
+        }),
       ]);
+
+    const linkMeta = await prisma.shortLink.findMany({
+      where: { id: { in: byLink.map((r) => r.shortLinkId) } },
+      select: { id: true, code: true, title: true, utmSource: true, utmMedium: true, utmContent: true },
+    });
+    const metaById = new Map(linkMeta.map((l) => [l.id, l]));
+    const sourceMap = new Map<string, number>();
+    const mediumMap = new Map<string, number>();
+    const topLinks = byLink
+      .map((r) => {
+        const m = metaById.get(r.shortLinkId);
+        const source = m?.utmSource || "(none)";
+        const medium = m?.utmMedium || "(none)";
+        sourceMap.set(source, (sourceMap.get(source) ?? 0) + r._count);
+        mediumMap.set(medium, (mediumMap.get(medium) ?? 0) + r._count);
+        return {
+          code: m?.code ?? "",
+          title: m?.title ?? null,
+          source: m?.utmSource ?? null,
+          medium: m?.utmMedium ?? null,
+          content: m?.utmContent ?? null,
+          clicks: r._count,
+        };
+      })
+      .sort((a, b) => b.clicks - a.clicks)
+      .slice(0, 20);
+    const toRows = (m: Map<string, number>) =>
+      [...m.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
 
     const clicksByDayMap = new Map<string, number>();
     clicksByDayRaw.forEach((c: { timestamp: Date; _count: number }) => {
@@ -171,6 +207,9 @@ export async function POST(
           name: c.country || "Unknown",
           value: c._count,
         })),
+        sources: toRows(sourceMap),
+        mediums: toRows(mediumMap),
+        topLinks,
       },
     });
   } catch (error) {

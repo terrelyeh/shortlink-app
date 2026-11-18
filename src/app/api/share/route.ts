@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveWorkspaceScope, canUserActOnResource } from "@/lib/workspace";
 import { z } from "zod";
+import { isValidSharePeriod } from "@/lib/share-period";
 import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 
@@ -17,7 +18,13 @@ const createShareSchema = z
   .object({
     shortLinkId: z.string().optional(),
     campaignName: z.string().min(1).optional(),
-    rangeWindow: z.enum(["7d", "14d", "30d", "90d"]).optional(),
+    // "all" | "YYYY-MM-DD..YYYY-MM-DD" (fixed, what the UI sends now) |
+    // legacy rolling "7d"… — see lib/share-period.ts.
+    rangeWindow: z
+      .string()
+      .max(30)
+      .refine(isValidSharePeriod, "Invalid rangeWindow")
+      .optional(),
     password: z.string().optional(),
     expiresAt: z.string().datetime().optional(),
     maxViews: z.number().int().positive().optional(),

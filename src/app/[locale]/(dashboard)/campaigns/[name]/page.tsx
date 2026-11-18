@@ -29,6 +29,7 @@ import {
   ChevronDown,
   Table2,
   CalendarRange,
+  Share2,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
@@ -38,6 +39,7 @@ import { TrendCell, classifyTrend, type TrendState } from "@/components/analytic
 import { formatRelativeTime } from "@/lib/utils/format";
 import { computeAnalytics, type RawAnalyticsData } from "@/lib/analytics/compute";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ShareModal } from "@/components/analytics/ShareModal";
 import { SyncButton } from "@/components/layout/SyncButton";
 
 interface CampaignLink {
@@ -70,6 +72,7 @@ export default function CampaignDetailPage() {
   // Test-click filter strings live in the analytics namespace because
   // the same UI shows up on /analytics — keeping one source of truth.
   const tAnalytics = useTranslations("analytics");
+  const tShare = useTranslations("share");
   const campaignName = decodeURIComponent(params.name as string);
 
   const qc = useQueryClient();
@@ -81,6 +84,7 @@ export default function CampaignDetailPage() {
   // campaigns are usually reviewed after they end (a fixed 30-day window
   // showed exhibition campaigns as empty a few months later).
   const [trendRange, setTrendRange] = useState<"all" | "90d" | "30d">("all");
+  const [shareOpen, setShareOpen] = useState(false);
 
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
@@ -419,6 +423,20 @@ export default function CampaignDetailPage() {
 
   return (
     <>
+      {/* Shares the period currently selected on this page, frozen. */}
+      <ShareModal
+        isOpen={shareOpen}
+        onClose={() => setShareOpen(false)}
+        campaignFilter={campaignName}
+        period={
+          trendRange === "all"
+            ? "all"
+            : {
+                start: new Date(Date.now() - (trendRange === "90d" ? 90 : 30) * 86_400_000),
+                end: new Date(),
+              }
+        }
+      />
       <PageHeader
         back={t("backToCampaigns")}
         onBack={() => router.push("/campaigns")}
@@ -436,6 +454,9 @@ export default function CampaignDetailPage() {
         actions={
           <>
             <SyncButton queryKeys={[[...linksKey], [...goalKey], [...rawKey]]} />
+            <button className="btn btn-secondary" onClick={() => setShareOpen(true)}>
+              <Share2 size={13} /> {tShare("shareCampaign")}
+            </button>
             <button
               className="btn btn-secondary"
               onClick={copyAllLinks}
