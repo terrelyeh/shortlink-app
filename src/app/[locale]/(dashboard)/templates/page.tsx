@@ -22,6 +22,7 @@ import {
   ChevronDown,
   ArrowRight,
   AlertCircle,
+  Info,
 } from "lucide-react";
 import Link from "next/link";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -176,6 +177,18 @@ export default function TemplatesPage() {
           </>
         }
       />
+
+      {/* What / optional / how — teammates read the old menu position as
+          "a required step" and didn't know they could skip templates. */}
+      <div className="flex gap-3 p-4 bg-sky-50/60 border border-sky-100 rounded-xl text-sm text-slate-600">
+        <Info className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+        <div className="space-y-1.5">
+          <p className="font-semibold text-slate-800">{t("templatesIntroTitle")}</p>
+          <p>{t("templatesIntroBody")}</p>
+          <p className="font-medium text-slate-700">{t("templatesIntroOptional")}</p>
+          <p className="text-slate-500">{t("templatesIntroHowTo")}</p>
+        </div>
+      </div>
 
       {/* Template List */}
       {templates.length === 0 ? (

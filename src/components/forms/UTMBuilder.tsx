@@ -277,10 +277,11 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
     <div className="space-y-4">
       {/* Template Selector */}
       {templates.length > 0 && (
-        <div className="p-4 bg-sky-50 border border-sky-100 rounded-xl">
-          <label className="block text-sm font-semibold text-sky-700 mb-2">
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+          <label className="block text-sm font-semibold text-slate-600 mb-2">
             <FileText className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />
             {t("applyTemplate")}
+            <span className="ml-1 text-xs font-normal text-slate-400">({t("optionalShortcut")})</span>
           </label>
           <div className="relative">
             <select
@@ -308,7 +309,7 @@ export function UTMBuilder({ values, onChange, originalUrl, campaignLocked }: UT
             </div>
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            {t("templateSelectorHint")}
+            {t("templateSelectorHintOptional")}
           </p>
         </div>
       )}

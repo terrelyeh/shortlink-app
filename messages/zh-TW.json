@@ -280,7 +280,13 @@
     "invalidName": "名稱格式不正確",
     "sourceGovernanceWarning": "「{value}」不在這個 workspace 的核准清單（{list}） — 儲存時會被擋下。",
     "mediumGovernanceWarning": "「{value}」不在這個 workspace 的核准清單（{list}） — 儲存時會被擋下。",
-    "templatesOnlyChannelPreset": "模板不綁定 campaign — 這是「管道預設」，campaign 每次建 link 時再填。"
+    "templatesOnlyChannelPreset": "模板不綁定 campaign — 這是「管道預設」，campaign 每次建 link 時再填。",
+    "optionalShortcut": "選填",
+    "templateSelectorHintOptional": "一鍵帶入媒介 / 來源 / 內容。不用也可以，直接在下方選即可。",
+    "templatesIntroTitle": "UTM 模板是什麼？（選用）",
+    "templatesIntroBody": "把一個常用通路的「媒介 / 來源 / 內容」存起來，例如「每週 EDM」= email / newsletter_weekly、「展攤 QR」= qr / poster。用途只是省得每次重打、讓大家的拼法一致。",
+    "templatesIntroOptional": "不用它也完全可以。建立連結時，在 UTM 區塊直接選媒介和來源就好。",
+    "templatesIntroHowTo": "要用的話：在這裡按模板的「使用」，或建立連結時在 UTM 區塊最上方選模板。模板不含活動（campaign），活動每次建連結時再填。"
   },
   "analytics": {
     "title": "數據分析",
