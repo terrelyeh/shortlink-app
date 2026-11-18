@@ -30,6 +30,7 @@ import {
 import Link from "next/link";
 import { StatusDot } from "@/components/ui/Badge";
 import { useToast } from "@/components/ui/Toast";
+import { formatDestination } from "@/lib/utils/destination";
 
 interface LinkTag {
   tag: { id: string; name: string; color?: string | null };
@@ -55,6 +56,7 @@ export interface LinkMobileCardProps {
     ogTitle?: string | null;
     _count: { clicks: number; conversions?: number };
     tags?: LinkTag[];
+    createdBy?: { id: string; name: string | null; image: string | null } | null;
   };
   shortBaseUrl: string;
   selected: boolean;
@@ -99,6 +101,7 @@ export function LinkMobileCard({
 
   const shortUrl = `${shortBaseUrl}/${link.code}`;
   const shortUrlDisplay = shortUrl.replace(/^https?:\/\//, "");
+  const dest = formatDestination(link.originalUrl);
 
   const statusLabel =
     link.status === "ACTIVE"
@@ -185,9 +188,8 @@ export function LinkMobileCard({
             {link.title || `/${link.code}`}
           </p>
           <p className="lmc-dest" title={link.originalUrl}>
-            {link.originalUrl
-              .replace(/^https?:\/\/(www\.)?/, "")
-              .substring(0, 60)}
+            → {dest.host}
+            {dest.rest}
           </p>
         </div>
 
@@ -276,6 +278,9 @@ export function LinkMobileCard({
       <div className="lmc-foot">
         <span className="lmc-status">
           <StatusDot status={link.status} /> {statusLabel}
+          {link.createdBy?.name && (
+            <span style={{ color: "var(--ink-500)" }}> · {link.createdBy.name}</span>
+          )}
         </span>
         <span className="lmc-clicks">
           <strong>{link._count.clicks.toLocaleString()}</strong>{" "}

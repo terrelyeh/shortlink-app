@@ -72,7 +72,7 @@ SyncButton click → qc.invalidateQueries(pageKeys) → 強制重抓當頁
 |---|---|---|
 | `["analytics-raw"]` | 90d × 10k 筆 raw clicks（~2MB） | `/analytics`、Campaign Detail、Compare |
 | `["campaigns-summary", window]` | leaderboard / 時序 / orphans | `/campaigns`、Compare |
-| `["links", 500]` | 連結列表（含 trend） | `/links` |
+| `["links", 500]` | 連結列表（含 trend、`createdBy`；Redis key `links-list-v3`） | `/links` |
 | `["links-trash"]` | 已軟刪除的連結（上限 200） | `/links/trash`；刪除後由 LinksClient invalidate |
 | `["campaign-links", name]` | 某活動下的 links | Campaign Detail |
 | `["campaign-goal", name]` | 該活動的 goalClicks | Campaign Detail |

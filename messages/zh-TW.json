@@ -196,7 +196,12 @@
     "socialPreviewFromPage": "目的頁面原本：{value}",
     "socialPreviewCard": "卡片預覽",
     "socialPreviewCacheNote": "各平台會快取預覽。已經分享出去的連結改完後，要到 Facebook Sharing Debugger / LinkedIn Post Inspector 重新抓取。",
-    "socialPreviewNoImage": "無圖片"
+    "socialPreviewNoImage": "無圖片",
+    "linkColumn": "短網址 → 目的網址",
+    "createdBy": "建立者",
+    "destinationTooltip": "開啟目的網址（不帶 UTM）— 完整網址：",
+    "abVariantsTooltip": "A/B 測試：流量會分到 {n} 個網址，不只這一個",
+    "mediumSource": "媒介 / 來源"
   },
   "utm": {
     "title": "UTM 參數",

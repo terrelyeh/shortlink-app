@@ -27,6 +27,7 @@ import {
   ChevronDown,
   FileSpreadsheet,
   X,
+  User as UserIcon,
 } from "lucide-react";
 import { CampaignFilter } from "@/components/campaigns/CampaignFilter";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -63,6 +64,8 @@ interface ShortLink {
   ogTitle?: string | null;
   _count: { clicks: number; conversions?: number };
   tags?: LinkTag[];
+  createdBy?: { id: string; name: string | null; image: string | null } | null;
+  variants?: unknown;
 }
 
 interface LinksClientProps {
@@ -78,7 +81,6 @@ interface LinksPayload {
 
 export default function LinksClient({ initialCampaign = "" }: LinksClientProps) {
   const t = useTranslations("links");
-  const tUtm = useTranslations("utm");
   const tCommon = useTranslations("common");
   const { success, error: toastError } = useToast();
   const searchParams = useSearchParams();
@@ -167,6 +169,7 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [tagFilter, setTagFilter] = useState("");
+  const [creatorFilter, setCreatorFilter] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
   const [sortBy, setSortBy] = useState("createdAt");
@@ -182,6 +185,19 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
   const [batchTagLoading, setBatchTagLoading] = useState(false);
 
   const shortBaseUrl = process.env.NEXT_PUBLIC_SHORT_URL || "http://localhost:3000/s";
+
+  // Creator filter options with per-person link counts (over all loaded
+  // links, not the filtered view) — doubles as a quick "who made what".
+  const creators = useMemo(() => {
+    const m = new Map<string, { id: string; name: string; count: number }>();
+    for (const l of allLinks) {
+      if (!l.createdBy) continue;
+      const cur = m.get(l.createdBy.id);
+      if (cur) cur.count++;
+      else m.set(l.createdBy.id, { id: l.createdBy.id, name: l.createdBy.name || "—", count: 1 });
+    }
+    return [...m.values()].sort((a, b) => b.count - a.count);
+  }, [allLinks]);
 
   const links = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -202,13 +218,14 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
     if (tagFilter) {
       out = out.filter((l) => (l.tags || []).some((tg) => tg.tag.id === tagFilter));
     }
+    if (creatorFilter) out = out.filter((l) => l.createdBy?.id === creatorFilter);
     const dir = sortOrder === "asc" ? 1 : -1;
     out = [...out].sort((a, b) => {
       if (sortBy === "clicks") return (a._count.clicks - b._count.clicks) * dir;
       return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir;
     });
     return out;
-  }, [allLinks, search, statusFilter, campaignFilter, tagFilter, sortBy, sortOrder]);
+  }, [allLinks, search, statusFilter, campaignFilter, tagFilter, creatorFilter, sortBy, sortOrder]);
 
   const confirmDelete = (id: string) => setDeleteConfirmId(id);
 
@@ -525,6 +542,44 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
             />
           </div>
         )}
+        {creators.length > 1 && (
+          <div style={{ position: "relative" }}>
+            <select
+              value={creatorFilter}
+              onChange={(e) => setCreatorFilter(e.target.value)}
+              className="input"
+              aria-label={t("createdBy")}
+              style={{
+                height: 32,
+                paddingLeft: 32,
+                paddingRight: 28,
+                appearance: "none",
+                cursor: "pointer",
+                fontSize: 12.5,
+              }}
+            >
+              <option value="">
+                {t("createdBy")}: {tCommon("all")}
+              </option>
+              {creators.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.count})
+                </option>
+              ))}
+            </select>
+            <UserIcon
+              size={13}
+              style={{
+                position: "absolute",
+                left: 10,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "var(--ink-500)",
+                pointerEvents: "none",
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Batch toolbar */}
@@ -697,12 +752,11 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
                     aria-label="Select all"
                   />
                 </th>
-                <th>{t("title")}</th>
-                <th style={{ width: 160 }}>Campaign</th>
-                <th style={{ width: 100 }}>{tUtm("medium")}</th>
-                <th style={{ width: 110 }}>{tUtm("source")}</th>
-                <th style={{ width: 140 }}>{t("shortUrl")}</th>
+                <th>{t("linkColumn")}</th>
+                <th style={{ width: 140 }}>Campaign</th>
+                <th style={{ width: 120 }}>{t("mediumSource")}</th>
                 <th style={{ width: 120 }}>{t("tags")}</th>
+                <th style={{ width: 120 }}>{t("createdBy")}</th>
                 <th style={{ width: 100 }}>{t("status")}</th>
                 <th className="num" style={{ width: 110 }}>
                   {/* Custom InfoTooltip — native `title` was unreliable
@@ -721,7 +775,7 @@ export default function LinksClient({ initialCampaign = "" }: LinksClientProps) 
                     <InfoTooltip text={t("clicksColumnTip")} align="right" />
                   </span>
                 </th>
-                <th style={{ width: 36 }} />
+                <th className="col-actions" style={{ width: 36 }} />
               </tr>
             </thead>
             <tbody>
