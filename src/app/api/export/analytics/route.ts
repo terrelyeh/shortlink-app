@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveWorkspaceScope } from "@/lib/workspace";
 import { buildCsv, csvResponse } from "@/lib/utils/csv";
+import { countedClickWhere } from "@/lib/click-quality";
 
 export async function GET(request: NextRequest) {
   try {
@@ -85,7 +86,7 @@ export async function GET(request: NextRequest) {
         ? { timestamp: { ...(startDate && { gte: startDate }), ...(endDate && { lte: endDate }) } }
         : {}),
       shortLinkId: { in: targetLinkIds },
-      ...(includeInternal ? {} : { isInternal: false }),
+      ...countedClickWhere(includeInternal),
     };
 
     const clicks = await prisma.click.findMany({

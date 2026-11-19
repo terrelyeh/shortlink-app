@@ -15,6 +15,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveWorkspaceScope } from "@/lib/workspace";
 import { cached, cacheKey } from "@/lib/cache";
+import { countedClickWhere } from "@/lib/click-quality";
 
 // Two years, not 90 days: this is a seasonal tool — exhibition campaigns
 // (Computex in June) get reviewed months later, and a 90-day window made
@@ -55,8 +56,9 @@ export async function GET(request: NextRequest) {
     // isInternal=true by default. Bump key so old v2 doesn't serve
     // stale data with test clicks mixed in.
     // v4: window 90 → 730 days.
+    // v5: excludes suspected scanner clicks; meta adds excludedBot + per-link counts.
     const key = cacheKey(
-      "analytics-raw-v4",
+      "analytics-raw-v5",
       session.user.id,
       workspaceId ?? "_",
       sinceIso,
@@ -68,10 +70,15 @@ export async function GET(request: NextRequest) {
         timestamp: { gte: since },
         ...(workspaceId ? { workspaceId } : {}),
         shortLink: { deletedAt: null, ...workspaceWhere },
-        ...(includeInternal ? {} : { isInternal: false }),
+        ...countedClickWhere(includeInternal),
       };
 
-      const [links, clicks, excludedInternal] = await Promise.all([
+      const excludedBase = {
+        timestamp: { gte: since },
+        ...(workspaceId ? { workspaceId } : {}),
+        shortLink: { deletedAt: null, ...workspaceWhere },
+      };
+      const [links, clicks, internalByLink, botByLink] = await Promise.all([
         prisma.shortLink.findMany({
           where: { deletedAt: null, ...workspaceWhere },
           select: {
@@ -103,20 +110,30 @@ export async function GET(request: NextRequest) {
           orderBy: { timestamp: "desc" },
           take: CLICK_CAP + 1, // +1 so we can tell if we hit the cap
         }),
-        // Count of clicks we filtered out — surfaced in the UI as
-        // "已過濾 N 筆測試點擊" so users know the filter is active.
-        // Skip the count when the filter is off (would always be 0).
+        // Clicks we filtered out, per link — surfaced as 「已過濾 N 筆…」.
+        // Per link (not one workspace total) so a campaign page can show
+        // only its own count. Skipped when the filter is off.
         includeInternal
-          ? Promise.resolve(0)
-          : prisma.click.count({
-              where: {
-                timestamp: { gte: since },
-                ...(workspaceId ? { workspaceId } : {}),
-                shortLink: { deletedAt: null, ...workspaceWhere },
-                isInternal: true,
-              },
+          ? Promise.resolve([] as { shortLinkId: string; _count: { _all: number } }[])
+          : prisma.click.groupBy({
+              by: ["shortLinkId"],
+              where: { ...excludedBase, isInternal: true },
+              _count: { _all: true },
+            }),
+        includeInternal
+          ? Promise.resolve([] as { shortLinkId: string; _count: { _all: number } }[])
+          : prisma.click.groupBy({
+              by: ["shortLinkId"],
+              where: { ...excludedBase, isInternal: false, isSuspectedBot: true },
+              _count: { _all: true },
             }),
       ]);
+
+      const excludedByLink: Record<string, { internal: number; bot: number }> = {};
+      for (const r of internalByLink) (excludedByLink[r.shortLinkId] ??= { internal: 0, bot: 0 }).internal = r._count._all;
+      for (const r of botByLink) (excludedByLink[r.shortLinkId] ??= { internal: 0, bot: 0 }).bot = r._count._all;
+      const excludedInternal = internalByLink.reduce((n, r) => n + r._count._all, 0);
+      const excludedBot = botByLink.reduce((n, r) => n + r._count._all, 0);
 
       const truncated = clicks.length > CLICK_CAP;
       const trimmed = truncated ? clicks.slice(0, CLICK_CAP) : clicks;
@@ -150,6 +167,8 @@ export async function GET(request: NextRequest) {
           since: sinceIso,
           includeInternal,
           excludedInternal,
+          excludedBot,
+          excludedByLink,
         },
       };
     });

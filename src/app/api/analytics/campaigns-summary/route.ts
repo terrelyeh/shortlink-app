@@ -25,6 +25,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { countedClickWhere } from "@/lib/click-quality";
 import { resolveWorkspaceScope } from "@/lib/workspace";
 import { cached, cacheKey } from "@/lib/cache";
 import { classifyTrend, type TrendState } from "@/components/analytics/TrendCell";
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
     // so v3 cached payloads (which mixed test clicks into the totals)
     // don't haunt the leaderboard for up to 60s.
     const key = cacheKey(
-      "campaigns-summary-v4",
+      "campaigns-summary-v6",
       session.user.id,
       scope.workspaceId ?? "_",
       days,
@@ -114,14 +115,22 @@ export async function GET(request: NextRequest) {
       // All click queries below filter out internal/test clicks unless
       // the caller opted in. The shared `clickFilter` keeps the flag
       // consistent across windowClicks, dailyRaw, and lastClicks.
-      const clickFilter = includeInternal ? {} : { isInternal: false };
+      const clickFilter = countedClickWhere(includeInternal);
       // Raw SQL companion of the same filter — used in the dailyRaw
       // queryRaw below where we can't pass a Prisma where object.
       const rawClickSqlFilter = includeInternal
         ? Prisma.sql``
-        : Prisma.sql`AND is_internal = false`;
+        : Prisma.sql`AND is_internal = false AND is_suspected_bot = false`;
 
-      const [windowClicks, windowConversions, dailyRaw, lastClicks] = linkIds.length > 0
+      // Rolling 7×24h windows for the trend — the same definition the
+      // campaign detail page uses, so both pages show the same ±%.
+      // (Calendar-day buckets made the list say −70% while the detail
+      // page said −14% for the same campaign.)
+      const nowMs = Date.now();
+      const last7From = new Date(nowMs - 7 * 86_400_000);
+      const prev7From = new Date(nowMs - 14 * 86_400_000);
+
+      const [windowClicks, windowConversions, dailyRaw, lastClicks, last7Clicks, prev7Clicks] = linkIds.length > 0
         ? await Promise.all([
             prisma.click.groupBy({
               by: ["shortLinkId"],
@@ -159,8 +168,18 @@ export async function GET(request: NextRequest) {
               where: { shortLinkId: { in: linkIds }, ...clickFilter },
               _max: { timestamp: true },
             }),
+            prisma.click.groupBy({
+              by: ["shortLinkId"],
+              where: { shortLinkId: { in: linkIds }, timestamp: { gte: last7From }, ...clickFilter },
+              _count: { _all: true },
+            }),
+            prisma.click.groupBy({
+              by: ["shortLinkId"],
+              where: { shortLinkId: { in: linkIds }, timestamp: { gte: prev7From, lt: last7From }, ...clickFilter },
+              _count: { _all: true },
+            }),
           ])
-        : [[], [], [], []];
+        : [[], [], [], [], [], []];
 
       const windowClicksMap = new Map(
         (windowClicks as { shortLinkId: string; _count: { _all: number } }[]).map((r) => [
@@ -327,14 +346,22 @@ export async function GET(request: NextRequest) {
       // trend compares last7d vs prev7d. If the requested window is
       // shorter than 14 days we don't have a prev-7d tail — trendState
       // falls back to "new" / "none" accordingly via classifyTrend.
+      const rollingByCampaign = (rows: { shortLinkId: string; _count: { _all: number } }[]) => {
+        const m = new Map<string, number>();
+        for (const r of rows) {
+          const name = linkIdToCampaign.get(r.shortLinkId);
+          if (name) m.set(name, (m.get(name) ?? 0) + r._count._all);
+        }
+        return m;
+      };
+      const last7ByCampaign = rollingByCampaign(last7Clicks as { shortLinkId: string; _count: { _all: number } }[]);
+      const prev7ByCampaign = rollingByCampaign(prev7Clicks as { shortLinkId: string; _count: { _all: number } }[]);
+
       const campaignsWithTrend = campaigns.map((c) => {
         const series = perCampaign[c.name] ?? [];
         const sparkline = series.slice(-7);
-        const last7d = sparkline.reduce((s, v) => s + v, 0);
-        const prev7d =
-          series.length >= 14
-            ? series.slice(-14, -7).reduce((s, v) => s + v, 0)
-            : 0;
+        const last7d = last7ByCampaign.get(c.name) ?? 0;
+        const prev7d = prev7ByCampaign.get(c.name) ?? 0;
         const { trendState, trendPct } = classifyTrend(last7d, prev7d);
         return {
           ...c,

@@ -109,5 +109,7 @@ export function classifyTrend(
   if (prev7d > 0 && last7d === 0) return { trendState: "dead", trendPct: -100 };
   const pct = ((last7d - prev7d) / prev7d) * 100;
   const state: TrendState = pct > 2 ? "up" : pct < -2 ? "down" : "flat";
-  return { trendState: state, trendPct: pct };
+  // Rounded here so every caller prints a whole percentage (the detail
+  // page used to show "↓14.285714285714285%").
+  return { trendState: state, trendPct: Math.round(pct) };
 }

@@ -11,6 +11,7 @@ import {
   validateUtmAgainstGovernance,
 } from "@/lib/utm-governance";
 import { fetchOpenGraph } from "@/lib/og-scraper";
+import { countedClickWhere } from "@/lib/click-quality";
 import { upsertCampaignForUtm } from "@/lib/campaign-autolink";
 import { loadLinkCreators, type LinkCreator } from "@/lib/link-creators";
 import { z } from "zod";
@@ -125,10 +126,11 @@ export async function GET(request: NextRequest) {
     // v2 suffix: clicks now filter out isInternal so old v1 cache (mixed
     // test clicks into row counts) is busted on deploy.
     // v3: rows now carry `createdBy` (creator column on /links).
+    // v4: counts also exclude suspected scanner clicks (isSuspectedBot).
     const ns = linksCacheNamespace(scope.workspaceId, session.user.id);
     const version = await cacheGetVersion(ns);
     const key = cacheKey(
-      "links-list-v3",
+      "links-list-v4",
       ns,
       version,
       page,
@@ -150,7 +152,7 @@ export async function GET(request: NextRequest) {
 
       // The relation-count filter and the trend-window filter share
       // this rule. When includeInternal is true, we just don't filter.
-      const internalFilter = includeInternal ? {} : { isInternal: false };
+      const internalFilter = countedClickWhere(includeInternal);
 
       const [links, total] = await Promise.all([
         prisma.shortLink.findMany({

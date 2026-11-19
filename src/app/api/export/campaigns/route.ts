@@ -29,6 +29,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { resolveWorkspaceScope } from "@/lib/workspace";
+import { countedClickWhere } from "@/lib/click-quality";
 import { buildCsv, csvResponse } from "@/lib/utils/csv";
 
 const DEFAULT_DAYS = 30;
@@ -55,10 +56,10 @@ export async function GET(request: NextRequest) {
 
     // Click filter shared across all formats. Default excludes test
     // clicks (isInternal) so exported numbers match what's on screen.
-    const internalFilter = includeInternal ? {} : { isInternal: false };
+    const internalFilter = countedClickWhere(includeInternal);
     const rawInternalSql = includeInternal
       ? Prisma.sql``
-      : Prisma.sql`AND is_internal = false`;
+      : Prisma.sql`AND is_internal = false AND is_suspected_bot = false`;
     const today = new Date().toISOString().split("T")[0];
 
     if (format === "links") {

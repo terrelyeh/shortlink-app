@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { resolveWorkspaceScope } from "@/lib/workspace";
 import { buildCsv, csvResponse } from "@/lib/utils/csv";
 import { loadLinkCreators } from "@/lib/link-creators";
+import { countedClickWhere } from "@/lib/click-quality";
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
       include: {
         _count: {
           select: {
-            clicks: includeInternal ? true : { where: { isInternal: false } },
+            clicks: includeInternal ? true : { where: countedClickWhere(false) },
           },
         },
         tags: { include: { tag: true } },

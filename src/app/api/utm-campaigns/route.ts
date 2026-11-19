@@ -1,3 +1,4 @@
+import { countedClickWhere } from "@/lib/click-quality";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -77,6 +78,7 @@ export async function GET(request: NextRequest) {
     const clickCounts = (await (prisma.click.groupBy as Function)({
       by: ["shortLinkId"],
       where: {
+        ...countedClickWhere(false),
         shortLink: {
           utmCampaign: { in: campaignNames },
           deletedAt: null,

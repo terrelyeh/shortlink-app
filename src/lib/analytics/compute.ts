@@ -47,6 +47,10 @@ export interface RawAnalyticsData {
     includeInternal?: boolean;
     /** Count of clicks excluded by the test-click filter (0 when off) */
     excludedInternal?: number;
+    /** Suspected scanner clicks left out (lib/click-quality). */
+    excludedBot?: number;
+    /** Excluded counts per link, so a campaign page can show only its own. */
+    excludedByLink?: Record<string, { internal: number; bot: number }>;
   };
 }
 
@@ -186,14 +190,31 @@ export function computeAnalytics(
 
   for (const c of inRange) {
     const d = new Date(c.timestamp);
-    const dayKey = d.toISOString().slice(0, 10);
+    const dayKey = localDayKey(d);
     dayMap.set(dayKey, (dayMap.get(dayKey) || 0) + 1);
     hourMap.set(d.getHours(), (hourMap.get(d.getHours()) || 0) + 1);
   }
 
-  const clicksByDay = Array.from(dayMap.entries())
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([date, clicks]) => ({ date, clicks }));
+  // Zero-fill so quiet days show as 0 instead of the line jumping
+  // straight between active days. Long ranges ("all", 730d) start at the
+  // first click rather than drawing months of zeros before the campaign.
+  const clicksByDay: { date: string; clicks: number }[] = [];
+  if (inRange.length > 0) {
+    let firstMs = Infinity;
+    for (const c of inRange) firstMs = Math.min(firstMs, new Date(c.timestamp).getTime());
+    const LONG_RANGE_MS = 92 * 24 * 60 * 60 * 1000;
+    const fromMs = periodMs > LONG_RANGE_MS ? firstMs : startMs;
+    const cursor = new Date(fromMs);
+    cursor.setHours(0, 0, 0, 0);
+    const last = new Date(Math.min(endMs, Date.now()));
+    const lastKey = localDayKey(last);
+    for (let guard = 0; guard < 1000; guard++) {
+      const key = localDayKey(cursor);
+      clicksByDay.push({ date: key, clicks: dayMap.get(key) ?? 0 });
+      if (key >= lastKey) break;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  }
 
   const clicksByHour = Array.from(hourMap.entries())
     .sort((a, b) => a[0] - b[0])
@@ -399,4 +420,12 @@ export function computeAnalytics(
       ),
     },
   };
+}
+
+/** YYYY-MM-DD in the viewer's timezone (same basis as the hour heatmap). */
+function localDayKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }

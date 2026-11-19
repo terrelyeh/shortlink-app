@@ -59,6 +59,8 @@
 19. **列表建立者** — `ShortLink.createdById` **沒有 Prisma relation**，`lib/link-creators.ts` 用一次 `user.findMany` 批次查名字，`/api/links`（Redis key `links-list-v3`）與 `/api/export/links` 共用。要在別處顯示建立者就用它，別每列各查一次
 20. **建立連結流程** — `/links/new` 是 server page，讀 `?utmCampaign=` / `?template=`（模板依 workspace 成員資格查）後把 `prefill` 傳給 `CreateLinkForm`；建立成功**留在原頁**顯示短網址 + QR，不再 redirect 回 `/links`。其他入口（活動頁「新增連結」、模板頁「使用」）都靠這兩個參數
 
+21. **疑似掃描點擊（`Click.isSuspectedBot`）** — 規則只有一條：UA 是 Chromium 且主版號 < 100（`lib/click-quality.ts`）。企業郵件安全閘道會在 EDM 寄出後幾分鐘內開遍所有連結（2026-11 查：EDM 點擊 57% 來自同一個 `Chrome/79` UA）。跟 `isInternal` 一樣**標記不刪除**、不計入 `clickCount`，所有統計用 `countedClickWhere(includeExcluded)` 取「算數的點擊」——**新寫 click 查詢一律用它**，不要只寫 `isInternal: false`。「含測試與疑似機器點擊」開關會兩者一起放回。歷史資料用 `scripts/flag-suspected-bot-clicks.mjs` 回填（可 `--undo`），**改規則時兩邊要同步**。IP 爆量規則試過、會誤抓連看多篇 LinkedIn 的真人，已放棄
+
 ## Conventions
 
 ### Server / Client split 命名

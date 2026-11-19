@@ -321,11 +321,11 @@
     "allLinks": "連結：全部",
     "clearFilter": "清除篩選",
     "trendNew": "新",
-    "includeTest": "含測試點擊",
-    "includeTestTip": "預設過濾：來自「測試短網址」按鈕（?_test=1）以及登入工作區成員自己點擊產生的點擊。打開可顯示全部。",
-    "filteredTestClicks": "已過濾 {n} 筆測試點擊（來自「測試短網址」或工作區成員）",
-    "realTrafficOnly": "顯示實際流量（已排除測試點擊）",
-    "includingTestClicks": "含測試點擊（包含 ?_test=1 與工作區成員點擊）",
+    "includeTest": "含測試與疑似機器點擊",
+    "includeTestTip": "預設排除兩種點擊：「測試短網址」（?_test=1）或工作區成員自己點的測試點擊，以及疑似郵件安全掃描的機器點擊（舊版瀏覽器自動點開 EDM 裡每個連結）。打開可顯示全部。",
+    "filteredTestClicks": "已排除 {n} 筆測試點擊（來自「測試短網址」或工作區成員）",
+    "realTrafficOnly": "顯示實際流量（已排除測試與疑似機器點擊）",
+    "includingTestClicks": "含測試與疑似機器點擊（未過濾）",
     "showAll": "全部顯示",
     "viewingLinkAnalytics": "正在查看單一連結分析",
     "viewingCampaignAnalytics": "正在查看單一活動分析",
@@ -376,7 +376,10 @@
       }
     },
     "rangeAll": "全部期間",
-    "rangeBeforeWindow": "{date} 之前的資料不在讀取範圍內"
+    "rangeBeforeWindow": "{date} 之前的資料不在讀取範圍內",
+    "filteredExcluded": "已排除 {parts}",
+    "excludedTestPart": "{n} 筆測試點擊",
+    "excludedBotPart": "{n} 筆疑似郵件掃描點擊"
   },
   "share": {
     "title": "分享報表",
@@ -727,7 +730,7 @@
       "exportLinks": "連結明細",
       "exportLinksHint": "每個連結一列：點擊、不重複訪客、最後點擊",
       "exportDaily": "每日趨勢（長表）",
-      "exportDailyHint": "日期 × 連結（近 90 天），適合樞紐分析 / 畫圖",
+      "exportDailyHint": "日期 × 連結（依目前選的期間），適合樞紐分析 / 畫圖",
       "resetClicksTooltip": "重設點擊計數（軟重設，可還原）",
       "resetDialogTitle": "重設「{name}」的點擊計數？",
       "resetDialogBody": "此動作會把這個活動旗下 {links} 條連結共 {count} 筆實際點擊標記為測試數據，KPI / 圖表會立刻歸 0。",

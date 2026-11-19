@@ -166,6 +166,23 @@ export default function CampaignDetailPage() {
     },
   });
 
+  // Excluded-click notice for THIS campaign only (the raw payload's
+  // totals are workspace-wide — showing those here was misleading).
+  const excludedSummary = useMemo(() => {
+    const byLink = raw?.meta.excludedByLink ?? {};
+    let test = 0;
+    let bot = 0;
+    for (const l of links) {
+      test += byLink[l.id]?.internal ?? 0;
+      bot += byLink[l.id]?.bot ?? 0;
+    }
+    const parts = [
+      test > 0 ? tAnalytics("excludedTestPart", { n: test }) : null,
+      bot > 0 ? tAnalytics("excludedBotPart", { n: bot.toLocaleString() }) : null,
+    ].filter(Boolean);
+    return parts.join("、");
+  }, [raw, links, tAnalytics]);
+
   const computed = useMemo(() => {
     if (!raw) return null;
     const rangeEnd = new Date();
@@ -511,7 +528,7 @@ export default function CampaignDetailPage() {
                       </span>
                     </a>
                     <a
-                      href={`/api/export/campaigns?format=link-daily&days=90&campaign=${encodeURIComponent(
+                      href={`/api/export/campaigns?format=link-daily&days=${trendRange === "all" ? 730 : trendRange === "90d" ? 90 : 30}&campaign=${encodeURIComponent(
                         campaignName,
                       )}${includeInternal ? "&includeInternal=1" : ""}`}
                       className="export-menu-item"
@@ -694,8 +711,8 @@ export default function CampaignDetailPage() {
         }}
       >
         <span style={{ fontVariantNumeric: "tabular-nums" }}>
-          {!includeInternal && (raw?.meta.excludedInternal ?? 0) > 0
-            ? tAnalytics("filteredTestClicks", { n: raw?.meta.excludedInternal ?? 0 })
+          {!includeInternal && excludedSummary
+            ? tAnalytics("filteredExcluded", { parts: excludedSummary })
             : includeInternal
               ? tAnalytics("includingTestClicks")
               : tAnalytics("realTrafficOnly")}
