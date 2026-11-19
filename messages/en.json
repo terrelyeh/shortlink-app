@@ -481,169 +481,6 @@
     "exportSummaryHint": "One row per campaign: clicks, trend, goal progress",
     "exportTimeseries": "Daily trend (long format)",
     "exportTimeseriesHint": "Date × campaign, ideal for pivot tables / charts",
-    "kickstartTitle": "Campaign Kickstart",
-    "kickstartDescription": "Pick a playbook, fill the basics, and spin up every channel's tracked link in one go.",
-    "kickstartBack": "Back",
-    "kickstartUtmGuide": "UTM Guide",
-    "kickstartOrientationHeading": "New to this tool? Read me first.",
-    "kickstartOrientationIntro": "Kickstart creates 8–10 tracked short links in one shot, each with the right UTM parameters for a specific marketing channel. Use this whenever you launch something with a full channel mix — it saves you from hand-building each link and making typos in UTM values.",
-    "kickstartOrientationWhenLabel": "When to use:",
-    "kickstartOrientationWhenBody": "new product launches, exhibition events, webinars, big campaigns with multiple channels.",
-    "kickstartOrientationWhenNotLabel": "When NOT to use:",
-    "kickstartOrientationWhenNotBody": "one-off links (use Links → Create link), CSV imports of 50+ links (use Links → Import CSV).",
-    "kickstartOrientationNewLabel": "Never heard of UTM?",
-    "kickstartOrientationNewBody": "Read the UTM Parameters Guide first (5 min read). It explains what source / medium / content actually mean.",
-    "kickstartOrientationExpand": "Show when to / when not to use ↓",
-    "kickstartOrientationCollapse": "Hide details ↑",
-    "kickstartStep1Title": "Pick a playbook",
-    "kickstartStep1HelpTitle": "A playbook is the typical channel mix for a campaign type.",
-    "kickstartStep1Help": "Every row in the playbook becomes one short link — all of them share your landing URL and utm_campaign, but each has its own source / medium / content so you can later compare which channel drove the most traffic.",
-    "kickstartStep2Title": "Campaign basics",
-    "kickstartStep2HelpTitle": "These two fields apply to every link in this campaign.",
-    "kickstartStep2Help": "utm_campaign is the id that groups all links under one campaign in your Analytics — keep it short, lowercase, underscored (we auto-normalize). Landing URL is the page all these links will redirect to.",
-    "kickstartStep2UtmCampaignLabel": "utm_campaign",
-    "kickstartStep2LandingLabel": "Landing URL",
-    "kickstartStep2SavedAs": "Saved as",
-    "kickstartStep2AlreadyExists": "This campaign already exists ({count} link{count, plural, one {} other {s}}) — see banner below.",
-    "kickstartStep3Title": "Channel plan",
-    "kickstartStep3HelpTitle": "Uncheck rows you don't need, or tweak the UTM values per row.",
-    "kickstartStep3Help": "Each row becomes one short link. Short codes are auto-generated. Source / medium / content values have specific meanings — see the ? icons on the column headers for examples.",
-    "kickstartStep3Selected": "{included} of {total} selected",
-    "kickstartStep3SelectedWithExisting": "{included} of {total} selected · {existing} already exist",
-    "kickstartColChannel": "Title",
-    "kickstartSourceHelpTitle": "Who sent them.",
-    "kickstartSourceHelpBody": "The specific platform or mailing list — e.g. facebook, google, newsletter, intercom.",
-    "kickstartMediumHelpTitle": "How they got here.",
-    "kickstartMediumHelpBody": "The traffic type — e.g. email, social, cpc (paid), referral.",
-    "kickstartContentHelpTitle": "Which creative.",
-    "kickstartContentHelpBody": "Distinguishes different posts / emails / ads within the same source+medium — e.g. edm_headline_a, fb_organic_v1.",
-    "kickstartExtendingHeading": "Extending an existing campaign",
-    "kickstartExtendingBody": "{campaign} already has {count} link{count, plural, one {} other {s}}. Rows matching an existing channel have been unchecked — they already exist. Only the checked rows will be added.",
-    "kickstartRowExists": "Already exists",
-    "kickstartRowCreated": "Created",
-    "kickstartRowDuplicate": "Duplicate this row",
-    "kickstartRowRemove": "Remove",
-    "kickstartAddBlankRow": "Add blank row",
-    "kickstartAddBlankRowHint": "Add a channel that isn't in the playbook (e.g. Twitter/X)",
-    "kickstartSubmitWillCreate": "Will create {count} link{count, plural, one {} other {s}} under campaign {campaign}",
-    "kickstartSubmitNeedFields": "Fill in a utm_campaign id (≥ 3 chars) and a landing URL (https://…) to continue.",
-    "kickstartSubmitIncompleteRow": "One or more checked rows is missing source / medium / content — fill them in or uncheck the row.",
-    "kickstartSubmitCreating": "Creating…",
-    "kickstartSubmitCreate": "Create {count} link{count, plural, one {} other {s}}",
-    "kickstartWhyShow": "Why?",
-    "kickstartWhyHide": "Hide why",
-    "kickstartNextStepsHeading": "{count} link{count, plural, one {} other {s}} created under {campaign}",
-    "kickstartNextStepsIntro": "Here's what to do next — in order:",
-    "kickstartNextStep1": "Open the Campaign dashboard to see all the links you just created and their short URLs. Copy each one to the corresponding channel (EDM tool, FB post, etc.).",
-    "kickstartNextStep2": "Set a goal (optional) on the Campaign page so the Leaderboard shows your progress toward target clicks.",
-    "kickstartNextStep3": "After launch, check Analytics daily for the first week. Filter by this campaign to see which channel is pulling the most weight.",
-    "kickstartNextStep4": "Need to add a channel later? Don't start from scratch — come back to Kickstart and enter the same utm_campaign value; it'll detect existing links and only create the missing ones.",
-    "kickstartOpenCampaign": "Open {campaign}",
-    "kickstartErrorsHeading": "{count} row{count, plural, one {} other {s}} failed",
-    "kickstartErrorsBody": "Check the errors inline above. Successful rows are already saved — you can fix the failing rows and click Create again.",
-    "kickstartPlaybookChannels": "{count} channels · hint: {hint}",
-    "kickstartPlaybooks": {
-      "product_launch": {
-        "name": "Product Launch",
-        "description": "New product launch with a landing page + EDM + social + PR + paid media.",
-        "channels": {
-          "edm_v1": {
-            "label": "EDM #1 — Announcement",
-            "hint": "Main announcement email"
-          },
-          "edm_v2": {
-            "label": "EDM #2 — Follow-up",
-            "hint": "Second piece — reminder / case study / FAQ"
-          },
-          "fb_v1": {
-            "label": "Facebook post — Announcement",
-            "hint": ""
-          },
-          "fb_v2": {
-            "label": "Facebook post — Follow-up",
-            "hint": "Second piece / follow-up post"
-          },
-          "li_v1": {
-            "label": "LinkedIn post — Announcement",
-            "hint": ""
-          },
-          "li_v2": {
-            "label": "LinkedIn post — Follow-up",
-            "hint": "Second piece / follow-up post"
-          },
-          "pr": {
-            "label": "PR release",
-            "hint": ""
-          },
-          "intercom": {
-            "label": "Intercom in-app",
-            "hint": ""
-          },
-          "li_ads": {
-            "label": "LinkedIn Ads",
-            "hint": ""
-          },
-          "google_ads": {
-            "label": "Google Ads",
-            "hint": ""
-          }
-        }
-      },
-      "exhibition_event": {
-        "name": "Exhibition Event",
-        "description": "Trade show / conference with a dedicated event landing page and pre-event promotion.",
-        "channels": {
-          "edm_save_date": {
-            "label": "EDM — Save the Date",
-            "hint": ""
-          },
-          "edm_reminder": {
-            "label": "EDM — Event Reminder",
-            "hint": "Sent 1–2 weeks before the event"
-          },
-          "fb_announce": {
-            "label": "Facebook — Announcement",
-            "hint": ""
-          },
-          "fb_booth": {
-            "label": "Facebook — Booth Tease",
-            "hint": ""
-          },
-          "li_announce": {
-            "label": "LinkedIn — Announcement",
-            "hint": ""
-          },
-          "li_booth": {
-            "label": "LinkedIn — Booth Tease",
-            "hint": ""
-          },
-          "pr_event": {
-            "label": "PR release",
-            "hint": ""
-          },
-          "intercom_event": {
-            "label": "Intercom in-app",
-            "hint": ""
-          },
-          "li_ads_event": {
-            "label": "LinkedIn Ads",
-            "hint": ""
-          },
-          "google_ads_event": {
-            "label": "Google Ads",
-            "hint": ""
-          },
-          "qr_booth_poster": {
-            "label": "QR — Booth poster",
-            "hint": "Set this row's own destination if the poster points elsewhere"
-          },
-          "qr_flyer": {
-            "label": "QR — Flyer / DM",
-            "hint": ""
-          }
-        }
-      }
-    },
     "searchPlaceholder": "Search campaigns...",
     "allStatuses": "All Statuses",
     "allTags": "All Tags",
@@ -867,8 +704,6 @@
     },
     "allTime": "All time",
     "clicksAllTime": "Clicks (all time)",
-    "kickstartRowUrlPlaceholder": "Destination (blank = default landing URL above)",
-    "kickstartSubmitBadRowUrl": "A row's destination must start with http(s)://",
     "statusUpcoming": "Upcoming",
     "periodPreset": "Campaign period",
     "periodPresetLong": "each campaign's period",
@@ -984,5 +819,158 @@
       "MEMBER": "Create and manage own resources",
       "VIEWER": "View only access"
     }
+  },
+  "kickstart": {
+    "title": "Campaign Kickstart",
+    "backToCampaigns": "Back to campaigns",
+    "progressLabel": "Setup progress",
+    "stepCount": "Step {n} of {total}",
+    "step": {
+      "type": "Type",
+      "basics": "Basics",
+      "destination": "Destination",
+      "channels": "Channels",
+      "goals": "Goals",
+      "review": "Review"
+    },
+    "q": {
+      "type": "What kind of campaign is this?",
+      "typeSub": "Pick a type and we'll lay out the usual channels and name every UTM for you.",
+      "basics": "What's it called, and when does it run?",
+      "basicsSub": "These set the tracking name, status and goal pace. You can change them later on the campaign page.",
+      "destination": "Where should the links go?",
+      "destinationSubExhibition": "The show's landing page. Booth QR codes can each point somewhere else (e.g. demo booking) in the next step.",
+      "destinationSubLaunch": "The product or campaign page. Every link goes here by default; you can change individual links later.",
+      "channels": "Which channels will you use?",
+      "channelsSub": "Laid out along the timeline — tick what you'll use. Posting several pieces on one channel? Use \"Add another\". Each piece gets its own tracked link so you can tell them apart.",
+      "goals": "Click goal per channel?",
+      "goalsSub": "Each channel gets its own progress bar on the campaign page, with a pace line. Not sure? Use the suggested values, or skip.",
+      "review": "One last check",
+      "reviewSub": "These are the links that will be created. Edit titles, content, codes and URLs inline; codes are checked as you type."
+    },
+    "type": {
+      "exhibition": "Exhibition",
+      "exhibitionDesc": "Pre-show promotion → on-site QR → post-show follow-up",
+      "exhibitionEg": "e.g. Computex, Interop, ISE",
+      "launch": "Product launch",
+      "launchDesc": "Announcement post, email and press release, plus a follow-up wave",
+      "launchEg": "e.g. Wi-Fi 7 AP launch",
+      "ecommerce": "E-commerce promo",
+      "ecommerceSoon": "Coming soon (Amazon Black Friday / Prime Day)"
+    },
+    "modeNew": "New campaign",
+    "modeExisting": "Add links to an existing campaign",
+    "nameLabel": "Campaign name",
+    "namePlaceholderExhibition": "e.g. ISE 2027",
+    "namePlaceholderLaunch": "e.g. Wi-Fi 7 AP",
+    "campaignLabel": "Tracking name (utm_campaign)",
+    "edit": "Edit",
+    "campaignHint": "Generated from the name; every link shares it. Use the same value in GA4 and ad platforms so the numbers line up.",
+    "nameTaken": "A campaign with this tracking name already exists.",
+    "switchToExisting": "Add links to it instead",
+    "existingLabel": "Campaign",
+    "existingPick": "Choose…",
+    "existingHint": "Keeps its tracking name; channels it already has are skipped automatically.",
+    "startLabel": "Start date",
+    "endLabel": "End date",
+    "periodHintExhibition": "Suggested: from the first teaser email to two weeks after the thank-you email.",
+    "periodHintLaunch": "Suggested: launch day to six weeks after.",
+    "startInPast": "The start date is in the past — is the year right?",
+    "endBeforeStart": "The end date is before the start date.",
+    "ownerLabel": "Owner",
+    "me": "(me)",
+    "ownerHint": "Whose KPI this campaign counts toward.",
+    "landingLabel": "Main destination URL",
+    "urlInvalid": "URLs must start with https://",
+    "pagePending": "The campaign page isn't live yet",
+    "pagePendingHint": "Use the homepage for now. These links get a \"page pending\" tag so you can filter and update them in one go once the page is live — short links stay the same.",
+    "pagePendingTag": "page pending",
+    "phase": {
+      "pre": "Pre-show",
+      "live": "On-site QR",
+      "post": "Post-show",
+      "launch": "Launch",
+      "follow": "Follow-up wave",
+      "extra": "Optional"
+    },
+    "phaseHint": {
+      "pre": "Get the right people to the booth",
+      "live": "One link per physical spot, so you learn which spot works",
+      "post": "Follow up within a week of the show",
+      "launch": "Main launch-day channels",
+      "follow": "A second wave 1–2 weeks later",
+      "extra": "Tick if needed"
+    },
+    "phaseTag": {
+      "pre": "pre-show",
+      "live": "on-site QR",
+      "post": "post-show",
+      "launch": "launch",
+      "follow": "follow-up"
+    },
+    "channels": {
+      "edmSaveTheDate": "EDM — Save the date",
+      "edmReminder": "EDM — Reminder",
+      "liTeaser": "LinkedIn — Teaser",
+      "qrBoothFront": "QR — Booth front",
+      "qrBoothDemo": "QR — Demo area",
+      "qrBrochure": "QR — Brochure / flyer",
+      "qrNamecard": "QR — Name card",
+      "edmPostEvent": "EDM — Thank-you",
+      "liRecap": "LinkedIn — Recap",
+      "prRelease": "Press release",
+      "partnerInvite": "Partner invitation",
+      "liAds": "LinkedIn Ads",
+      "liAnnounce": "LinkedIn — Announcement",
+      "edmAnnounce": "EDM — Announcement",
+      "intercom": "Intercom in-app",
+      "liFollowup": "LinkedIn — Follow-up",
+      "edmFollowup": "EDM — Follow-up",
+      "fbAnnounce": "Facebook — Announcement",
+      "googleAds": "Google Ads"
+    },
+    "alreadyCreated": "Already created (/{code})",
+    "addAnother": "Add another",
+    "qrGoesTo": "This QR goes to",
+    "willCreate": "{n} links will be created",
+    "goalPieces": "{n} piece(s)",
+    "goalRef": "Reference: past average {avg} per piece × {n} ≈ {sug}",
+    "goalNoRef": "No past data for this channel",
+    "useSuggestions": "Use all suggestions",
+    "goalTotal": "Total goal {n}",
+    "goalPaceNote": "While the campaign runs, the campaign page marks where you should be by today.",
+    "goalSkipNote": "No end date, so there's no pace line — you can add one later on the campaign page.",
+    "periodLabel": "Period",
+    "notSet": "Not set",
+    "goalLabel": "Goals",
+    "colTitle": "Title",
+    "colChannel": "Channel",
+    "colCode": "Short code",
+    "colUrl": "Destination",
+    "codeRandom": "blank = random",
+    "codeRandomHint": "Blank gives a random code",
+    "codeOk": "available",
+    "codeInvalid": "3–50 letters, digits, - or _",
+    "codeDuplicate": "Duplicated in this list",
+    "codeTaken": "Already in use",
+    "someFailed": "{ok} created, {n} failed (fix and press again — created links won't be duplicated):",
+    "retryFailed": "Retry {n}",
+    "createN": "Create {n} links",
+    "back": "Back",
+    "next": "Next",
+    "skip": "Skip",
+    "doneTitle": "Done — {n} links created",
+    "doneSub": "Campaign {campaign}'s period, owner and goals are set too.",
+    "doneLinks": "Short links",
+    "copyAll": "Copy all",
+    "nextTitle": "Next",
+    "next1": "Open each link once with \"Test short URL\" to check where it lands (test clicks aren't counted).",
+    "next2": "For printed QR codes, download the SVG from the campaign page's Links tab for the designer, then scan a proof with a phone.",
+    "next3": "Once it's running, check each channel's goal progress on the campaign page — channels behind pace show in orange.",
+    "goToCampaign": "Go to campaign",
+    "startOver": "Set up another campaign",
+    "settingsSaveFailed": "Links were created, but the period / owner / goals didn't save — set them on the campaign page.",
+    "goalRefLoading": "Calculating reference…",
+    "rowsNeedFix": "{n} row(s) need fixing (red boxes) before creating."
   }
 }

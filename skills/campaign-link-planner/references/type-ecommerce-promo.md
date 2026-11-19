@@ -22,7 +22,7 @@ Still fill the UTM columns even for Amazon destinations — the ShortLink tool u
 
 | Piece | medium / source | content |
 |---|---|---|
-| EDM 預告 / 開賣 / 最後機會 | email / newsletter | `teaser`, `launch_day`, `last_chance` |
+| EDM 預告 / 開賣 / 最後機會 | email / mailchimp | `teaser`, `launch_day`, `last_chance` |
 | 社群貼文 | social / facebook, instagram, linkedin… | `teaser`, `deal_live`, `last_chance` |
 | KOL / 部落客 | influencer / kol_<name> or platform | `review`, `unboxing` |
 | 合作夥伴 / 比價網站 | referral / partner_<name> | `deal` |

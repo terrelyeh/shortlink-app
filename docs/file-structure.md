@@ -15,7 +15,7 @@ src/
 │   │   │   │   ├── CampaignsClient.tsx
 │   │   │   │   ├── [name]/page.tsx # 單活動駕駛艙（Overview / Traffic / Links tabs）
 │   │   │   │   ├── compare/        # /campaigns/compare?names=a,b,c
-│   │   │   │   └── kickstart/      # Wizard：選 playbook 一鍵建整套追蹤連結
+│   │   │   │   └── kickstart/      # 引導式活動啟動器（skill 流程的網頁版）
 │   │   │   ├── links/
 │   │   │   │   ├── page.tsx + LinksClient.tsx
 │   │   │   │   ├── [id]/           # 編輯
@@ -88,7 +88,7 @@ src/
 │   ├── share-period.ts             # 分享報告期間格式（all / 固定日期 / 舊滾動值）
 │   ├── link-creators.ts            # createdById → 建立者名字（無 relation，批次查）
 │   ├── utils/destination.ts        # 列表顯示用的目的網址（去 UTM、只允許 http(s) href）
-│   ├── campaign-playbooks.ts       # Kickstart wizard 的 playbook 定義（Product Launch / Exhibition）
+│   ├── kickstart/                  # 活動啟動器範本（templates.ts）與命名規則（naming.ts）
 │   └── utils/{utm,shortcode,format}.ts
 ├── messages/{en,zh-TW}.json        # 雙語文件；每新增使用者可見字串就兩邊都要加
 └── middleware.ts                   # next-intl routing + 短域名守護（rewrite /<code> → /s/<code>）

@@ -23,7 +23,7 @@ Goal of the campaign: make target buyers aware of the product and get them to th
 |---|---|---|
 | LinkedIn 發表文 / 追蹤文 | social / linkedin | `announce` / `followup` |
 | Facebook 發表文 / 追蹤文 | social / facebook | `announce` / `followup` |
-| EDM 第一封 / 第二封 | email / newsletter | `announce` / `followup` |
+| EDM 第一封 / 第二封 | email / mailchimp | `announce` / `followup` |
 | 新聞稿 | referral / pr | `press` |
 | Intercom | referral / intercom | `app` |
 | LinkedIn Ads | cpc / linkedin | `visual_a`, `visual_b` (one link per creative) |

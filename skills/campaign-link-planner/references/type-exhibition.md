@@ -15,13 +15,13 @@ Goal: get the right visitors to the booth (pre-show), capture interest on site (
 
 | Piece | medium / source | content |
 |---|---|---|
-| 展前邀請 EDM | email / newsletter | `save_the_date`, `reminder` |
+| 展前邀請 EDM | email / mailchimp | `save_the_date`, `reminder` |
 | LinkedIn 展前預告 | social / linkedin | `teaser`, `booth_tease` |
 | 攤位海報 QR | qr / poster | position: `booth_front`, `booth_demo`, `hall_entrance` |
 | 型錄 / DM 上的 QR | qr / flyer | `brochure` |
 | 名片 QR | qr / namecard | `staff` (or per person if they want to compare) |
 | 代理商邀請 | referral / partner_<name> | `invite` |
-| 展後 EDM | email / newsletter | `post_event` |
+| 展後 EDM | email / mailchimp | `post_event` |
 | LinkedIn 展後回顧 | social / linkedin | `recap` |
 
 Printed QR rules: never set `expires_at` (posters get reused and photographed); custom codes should be short and readable because people sometimes type them; one link per physical position so you learn which spot works. Ask whether last year's number was per QR or all QR combined before using it as a baseline.

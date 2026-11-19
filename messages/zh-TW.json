@@ -481,169 +481,6 @@
     "exportSummaryHint": "每個活動一列：點擊、趨勢、目標達成率",
     "exportTimeseries": "每日趨勢（長表）",
     "exportTimeseriesHint": "日期 × 活動，適合 Excel 樞紐分析 / 畫圖",
-    "kickstartTitle": "活動啟動器",
-    "kickstartDescription": "選一個範本、填入基本資訊，一次產生整場活動所需的追蹤短網址。",
-    "kickstartBack": "返回",
-    "kickstartUtmGuide": "UTM 指南",
-    "kickstartOrientationHeading": "第一次用？先看這段。",
-    "kickstartOrientationIntro": "啟動器一次幫你建立 8–10 條帶正確 UTM 的追蹤短網址，每一條對應一個行銷管道。每次啟動有多管道的活動時就用它，省去手動一條一條建 + 避免 UTM 打錯字。",
-    "kickstartOrientationWhenLabel": "什麼時候用：",
-    "kickstartOrientationWhenBody": "新品上市、展會活動、Webinar、需要多管道推廣的大型活動。",
-    "kickstartOrientationWhenNotLabel": "什麼時候「不」用：",
-    "kickstartOrientationWhenNotBody": "單一連結（請用「連結管理 → 建立連結」）、50 條以上的 CSV 匯入（請用「連結管理 → 匯入 CSV」）。",
-    "kickstartOrientationNewLabel": "沒聽過 UTM？",
-    "kickstartOrientationNewBody": "先讀 UTM 參數使用指南（5 分鐘），會解釋 source / medium / content 各自代表什麼意思。",
-    "kickstartOrientationExpand": "展開使用時機說明 ↓",
-    "kickstartOrientationCollapse": "收起 ↑",
-    "kickstartStep1Title": "選擇活動範本",
-    "kickstartStep1HelpTitle": "範本是某種活動類型的標準管道組合。",
-    "kickstartStep1Help": "範本中每一列會變成一條短網址 — 所有連結共用相同的 landing URL 和 utm_campaign，但各自有獨立的 source / medium / content，之後才能比較哪個管道成效最好。",
-    "kickstartStep2Title": "活動基本資訊",
-    "kickstartStep2HelpTitle": "這兩個欄位會套用到本次活動的每一條連結。",
-    "kickstartStep2Help": "utm_campaign 是所有連結在 Analytics 報表中歸屬於同一場活動的 id — 建議短、全小寫、用底線（系統會自動標準化）。Landing URL 就是所有連結要導去的頁面。",
-    "kickstartStep2UtmCampaignLabel": "utm_campaign",
-    "kickstartStep2LandingLabel": "Landing URL",
-    "kickstartStep2SavedAs": "會儲存為",
-    "kickstartStep2AlreadyExists": "這個 campaign 已存在（{count} 條連結）— 請看下方 banner。",
-    "kickstartStep3Title": "管道規劃",
-    "kickstartStep3HelpTitle": "取消勾選不需要的列，或調整每一列的 UTM 值。",
-    "kickstartStep3Help": "每一列會變成一條短網址。短碼自動產生。Source / medium / content 有各自的意義 — 點欄位標題旁的 ? 看說明和範例。",
-    "kickstartStep3Selected": "已選 {included} / {total}",
-    "kickstartStep3SelectedWithExisting": "已選 {included} / {total} · {existing} 條已存在",
-    "kickstartColChannel": "標題",
-    "kickstartSourceHelpTitle": "誰帶他來的。",
-    "kickstartSourceHelpBody": "具體平台或電子報名稱 — 例如 facebook、google、newsletter、intercom。",
-    "kickstartMediumHelpTitle": "怎麼來的。",
-    "kickstartMediumHelpBody": "流量類型 — 例如 email、social、cpc（付費）、referral。",
-    "kickstartContentHelpTitle": "哪個素材。",
-    "kickstartContentHelpBody": "區分相同 source+medium 下的不同貼文 / 信件 / 廣告 — 例如 edm_headline_a、fb_organic_v1。",
-    "kickstartExtendingHeading": "擴充既有活動",
-    "kickstartExtendingBody": "{campaign} 已有 {count} 條連結。符合既有管道（source+medium+content 完全相同）的列已自動取消勾選 — 只會建立剩下勾選的部分。",
-    "kickstartRowExists": "已存在",
-    "kickstartRowCreated": "已建立",
-    "kickstartRowDuplicate": "複製此列",
-    "kickstartRowRemove": "移除",
-    "kickstartAddBlankRow": "新增空白列",
-    "kickstartAddBlankRowHint": "加入範本沒有的管道（例如 Twitter/X）",
-    "kickstartSubmitWillCreate": "將在活動 {campaign} 下建立 {count} 條連結",
-    "kickstartSubmitNeedFields": "請填入 utm_campaign（至少 3 字元）和 landing URL（https://…）才能繼續。",
-    "kickstartSubmitIncompleteRow": "有勾選的列缺 source / medium / content — 請補齊或取消勾選。",
-    "kickstartSubmitCreating": "建立中…",
-    "kickstartSubmitCreate": "建立 {count} 條連結",
-    "kickstartWhyShow": "為什麼？",
-    "kickstartWhyHide": "收起說明",
-    "kickstartNextStepsHeading": "在 {campaign} 下已建立 {count} 條連結",
-    "kickstartNextStepsIntro": "接下來建議依序做這些：",
-    "kickstartNextStep1": "打開 Campaign 頁面，看所有剛建的連結和短網址，把每條複製到對應的管道（EDM 工具、FB 貼文等）。",
-    "kickstartNextStep2": "（選配）在 Campaign 頁設目標點擊數，Leaderboard 會顯示達成率。",
-    "kickstartNextStep3": "活動上線後，第一週每天看數據分析，用此活動當篩選，觀察哪個管道帶最多流量。",
-    "kickstartNextStep4": "之後要補管道？不要重頭做 — 回到啟動器，輸入相同的 utm_campaign，系統會偵測既有連結，只建缺的部分。",
-    "kickstartOpenCampaign": "打開 {campaign}",
-    "kickstartErrorsHeading": "{count} 列建立失敗",
-    "kickstartErrorsBody": "錯誤訊息在上方每列中。已成功的列已經存到 DB — 修正失敗列後可以再按一次建立。",
-    "kickstartPlaybookChannels": "{count} 個管道 · 提示：{hint}",
-    "kickstartPlaybooks": {
-      "product_launch": {
-        "name": "新產品上市",
-        "description": "新產品上市 + landing page + EDM + 社群 + PR + 付費媒體的完整組合。",
-        "channels": {
-          "edm_v1": {
-            "label": "EDM #1 — 公告",
-            "hint": "主要公告信"
-          },
-          "edm_v2": {
-            "label": "EDM #2 — 跟進",
-            "hint": "第二篇素材 — 提醒 / 案例 / FAQ"
-          },
-          "fb_v1": {
-            "label": "Facebook 貼文 — 公告",
-            "hint": ""
-          },
-          "fb_v2": {
-            "label": "Facebook 貼文 — 跟進",
-            "hint": "第二篇素材 / 跟進貼文"
-          },
-          "li_v1": {
-            "label": "LinkedIn 貼文 — 公告",
-            "hint": ""
-          },
-          "li_v2": {
-            "label": "LinkedIn 貼文 — 跟進",
-            "hint": "第二篇素材 / 跟進貼文"
-          },
-          "pr": {
-            "label": "PR 新聞稿",
-            "hint": ""
-          },
-          "intercom": {
-            "label": "Intercom 站內訊息",
-            "hint": ""
-          },
-          "li_ads": {
-            "label": "LinkedIn Ads",
-            "hint": ""
-          },
-          "google_ads": {
-            "label": "Google Ads",
-            "hint": ""
-          }
-        }
-      },
-      "exhibition_event": {
-        "name": "展會活動",
-        "description": "展覽 / 大型研討會，專屬 event landing page + 事前宣傳。",
-        "channels": {
-          "edm_save_date": {
-            "label": "EDM — Save the Date",
-            "hint": ""
-          },
-          "edm_reminder": {
-            "label": "EDM — 活動提醒",
-            "hint": "活動前 1–2 週發送"
-          },
-          "fb_announce": {
-            "label": "Facebook — 活動公告",
-            "hint": ""
-          },
-          "fb_booth": {
-            "label": "Facebook — 展攤預告",
-            "hint": ""
-          },
-          "li_announce": {
-            "label": "LinkedIn — 活動公告",
-            "hint": ""
-          },
-          "li_booth": {
-            "label": "LinkedIn — 展攤預告",
-            "hint": ""
-          },
-          "pr_event": {
-            "label": "PR 新聞稿",
-            "hint": ""
-          },
-          "intercom_event": {
-            "label": "Intercom 站內訊息",
-            "hint": ""
-          },
-          "li_ads_event": {
-            "label": "LinkedIn Ads",
-            "hint": ""
-          },
-          "google_ads_event": {
-            "label": "Google Ads",
-            "hint": ""
-          },
-          "qr_booth_poster": {
-            "label": "QR — 展攤海報",
-            "hint": "海報導向別的網址時，在這一列填它自己的目的網址"
-          },
-          "qr_flyer": {
-            "label": "QR — 傳單 / DM",
-            "hint": ""
-          }
-        }
-      }
-    },
     "searchPlaceholder": "搜尋活動...",
     "allStatuses": "所有狀態",
     "allTags": "所有標籤",
@@ -867,8 +704,6 @@
     },
     "allTime": "全部期間",
     "clicksAllTime": "點擊數（全部期間）",
-    "kickstartRowUrlPlaceholder": "目的網址（留空 = 用上方的預設網址）",
-    "kickstartSubmitBadRowUrl": "有一列的目的網址不是 http(s):// 開頭",
     "statusUpcoming": "即將開始",
     "periodPreset": "活動期間",
     "periodPresetLong": "各活動期間",
@@ -984,5 +819,158 @@
       "MEMBER": "建立和管理自己的資源",
       "VIEWER": "僅能檢視"
     }
+  },
+  "kickstart": {
+    "title": "活動啟動器",
+    "backToCampaigns": "返回行銷活動",
+    "progressLabel": "設定進度",
+    "stepCount": "第 {n} / {total} 步",
+    "step": {
+      "type": "活動類型",
+      "basics": "基本資訊",
+      "destination": "目的網址",
+      "channels": "通路",
+      "goals": "目標",
+      "review": "確認建立"
+    },
+    "q": {
+      "type": "這是哪一種活動？",
+      "typeSub": "選好類型，我們會帶出這類活動常用的通路，並自動幫你命名所有 UTM。",
+      "basics": "活動叫什麼、什麼時候跑？",
+      "basicsSub": "這些資料會決定追蹤名稱、狀態與目標進度，之後也能在活動頁修改。",
+      "destination": "點了連結要去哪裡？",
+      "destinationSubExhibition": "填展會活動頁網址。現場 QR 可以在下一步各自指定要導去哪（例如 Demo 預約頁）。",
+      "destinationSubLaunch": "填產品頁或活動頁網址，所有連結預設都導到這裡，下一步可以逐條調整。",
+      "channels": "要在哪些通路發？",
+      "channelsSub": "已依時程排好，勾選這次會用到的通路；同一個通路要發好幾則，按「再加一則」。每一則都有自己的追蹤連結，之後才分得出哪則表現好。",
+      "goals": "各通路的點擊目標？",
+      "goalsSub": "依通路設目標，活動頁會分別顯示進度，還會標出「照時間應該到哪裡」。不確定的話可以先套用參考值，或直接略過。",
+      "review": "最後確認一次",
+      "reviewSub": "這是將要建立的連結。標題、內容、短碼和網址都可以直接改；短碼會即時檢查有沒有被用過。"
+    },
+    "type": {
+      "exhibition": "展會",
+      "exhibitionDesc": "展前宣傳 → 現場 QR → 展後追蹤",
+      "exhibitionEg": "例：Computex、Interop、ISE",
+      "launch": "新品上市",
+      "launchDesc": "發表文、發表信、新聞稿，加上追蹤的第二波",
+      "launchEg": "例：Wi-Fi 7 AP 上市",
+      "ecommerce": "電商促銷",
+      "ecommerceSoon": "即將推出（Amazon 黑五 / Prime Day）"
+    },
+    "modeNew": "新活動",
+    "modeExisting": "幫既有活動補連結",
+    "nameLabel": "活動名稱",
+    "namePlaceholderExhibition": "例：ISE 2027",
+    "namePlaceholderLaunch": "例：Wi-Fi 7 AP",
+    "campaignLabel": "追蹤名稱 (utm_campaign)",
+    "edit": "修改",
+    "campaignHint": "系統依活動名稱自動產生，所有連結都會用同一個值；GA4 和廣告平台也要用這個名字才對得起來。",
+    "nameTaken": "這個追蹤名稱已經有活動了。",
+    "switchToExisting": "改成幫它補連結",
+    "existingLabel": "選擇活動",
+    "existingPick": "請選擇…",
+    "existingHint": "沿用原本的追蹤名稱，已經建過的通路會自動略過，不會重複。",
+    "startLabel": "開始日",
+    "endLabel": "結束日",
+    "periodHintExhibition": "建議從第一封預告信寄出那天，算到展後感謝信寄出後兩週。",
+    "periodHintLaunch": "建議從發表日算到發表後 6 週。",
+    "startInPast": "開始日已經過了，年份對嗎？",
+    "endBeforeStart": "結束日早於開始日。",
+    "ownerLabel": "負責人",
+    "me": "（我）",
+    "ownerHint": "這檔活動的成效算在誰的 KPI 上。",
+    "landingLabel": "主要目的網址",
+    "urlInvalid": "網址要以 https:// 開頭。",
+    "pagePending": "活動頁還沒上線",
+    "pagePendingHint": "先填官網首頁也沒關係，這些連結會加上「待換活動頁」標籤，等頁面上線後在連結列表篩選出來一次改好，短網址不會變。",
+    "pagePendingTag": "待換活動頁",
+    "phase": {
+      "pre": "展前宣傳",
+      "live": "現場 QR",
+      "post": "展後追蹤",
+      "launch": "發表",
+      "follow": "第二波追蹤",
+      "extra": "選用"
+    },
+    "phaseHint": {
+      "pre": "讓對的人知道要來攤位",
+      "live": "一個實體位置一條連結，才知道哪裡最多人掃",
+      "post": "展後一週內追蹤最有效",
+      "launch": "發表當天的主要通路",
+      "follow": "一到兩週後的第二波",
+      "extra": "有需要再勾"
+    },
+    "phaseTag": {
+      "pre": "展前",
+      "live": "現場QR",
+      "post": "展後",
+      "launch": "發表",
+      "follow": "追蹤"
+    },
+    "channels": {
+      "edmSaveTheDate": "EDM — Save the date",
+      "edmReminder": "EDM — 展前提醒",
+      "liTeaser": "LinkedIn — 展前預告",
+      "qrBoothFront": "QR — 攤位正面",
+      "qrBoothDemo": "QR — Demo 區",
+      "qrBrochure": "QR — 型錄 / DM",
+      "qrNamecard": "QR — 名片",
+      "edmPostEvent": "EDM — 展後感謝",
+      "liRecap": "LinkedIn — 展後回顧",
+      "prRelease": "新聞稿",
+      "partnerInvite": "代理商 / 合作夥伴邀請",
+      "liAds": "LinkedIn Ads",
+      "liAnnounce": "LinkedIn — 發表文",
+      "edmAnnounce": "EDM — 發表信",
+      "intercom": "Intercom 站內訊息",
+      "liFollowup": "LinkedIn — 追蹤文",
+      "edmFollowup": "EDM — 追蹤信",
+      "fbAnnounce": "Facebook — 發表文",
+      "googleAds": "Google Ads"
+    },
+    "alreadyCreated": "已建立（/{code}）",
+    "addAnother": "再加一則",
+    "qrGoesTo": "這個 QR 導去",
+    "willCreate": "將建立 {n} 條連結",
+    "goalPieces": "{n} 則",
+    "goalRef": "參考：過去每則平均 {avg} 次 × {n} 則 ≈ {sug}",
+    "goalNoRef": "過去沒有這個通路的資料",
+    "useSuggestions": "全部套用參考值",
+    "goalTotal": "總目標 {n}",
+    "goalPaceNote": "活動進行中時，活動頁會依期間標出今天應該到的進度。",
+    "goalSkipNote": "沒有填結束日，所以不會有進度參考線；之後可以在活動頁補上。",
+    "periodLabel": "活動期間",
+    "notSet": "未設定",
+    "goalLabel": "目標",
+    "colTitle": "標題",
+    "colChannel": "通路",
+    "colCode": "短碼",
+    "colUrl": "目的網址",
+    "codeRandom": "留空 = 隨機",
+    "codeRandomHint": "留空會產生隨機短碼",
+    "codeOk": "可以使用",
+    "codeInvalid": "只能用 3–50 個英數字、- 或 _",
+    "codeDuplicate": "這次的清單裡重複了",
+    "codeTaken": "已經被用過了",
+    "someFailed": "已建立 {ok} 條，{n} 條失敗（修正後再按一次即可，已建立的不會重複）：",
+    "retryFailed": "重試 {n} 條",
+    "createN": "建立 {n} 條連結",
+    "back": "上一步",
+    "next": "下一步",
+    "skip": "略過",
+    "doneTitle": "完成！已建立 {n} 條連結",
+    "doneSub": "活動 {campaign} 的期間、負責人和目標也都設好了。",
+    "doneLinks": "短網址",
+    "copyAll": "複製全部",
+    "nextTitle": "接下來",
+    "next1": "每條連結按一次「測試短網址」，確認導到對的頁面（測試點擊不會算進數據）。",
+    "next2": "要印的 QR，到活動頁「連結」分頁下載 SVG 交給設計；印出打樣後用手機實際掃一次。",
+    "next3": "活動開始後，到活動頁看各通路的目標進度，落後的會以橘色標出。",
+    "goToCampaign": "前往活動頁",
+    "startOver": "再建一個活動",
+    "settingsSaveFailed": "連結已建立，但活動期間 / 負責人 / 目標沒有存成功，請到活動頁再設定一次。",
+    "goalRefLoading": "計算參考值中…",
+    "rowsNeedFix": "還有 {n} 條需要修正（紅框處）才能建立。"
   }
 }

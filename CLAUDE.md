@@ -47,7 +47,7 @@
 7. **Auth + Workspace** ⭐ — DB-driven signIn gate；權限判斷全在 `lib/workspace.ts`：resource 層級用 `canUserActOnResource`、workspace 層級用 `isWorkspaceAdmin` + `resolveWorkspaceAccess`、`/api/workspaces/*` 用 `requireWorkspaceMember`
 8. **UTM 建構器 + 白名單** — 治理設定只有 workspace OWNER/ADMIN 能改
 9. **Custom domain** — `go.engenius.ai/<code>` internal rewrite 到 `/s/<code>`，其餘 302 到官網
-10. **Kickstart wizard** — 選 playbook 一鍵建整套追蹤連結
+10. **Kickstart wizard** — 引導式 6 步，等於活動規劃 skill 的網頁版（範本 `lib/kickstart/templates.ts` ↔ skill `references/type-*.md`、命名 `lib/kickstart/naming.ts` ↔ `utm-rules.md`，**改一邊要同步另一邊**）。建立走 `/api/links/batch-csv` 一次送出，再 PATCH 活動的期間 / 負責人 / 依通路目標。EDM 的 `utm_source` 統一 `mailchimp`
 11. **Mobile baseline** — ≤768px `/links` 切 card view
 12. **測試點擊標記與軟重設** — `Click.isInternal` + `resetBatchId`，標記而非刪除，可整批還原
 13. **CSV 匯出** — links / analytics / campaigns 三個 endpoint 共用 `csvResponse()`

@@ -31,7 +31,7 @@ These match the ShortLink tool's built-in UTM lists and the team's UTM 使用指
 Prefer the tool's built-in values so dropdowns and whitelists match:
 
 - social / cpc / display: `linkedin`, `facebook`, `instagram`, `threads`, `x`, `youtube`, `line`, `google`, `bing`, `amazon`
-- email: `newsletter` (or the platform: `hubspot`, `mailchimp`)
+- email: `mailchimp` — the team's standard (it's what EDMs are sent with). Don't mix in `newsletter`: one campaign using both splits its report in two. Use another platform's name only if the email really goes out through it (`hubspot`).
 - referral: `pr` (press release), `partner` or `partner_<name>`, `distributor`, `website`, `intercom`
 - qr: `poster`, `flyer`, `standee`, `packaging`, `namecard`, `event`
 - influencer: the platform, or `kol_<name>` when tracking named creators

@@ -200,11 +200,11 @@ const scoped = await prisma.shortLink.findMany({
 
 ## 10. Kickstart wizard（活動啟動器）
 
-`/campaigns/kickstart`：選 playbook（Product Launch / Exhibition Event）→ 自動展開 8–10 個頻道的 checklist（每個頻道一條 link，預填 source/medium/content）→ 一鍵 sequential POST `/api/links` 建完。
+`/campaigns/kickstart`：引導式 6 步（類型 → 基本資訊 → 目的網址 → 通路 → 目標 → 確認），等於活動規劃 skill 的網頁版。UTM / 短碼 / 標題 / 標籤由 `lib/kickstart/naming.ts` 依 skill 的 `utm-rules.md` 產生；一次送 `/api/links/batch-csv`（沿用 CSV 匯入的白名單、標籤、自訂短碼處理），再 `PATCH /api/utm-campaigns/[name]` 寫入期間 / 負責人 / 依通路目標。
 
 **擴充模式**：使用者輸入既有 utm_campaign 名稱時，wizard query `/api/links?campaign=<name>` 找出已建頻道，自動 uncheck 對應列（用 `useRef` 確保只 auto-uncheck 一次，不會 stomp 使用者手動切換）。完全成功的列在 submit 後也自動 uncheck，避免 partial-failure retry 重複建立。
 
-Playbook 定義在 `lib/campaign-playbooks.ts`；name / description / channel label 走 i18n key `kickstartPlaybooks.{id}.channels.{id}.{label|hint}`。
+範本定義在 `lib/kickstart/templates.ts`（與 skill 的 `references/type-*.md` 同步）；文字走 i18n namespace `kickstart`。元件在 `components/kickstart/KickstartWizard.tsx`。
 
 ## 11. Mobile responsive baseline
 
