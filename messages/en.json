@@ -300,7 +300,7 @@
     "custom": "Custom Range",
     "clicks": "Clicks",
     "uniqueClicks": "Unique Clicks",
-    "referrers": "Referring pages",
+    "referrers": "Referrer sites",
     "referrersHint": "From the HTTP Referer header — only set when the click came from a web page. Email / Slack / WhatsApp / direct paste don't carry a referer. For real channel breakdowns use utm_source / utm_medium below.",
     "devices": "Devices",
     "browsers": "Browsers",
@@ -845,7 +845,9 @@
       "detailClicks": "Clicks (all time)",
       "detailFirstClick": "First click",
       "detailPeakDay": "Peak day",
-      "filterTrafficByLink": "Show only this link in Traffic"
+      "filterTrafficByLink": "Show only this link in Traffic",
+      "expandLink": "Expand link details",
+      "collapseLink": "Collapse link details"
     },
     "allTime": "All time",
     "clicksAllTime": "Clicks (all time)",
@@ -889,7 +891,9 @@
     "dayN": "Day {n}",
     "alignCalendar": "By date",
     "alignStart": "Align start",
-    "alignStartTooltip": "Day 0 = each campaign's start date (or its first click when no period is set), so campaigns held at different times line up"
+    "alignStartTooltip": "Day 0 = each campaign's start date (or its first click when no period is set), so campaigns held at different times line up",
+    "alignNoData": "Alignment needs at least two campaigns with a start date or clicks",
+    "alignStartOutside": "Some campaigns start outside the selected window, so their curve is cut off when aligned — switch to Campaign period or All time."
   },
   "errors": {
     "required": "This field is required",

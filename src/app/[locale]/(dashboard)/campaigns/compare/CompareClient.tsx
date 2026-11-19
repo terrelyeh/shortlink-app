@@ -209,34 +209,43 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
       hi = Math.min(dates.length - 1, hi + 2);
       const series: Record<string, number[]> = {};
       for (const n of present) series[n] = perCampaign[n].slice(lo, hi + 1);
-      return { dates: dates.slice(lo, hi + 1), series, xLabels: undefined };
+      return { dates: dates.slice(lo, hi + 1), series, xLabels: undefined, startOutside: false };
     }
 
     // Day 0 = start date (or first click). Clicks before day 0 — e.g.
     // pre-show EDMs — are kept as negative days. The tail stops a week
-    // after each campaign has 95% of its clicks (max 120 days), so a trickle of late
-    // clicks doesn't stretch the axis over months.
+    // after each campaign has 95% of its clicks (max 120 days), so a
+    // trickle of late clicks doesn't stretch the axis over months.
+    //
+    // Day 0 is located by date difference, so a start date outside the
+    // window (earlier than 7/30/90d, or still upcoming) stays correct
+    // instead of falling back to "first click in the window". The axis
+    // is UTC days while start dates are Taiwan days, so a click between
+    // 00:00 and 08:00 Taiwan time on day 0 can show up on day −1.
+    const DAY_MS = 86_400_000;
+    const axis0 = Date.parse(`${dates[0]}T00:00:00Z`);
     const MAX_PRE = 60;
     const plan: { n: string; d0: number; pre: number; post: number }[] = [];
     for (const n of present) {
       const arr = perCampaign[n];
       const startDay = storedDateToDay(byName.get(n)?.startDate);
       const first = firstNz(arr);
-      let d0 = startDay ? dates.indexOf(startDay) : -1;
-      if (d0 < 0) d0 = first;
-      if (d0 < 0) continue;
-      const pre = first >= 0 && first < d0 ? Math.min(d0 - first, MAX_PRE) : 0;
-      const total = arr.reduce((x, y) => x + y, 0);
+      const d0 = startDay ? Math.round((Date.parse(`${startDay}T00:00:00Z`) - axis0) / DAY_MS) : first;
+      if (d0 < 0 && !startDay) continue; // no start date and no clicks in the window
+      const from = first >= 0 && first < d0 ? Math.max(first, d0 - MAX_PRE) : d0;
+      // 95% of the clicks we'll actually draw (from `from` onwards).
+      let total = 0;
+      for (let i = Math.max(0, from); i < arr.length; i++) total += arr[i];
       let cum = 0;
-      let p98 = d0;
-      for (let i = Math.max(0, d0 - pre); i < arr.length; i++) {
+      let p95 = d0;
+      for (let i = Math.max(0, from); i < arr.length && total > 0; i++) {
         cum += arr[i];
         if (cum >= total * 0.95) {
-          p98 = i;
+          p95 = i;
           break;
         }
       }
-      plan.push({ n, d0, pre, post: Math.max(p98 - d0, 0) + 7 });
+      plan.push({ n, d0, pre: d0 - from, post: Math.max(p95 - d0, 0) + 7 });
     }
     if (plan.length < 2) return null;
     const preLen = Math.max(...plan.map((p) => p.pre));
@@ -252,7 +261,10 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
       }
     }
     const xLabels = Array.from({ length: len }, (_, i) => t("dayN", { n: i - preLen }));
-    return { dates: xLabels, series, xLabels };
+    // A start date outside the fetched window can't be lined up with
+    // the clicks around it — tell the user to widen the window.
+    const startOutside = plan.some((p) => p.d0 < 0 || p.d0 >= dates.length);
+    return { dates: xLabels, series, xLabels, startOutside };
   }, [summary, names, align, t]);
 
   const winners = useMemo(() => {
@@ -356,7 +368,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
           )}
 
           {/* Overlay chart */}
-          {overlay && (
+          {summary?.timeseries && names.filter((n) => summary.timeseries?.perCampaign[n]).length >= 2 && (
             <div className="card card-padded" style={{ marginBottom: 14 }}>
               <div className="row-between" style={{ marginBottom: 10 }}>
                 <div className="section-title">
@@ -395,7 +407,8 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                   ))}
                 </div>
               </div>
-              <MultiCampaignChart
+              {overlay ? (
+                <MultiCampaignChart
                 dates={overlay.dates}
                 series={overlay.series}
                 xLabels={overlay.xLabels}
@@ -403,6 +416,15 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                 showLegend={false}
                 height={280}
               />
+              ) : null}
+              {overlay?.startOutside && (
+                <p className="muted" style={{ fontSize: 12, margin: "8px 0 0" }}>{t("alignStartOutside")}</p>
+              )}
+              {!overlay && (
+                <div style={{ height: 120, display: "grid", placeItems: "center", fontSize: 13, color: "var(--ink-500)" }}>
+                  {align === "aligned" ? t("alignNoData") : t("noData")}
+                </div>
+              )}
             </div>
           )}
 

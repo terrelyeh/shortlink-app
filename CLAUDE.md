@@ -63,6 +63,8 @@
 
 22. **活動期間與狀態** — `Campaign.startDate/endDate` 存「台灣時間當天 00:00」，含頭尾兩天；所有換算在 `lib/campaign-period.ts`（`periodBoundsMs` / `periodTimestampWhere` / `campaignPhase`）。**狀態由日期推算**（即將開始 / 進行中 / 已結束），只有「封存」是手動（`status=ARCHIVED`，連結照常運作）；舊的 DRAFT / COMPLETED 視同 ACTIVE。活動列表、活動頁、比較頁的預設期間都是「活動期間」（沒設就是全部期間），**目標進度一律用活動期間的點擊當分母、不封頂**，不跟著期間切換。編輯走 `PATCH /api/utm-campaigns/[name]`（goal / startDate / endDate / status 皆選填）；`/api/campaigns/[id]` 的 PATCH 沒有 UI 在用
 
+23. **活動頁下鑽** — 流量分頁的每個清單（source / medium / content / 連結 / 國家 / 來源網站）都是篩選器，走 `computeAnalytics` 的 `source/medium/content`（連結層）與 `country/referrer`（點擊層）；`linkId` 也必須符合 campaign / tag 範圍（`/analytics` 選連結時會自動拿掉不符的篩選）。來源網站依網站合併在 `lib/analytics/referrer.ts`（品牌族群表、`android-app://` 套件名、共用網域如 `github.io` 保留子網域），`NO_REFERRER` 代表無 referrer。連結分頁點一列就地展開 `CampaignLinkDetail`；從活動頁編輯連結帶 `?returnTo=/campaigns/<name>`（編輯頁只接受這個格式，存檔後回到連結**目前**所屬的活動）。比較頁「對齊開始日」以日期差算第 0 天（開始日前為負天數），時間軸是 UTC 日、開始日是台灣日，差 8 小時屬已知近似
+
 ## Conventions
 
 ### Server / Client split 命名

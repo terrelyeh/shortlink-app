@@ -40,7 +40,7 @@ import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
 import { ClicksChart } from "@/components/analytics/ClicksChart";
 import { PieChartComponent } from "@/components/analytics/PieChartComponent";
-import { classifyTrend, type TrendState } from "@/components/analytics/TrendCell";
+import { classifyTrend } from "@/components/analytics/TrendCell";
 import { formatRelativeTime } from "@/lib/utils/format";
 import {
   campaignPhase,
@@ -296,39 +296,25 @@ export default function CampaignDetailPage() {
   const toggleDrill = (key: (typeof DRILL_KEYS)[number], value: string) =>
     setDrill((d) => ({ ...d, [key]: d[key] === value ? undefined : value }));
 
-  // Per-link metrics from the raw click stream — single pass over all
-  // clicks keyed by shortLinkId, so we don't re-scan N times per link.
-  // Covers: unique visitors (ipHash distinct), last click, 7d trend
-  // (last 7d vs previous 7d), and a 7-day sparkline.
-  // `raw.clicks` is capped at 90 days / 10k rows by the API; values
-  // beyond that window are simply absent — we surface "—" in the UI.
+  // Per-link metrics from the raw click stream — one pass over all clicks
+  // keyed by shortLinkId: unique visitors (distinct ipHash), last click,
+  // a lifetime mini-trend and the busiest day. `raw.clicks` is capped
+  // (730 days / 10k rows) by the API; anything older is simply absent.
   const perLinkMetrics = useMemo(() => {
-    const empty = () => ({
-      uniques: new Set<string>(),
-      lastClickAt: null as Date | null,
-      last7d: 0,
-      prev7d: 0,
-      daily: new Array(7).fill(0) as number[],
-      days: new Map<string, number>(),
-    });
-    const acc = new Map<string, ReturnType<typeof empty>>();
-    for (const l of links) acc.set(l.id, empty());
-    if (!raw) {
-      return new Map<
-        string,
-        {
-          uniqueClicks: number;
-          lastClickAt: Date | null;
-          trendPct: number | null;
-          trendState: "up" | "down" | "flat" | "new" | "dead" | "none";
-          sparkline: number[];
-          lifetime: number[];
-          peak: { date: string; clicks: number } | null;
-        }
-      >();
-    }
-    const now = Date.now();
-    const DAY = 86400000;
+    type Out = {
+      uniqueClicks: number;
+      lastClickAt: Date | null;
+      lifetime: number[];
+      peak: { date: string; clicks: number } | null;
+    };
+    const out = new Map<string, Out>();
+    let sparkMax = 1;
+    if (!raw) return { byLink: out, sparkMax };
+    const acc = new Map<
+      string,
+      { uniques: Set<string>; lastClickAt: Date | null; days: Map<string, number> }
+    >();
+    for (const l of links) acc.set(l.id, { uniques: new Set(), lastClickAt: null, days: new Map() });
     let firstMs = Infinity;
     for (const c of raw.clicks) {
       const m = acc.get(c.shortLinkId);
@@ -339,35 +325,16 @@ export default function CampaignDetailPage() {
       const dk = localDayKey(ts);
       m.days.set(dk, (m.days.get(dk) ?? 0) + 1);
       if (!m.lastClickAt || ts > m.lastClickAt) m.lastClickAt = ts;
-      const ageMs = now - ts.getTime();
-      if (ageMs < 7 * DAY) {
-        m.last7d++;
-        const daysAgo = Math.floor(ageMs / DAY);
-        if (daysAgo >= 0 && daysAgo < 7) m.daily[6 - daysAgo]++;
-      } else if (ageMs < 14 * DAY) {
-        m.prev7d++;
-      }
     }
-    const out = new Map<
-      string,
-      {
-        uniqueClicks: number;
-        lastClickAt: Date | null;
-        trendPct: number | null;
-        trendState: TrendState;
-        sparkline: number[];
-        lifetime: number[];
-        peak: { date: string; clicks: number } | null;
-      }
-    >();
     // Lifetime mini-trend: every row shares one axis (campaign's first
-    // click → today) in ≤ 40 bins, so rows can be compared by eye. The old
-    // 7-day trend was blank for nearly every link once a campaign ended.
+    // click → today) in ≤ 40 bins and one y-scale, so rows can be compared
+    // by eye. Bins are cut from today backwards so the newest bin is a
+    // full one (a partial last bin made every line dip at the right edge).
     const axis: string[] = [];
     if (Number.isFinite(firstMs)) {
       const cur = new Date(firstMs);
       cur.setHours(0, 0, 0, 0);
-      const todayKey = localDayKey(new Date(now));
+      const todayKey = localDayKey(new Date());
       for (let g = 0; g < 1000; g++) {
         const k = localDayKey(cur);
         axis.push(k);
@@ -375,31 +342,22 @@ export default function CampaignDetailPage() {
         cur.setDate(cur.getDate() + 1);
       }
     }
-    const bins = Math.min(40, Math.max(axis.length, 1));
-    const per = Math.ceil(axis.length / bins) || 1;
+    const per = Math.max(1, Math.ceil(axis.length / 40));
     for (const [id, m] of acc) {
-      const { trendState, trendPct } = classifyTrend(m.last7d, m.prev7d);
       const lifetime: number[] = [];
-      for (let i = 0; i < axis.length; i += per) {
+      for (let end = axis.length; end > 0; end -= per) {
         let sum = 0;
-        for (let j = i; j < Math.min(i + per, axis.length); j++) sum += m.days.get(axis[j]) ?? 0;
-        lifetime.push(sum);
+        for (let j = Math.max(0, end - per); j < end; j++) sum += m.days.get(axis[j]) ?? 0;
+        lifetime.unshift(sum);
+        sparkMax = Math.max(sparkMax, sum);
       }
       let peak: { date: string; clicks: number } | null = null;
       for (const [date, clicks] of m.days) {
         if (!peak || clicks > peak.clicks) peak = { date, clicks };
       }
-      out.set(id, {
-        uniqueClicks: m.uniques.size,
-        lastClickAt: m.lastClickAt,
-        trendPct,
-        trendState,
-        sparkline: m.daily,
-        lifetime,
-        peak,
-      });
+      out.set(id, { uniqueClicks: m.uniques.size, lastClickAt: m.lastClickAt, lifetime, peak });
     }
-    return out;
+    return { byLink: out, sparkMax };
   }, [raw, links]);
 
   const saveGoal = async () => {
@@ -415,7 +373,12 @@ export default function CampaignDetailPage() {
       if (response.ok) {
         // Optimistic update + invalidate both the goal query and the
         // Campaigns leaderboard so goal progress % stays consistent.
-        qc.setQueryData(goalKey, { goalClicks: parsed });
+        // Merge — the same cache entry also holds the period / archive
+        // record, which a plain overwrite used to wipe until refetch.
+        qc.setQueryData(goalKey, (old: typeof goalData) =>
+          old ? { ...old, goalClicks: parsed } : old,
+        );
+        qc.invalidateQueries({ queryKey: goalKey });
         qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
         setEditingGoal(false);
         success(t("goalSaved"));
@@ -436,7 +399,10 @@ export default function CampaignDetailPage() {
         body: JSON.stringify({ goalClicks: null }),
       });
       if (response.ok) {
-        qc.setQueryData(goalKey, { goalClicks: null });
+        qc.setQueryData(goalKey, (old: typeof goalData) =>
+          old ? { ...old, goalClicks: null } : old,
+        );
+        qc.invalidateQueries({ queryKey: goalKey });
         qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
         setGoalInput("");
         setEditingGoal(false);
@@ -1555,7 +1521,7 @@ export default function CampaignDetailPage() {
               <tbody>
                 {links.map((link) => {
                   const shortUrl = `${shortBaseUrl}/${link.code}`;
-                  const m = perLinkMetrics.get(link.id);
+                  const m = perLinkMetrics.byLink.get(link.id);
                   const sharePct = (link._count.clicks / totalCampaignClicks) * 100;
                   const expanded = expandedLinkId === link.id;
                   let dest = link.originalUrl;
@@ -1569,15 +1535,26 @@ export default function CampaignDetailPage() {
                     <Fragment key={link.id}>
                     <tr
                       className={`link-row ${expanded ? "expanded" : ""}`}
-                      onClick={() => setExpandedLinkId(expanded ? null : link.id)}
-                      aria-expanded={expanded}
+                      onClick={() => {
+                        // Selecting text (e.g. to copy the URL) shouldn't toggle.
+                        if (window.getSelection()?.toString()) return;
+                        setExpandedLinkId(expanded ? null : link.id);
+                      }}
                     >
                       <td>
-                        <ChevronRight
-                          size={14}
-                          className="link-row-chevron"
-                          style={{ color: "var(--ink-500)" }}
-                        />
+                        <button
+                          type="button"
+                          className="link-row-toggle"
+                          aria-expanded={expanded}
+                          aria-controls={`link-detail-${link.id}`}
+                          aria-label={expanded ? t("collapseLink") : t("expandLink")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedLinkId(expanded ? null : link.id);
+                          }}
+                        >
+                          <ChevronRight size={14} className="link-row-chevron" />
+                        </button>
                       </td>
                       <td>
                         <div style={{ minWidth: 0 }}>
@@ -1668,10 +1645,10 @@ export default function CampaignDetailPage() {
                       <td>
                         {m && m.peak ? (
                           <div className="lifetime-cell">
-                            <MiniSpark values={m.lifetime} width={100} height={22} />
+                            <MiniSpark values={m.lifetime} max={perLinkMetrics.sparkMax} width={100} height={22} />
                             <span>
                               {t("peakDay", {
-                                date: `${Number(m.peak.date.slice(5, 7))}/${Number(m.peak.date.slice(8, 10))}`,
+                                date: `${m.peak.date.slice(0, 4) === String(new Date().getFullYear()) ? "" : `${m.peak.date.slice(0, 4)}/`}${Number(m.peak.date.slice(5, 7))}/${Number(m.peak.date.slice(8, 10))}`,
                                 n: m.peak.clicks.toLocaleString(),
                               })}
                             </span>
@@ -1714,7 +1691,7 @@ export default function CampaignDetailPage() {
                       </td>
                     </tr>
                     {expanded && (
-                      <tr className="link-detail-row">
+                      <tr className="link-detail-row" id={`link-detail-${link.id}`}>
                         <td colSpan={10}>
                           {raw ? (
                             <CampaignLinkDetail

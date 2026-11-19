@@ -300,7 +300,7 @@
     "custom": "自訂範圍",
     "clicks": "點擊數",
     "uniqueClicks": "不重複點擊",
-    "referrers": "來源頁 (Referrer)",
+    "referrers": "來源網站 (Referrer)",
     "referrersHint": "讀 HTTP Referer header — 只有從網頁點擊時才會帶。Email / Slack / WhatsApp / 直接貼網址都不會有 referer。要看真實通路拆解請看下方 utm_source / utm_medium。",
     "devices": "裝置分佈",
     "browsers": "瀏覽器",
@@ -845,7 +845,9 @@
       "detailClicks": "點擊（全期間）",
       "detailFirstClick": "第一次點擊",
       "detailPeakDay": "高峰日",
-      "filterTrafficByLink": "在「流量」分頁只看這條連結"
+      "filterTrafficByLink": "在「流量」分頁只看這條連結",
+      "expandLink": "展開連結細節",
+      "collapseLink": "收合連結細節"
     },
     "allTime": "全部期間",
     "clicksAllTime": "點擊數（全部期間）",
@@ -889,7 +891,9 @@
     "dayN": "第 {n} 天",
     "alignCalendar": "依日期",
     "alignStart": "對齊開始日",
-    "alignStartTooltip": "第 0 天 = 各活動的開始日（沒設活動期間就用第一次點擊那天），方便比較不同時間舉辦的活動"
+    "alignStartTooltip": "第 0 天 = 各活動的開始日（沒設活動期間就用第一次點擊那天），方便比較不同時間舉辦的活動",
+    "alignNoData": "需要至少兩個活動有開始日或點擊，才能對齊比較",
+    "alignStartOutside": "有活動的開始日不在目前選的期間內，對齊後看不到它的完整走勢 — 建議切到「活動期間」或「全部期間」。"
   },
   "errors": {
     "required": "此欄位為必填",

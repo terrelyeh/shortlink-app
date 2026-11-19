@@ -956,6 +956,16 @@ table.data td.muted { color: var(--ink-500); }
 
 /* Campaign page — links tab */
 .link-row { cursor: pointer; }
+.link-row-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--ink-500);
+}
+.link-row-toggle:hover { background: var(--bg-subtle); color: var(--ink-100); }
+.link-row-toggle:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 1px; }
 .link-row .link-row-chevron { transition: transform 0.15s ease; }
 .link-row.expanded .link-row-chevron { transform: rotate(90deg); }
 .link-row.expanded > td { background: var(--bg-subtle); }

@@ -51,11 +51,19 @@ const MULTI_SUFFIX = new Set([
   "com.au", "com.cn", "com.hk", "com.sg", "co.kr", "co.in", "com.br",
 ]);
 
+// Hosting platforms where each subdomain is a different site.
+const SHARED_HOSTS = new Set([
+  "github.io", "vercel.app", "netlify.app", "pages.dev", "herokuapp.com",
+  "blogspot.com", "wordpress.com", "medium.com", "substack.com", "notion.site",
+]);
+
 function registrableDomain(host: string): string {
+  // IP addresses (v4, or v6 in brackets) are their own "site".
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":") || host.startsWith("[")) return host;
   const parts = host.split(".").filter(Boolean);
   if (parts.length <= 2) return parts.join(".");
   const lastTwo = parts.slice(-2).join(".");
-  if (MULTI_SUFFIX.has(lastTwo)) return parts.slice(-3).join(".");
+  if (MULTI_SUFFIX.has(lastTwo) || SHARED_HOSTS.has(lastTwo)) return parts.slice(-3).join(".");
   return lastTwo;
 }
 

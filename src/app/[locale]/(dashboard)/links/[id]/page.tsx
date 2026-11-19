@@ -329,7 +329,15 @@ export default function EditLinkPage() {
       qc.invalidateQueries({ queryKey: ["campaign-links"] });
       qc.invalidateQueries({ queryKey: ["utm-campaigns"] });
       toast.success(t("updateSuccess"));
-      router.push(returnTo ?? "/links");
+      // Came from a campaign page: go back to the campaign the link is in
+      // NOW — if utm_campaign was edited, the old page no longer lists it.
+      router.push(
+        returnTo
+          ? utmCampaign
+            ? `/campaigns/${encodeURIComponent(utmCampaign)}`
+            : "/links"
+          : "/links",
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update link");
       setSaving(false);
