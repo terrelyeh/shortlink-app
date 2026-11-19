@@ -1,6 +1,6 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-11-18 — PR #65–#68：社群預覽覆寫、垃圾桶、列表建立者欄、UX 審查三批改善（全部期間 / 可印刷 QR / 建立流程 / 分享報告固定日期）、側欄精簡
+> Last updated: 2026-11-19 — PR #69–#77：活動規劃 skill、排除郵件掃描點擊、活動期間 / 狀態 / 封存、活動頁下鑽、依通路目標 + 進度參考線、活動負責人、引導式活動啟動器
 
 ## Project Overview
 
@@ -27,7 +27,10 @@
 | `src/app/layout.tsx` | Root layout，提供 `<html>/<body>`。非 locale 頁（`/link-*`、`/share`、`/track.js`）靠它 |
 | `src/app/[locale]/(dashboard)/` | 主要頁面。route group，不是 `/dashboard` 路徑 |
 | `src/lib/workspace.ts` | ⭐ 所有權限與範圍判斷的單一來源 |
-| `src/lib/analytics/compute.ts` | Client 端聚合（純 JS），dashboard 效能的關鍵 |
+| `src/lib/analytics/compute.ts` | Client 端聚合（純 JS），dashboard 效能的關鍵；活動頁下鑽的篩選也在這 |
+| `src/lib/click-quality.ts` | ⭐「哪些點擊算數」— 所有 click 查詢用 `countedClickWhere()` |
+| `src/lib/campaign-period.ts` / `campaign-goal.ts` | 活動期間（台灣日、含頭尾）、狀態推算、目標進度參考線 |
+| `src/lib/kickstart/` | 活動啟動器範本與命名規則 — 跟 `skills/campaign-link-planner/references/` 同步 |
 | `src/lib/cache.ts` + `cache-scopes.ts` | Redis wrapper + invalidation 入口 |
 | `src/middleware.ts` | next-intl routing + 短域名守護 |
 | `prisma/schema.prisma` | FK 索引不會自動建，加 relation 要一併加 `@@index` |
@@ -52,22 +55,17 @@
 12. **測試點擊標記與軟重設** — `Click.isInternal` + `resetBatchId`，標記而非刪除，可整批還原
 13. **CSV 匯出** — links / analytics / campaigns 三個 endpoint 共用 `csvResponse()`
 14. **Analytics 進階指標** — 點擊衰減曲線 / 7×24 熱度圖（用 viewer 時區）/ 城市排行
-15. **社群分享預覽覆寫** — `ShortLink.ogOverride{Title,Description,Image}`（全 nullable，只在編輯頁設定）。`/s/[code]` 在「有覆寫值 **且** `isPreviewCrawler(ua)`」時回 200 HTML（自訂 `og:*` + meta refresh，`private, no-store`），**不轉址也不記點擊**。邏輯在 `lib/social-preview.ts`；空欄位 fallback 到爬到的 `og*` → `title`。分支刻意放在 geo 檢查**之前**（FB/LINE 從美國機房抓）
-16. **垃圾桶** — `/links/trash` + `GET /api/links/trash`（上限 200、不走 Redis）+ `POST /api/links/[id]/restore`（`canUserActOnResource`、寫 `RESTORE_LINK`）。query key `["links-trash"]`，LinksClient 的刪除會 invalidate 它
-17. **分享報告期間** — `ShareToken.rangeWindow` 存 `all` / `YYYY-MM-DD..YYYY-MM-DD`（台灣時間、含頭尾）/ 舊的 `7d` 等滾動值，解析全在 `lib/share-period.ts`。UI 一律產生固定日期（滾動視窗會讓主管隔週打開數字變了）。報告排除 `isInternal` 點擊
-18. **QR 下載** — 一律走 `lib/qr-export.ts`（`qrcode` 套件現場產 1024px PNG / 真向量 SVG + 中央 logo），不要從畫面上的小 canvas `toDataURL`
-19. **列表建立者** — `ShortLink.createdById` **沒有 Prisma relation**，`lib/link-creators.ts` 用一次 `user.findMany` 批次查名字，`/api/links`（Redis key `links-list-v3`）與 `/api/export/links` 共用。要在別處顯示建立者就用它，別每列各查一次
-20. **建立連結流程** — `/links/new` 是 server page，讀 `?utmCampaign=` / `?template=`（模板依 workspace 成員資格查）後把 `prefill` 傳給 `CreateLinkForm`；建立成功**留在原頁**顯示短網址 + QR，不再 redirect 回 `/links`。其他入口（活動頁「新增連結」、模板頁「使用」）都靠這兩個參數
-
-21. **疑似掃描點擊（`Click.isSuspectedBot`）** — 規則只有一條：UA 是 Chromium 且主版號 < 100（`lib/click-quality.ts`）。企業郵件安全閘道會在 EDM 寄出後幾分鐘內開遍所有連結（2026-11 查：EDM 點擊 57% 來自同一個 `Chrome/79` UA）。跟 `isInternal` 一樣**標記不刪除**、不計入 `clickCount`，所有統計用 `countedClickWhere(includeExcluded)` 取「算數的點擊」——**新寫 click 查詢一律用它**，不要只寫 `isInternal: false`。「含測試與疑似機器點擊」開關會兩者一起放回。歷史資料用 `scripts/flag-suspected-bot-clicks.mjs` 回填（可 `--undo`），**改規則時兩邊要同步**。IP 爆量規則試過、會誤抓連看多篇 LinkedIn 的真人，已放棄
-
-22. **活動期間與狀態** — `Campaign.startDate/endDate` 存「台灣時間當天 00:00」，含頭尾兩天；所有換算在 `lib/campaign-period.ts`（`periodBoundsMs` / `periodTimestampWhere` / `campaignPhase`）。**狀態由日期推算**（即將開始 / 進行中 / 已結束），只有「封存」是手動（`status=ARCHIVED`，連結照常運作）；舊的 DRAFT / COMPLETED 視同 ACTIVE。活動列表、活動頁、比較頁的預設期間都是「活動期間」（沒設就是全部期間），**目標進度一律用活動期間的點擊當分母、不封頂**，不跟著期間切換。編輯走 `PATCH /api/utm-campaigns/[name]`（goal / startDate / endDate / status 皆選填）；`/api/campaigns/[id]` 的 PATCH 沒有 UI 在用
-
-23. **活動頁下鑽** — 流量分頁的每個清單（source / medium / content / 連結 / 國家 / 來源網站）都是篩選器，走 `computeAnalytics` 的 `source/medium/content`（連結層）與 `country/referrer`（點擊層）；`linkId` 也必須符合 campaign / tag 範圍（`/analytics` 選連結時會自動拿掉不符的篩選）。來源網站依網站合併在 `lib/analytics/referrer.ts`（品牌族群表、`android-app://` 套件名、共用網域如 `github.io` 保留子網域），`NO_REFERRER` 代表無 referrer。連結分頁點一列就地展開 `CampaignLinkDetail`；從活動頁編輯連結帶 `?returnTo=/campaigns/<name>`（編輯頁只接受這個格式，存檔後回到連結**目前**所屬的活動）。比較頁「對齊開始日」以日期差算第 0 天（開始日前為負天數），時間軸是 UTC 日、開始日是台灣日，差 8 小時屬已知近似
-
-24. **依通路的點擊目標** — `Campaign.goalByMedium`（Json，`{ "<utm_medium>": clicks }`，可為空）；有設時 API 會讓 `goalClicks` = 加總，所以活動列表 / 比較頁照舊只讀 `goalClicks`。只存總數或清除目標時 API 會把 `goalByMedium` 設回 DbNull，避免拆分跟總數對不上。進度參考線（`lib/campaign-goal.ts` 的 `goalPaceFraction`）= 活動期間已經過的比例 × 目標，只在「進行中且有開始與結束日」時顯示；第一版是線性。目標卡在 `components/campaigns/CampaignGoalCard.tsx`。活動規劃 skill 的 `plan-template.md` 目標表也改成依 utm_medium 一列
-
-25. **活動負責人** — `Campaign.ownerId`（FK → users，`onDelete: SetNull`，有 `@@index`）是**明確指派**的 KPI 負責人，不要拿 `createdById` 代替（活動多半是第一條連結自動建出來的）。指派走 `PATCH /api/utm-campaigns/[name]` 的 `ownerId`，API 會檢查對方是該 workspace 成員，並寫進稽核紀錄。成員清單用 `components/campaigns/CampaignOwner.tsx` 的 `useWorkspaceMembers()`——它跟 設定 → 成員 **共用 query key `["workspace-members", wsId]` 與快取形狀 `{ members }`**，只用 `select` 轉換，不要改成存陣列。活動列表的負責人摘要卡**刻意不加總點擊**（不同活動量級差百倍），只算進行中 / 達標 / 落後進度幾檔。公開分享報告只露出負責人名字
+15. **社群分享預覽覆寫** — 預覽爬蟲 + 有覆寫值才回自訂 `og:*` HTML，不轉址不記點擊；分支在 geo 檢查之前（`lib/social-preview.ts`）
+16. **垃圾桶** — `/links/trash` + restore API，query key `["links-trash"]`
+17. **分享報告期間** — `ShareToken.rangeWindow` 固定日期（`lib/share-period.ts`），排除測試與掃描點擊，活動報告只露負責人名字
+18. **QR 下載** — 一律走 `lib/qr-export.ts`，不要從畫面小 canvas 輸出
+19. **列表建立者** — `createdById` 沒有 relation，用 `lib/link-creators.ts` 批次查
+20. **建立連結流程** — `/links/new` 讀 `?utmCampaign=` / `?template=` 預填，建立後留在原頁
+21. **疑似掃描點擊** ⭐ — `Click.isSuspectedBot`（Chromium < 100），標記不刪除；**新寫 click 查詢一律用 `countedClickWhere()`**，規則改了要同步 `scripts/flag-suspected-bot-clicks.mjs`
+22. **活動期間與狀態** — 台灣日含頭尾；狀態由日期推算，只有封存手動；三個活動頁面預設「活動期間」；目標分母 = 活動期間點擊。編輯走 `PATCH /api/utm-campaigns/[name]`，**前端更新 `["campaign-goal", name]` 快取要 merge**
+23. **活動頁下鑽** — 流量分頁清單都是篩選器（`computeAnalytics` 新篩選）；來源網站合併在 `lib/analytics/referrer.ts`；連結列就地展開；編輯連結 `?returnTo=` 只收 `/campaigns/<name>`
+24. **依通路目標** — `Campaign.goalByMedium`，API 讓 `goalClicks` = 加總；參考線 `goalPaceFraction`（線性，進行中且有起訖日才顯示）
+25. **活動負責人** — `Campaign.ownerId`（FK、SetNull），明確指派、不用 `createdById` 代替；`useWorkspaceMembers()` 共用 `["workspace-members", wsId]` 的 `{ members }` 形狀；摘要卡不加總點擊
 
 ## Conventions
 
@@ -131,12 +129,22 @@ Prisma schema 用 camelCase（`userId`），但 DB 欄位名是 snake_case（`us
 
 **這是個低流量的內部工具**，不要為了想像中的規模做過度優化。資料量小也代表：改 schema、跑 backfill、直接對正式 DB 做維運都還算安全，但每次都要先 dry-run。
 
+**EDM 原始點擊有一半以上是企業郵件安全掃描**（2026-11-19 起自動排除，舊資料已回填：interop 2,544 → 1,616、computex 1,585 → 866）。跟過去活動比較時要用工具上現在的數字。
+
 **流量來源要看 UTM，不要看 referrer**（2026-11-18 查）— 4,163 次點擊裡 82% 沒有 referrer（email 2,301/2,765、social 736/974、qr 56/56 全無），能從 UA 認出 LINE/FB/LinkedIn App 內建瀏覽器的只有 11 筆。做 referrer 分類（PicSee 那種 LINE / Direct / AI Agent）大部分只會落進 Direct，不值得做。
 
 ### 🔜 Next Steps / Pending
 
-- **需要登入的流程還沒人在正式環境實測**（畫面已用 harness 驗過，見 Pitfall #31）：編輯頁「社群分享預覽」、`/links/trash` 還原、建立分享連結（活動頁 / 分析頁）並用無痕開、分析匯出 CSV 內容是否只含篩選範圍。另外：舊的滾動期間分享 token（`7d` 等）理論相容但沒拿真 token 測過。建議給 `KLVbR43`（Computex 海報 LinkedIn QR）設預覽覆寫 — 它爬到的是「LinkedIn Login, Sign in」
-- **活動規劃 skill → 未來併入活動啟動器** — `skills/campaign-link-planner/` 是給行銷同事用的跨 agent skill（Claude.ai / Claude Code / Codex / Hermes），問答後產出 CSV 匯入檔 + Markdown 成效衡量計畫，涵蓋新品上市 / 展會 / 電商促銷（Amazon Attribution）與多市場多語系。**它的 references/ 就是將來擴充 `/campaigns/kickstart` 的規格書**：補電商促銷範本、「市場」欄一次展開多國、排程生效 / 自訂短碼 / 標籤、建立後在活動頁產生衡量計畫分頁。改匯入格式（`api/links/batch-csv`）或 UTM 清單（`lib/utils/utm.ts`）時，要同步改 skill 的 `references/csv-format.md`、`utm-rules.md` 與 `scripts/validate_links_csv.py`。分享用 zip 用 `cd skills && zip -r campaign-link-planner.zip campaign-link-planner` 產生
+- **需要登入的流程還沒人在正式環境實測**（畫面都只用 harness + mock 驗過，見 Pitfall #31）：
+  - 舊的：編輯頁「社群分享預覽」、`/links/trash` 還原、建立分享連結並用無痕開、分析匯出 CSV 是否只含篩選範圍、舊滾動期間分享 token（`7d`）
+  - 2026-11-19 新增：活動期間編輯 / 封存、依通路目標存取、負責人指派、活動頁流量篩選與連結展開、比較頁對齊、**活動啟動器實際建立**（batch-csv + PATCH 的串接）
+  - 建議給 `KLVbR43`（Computex 海報 LinkedIn QR）設預覽覆寫 — 它爬到的是「LinkedIn Login, Sign in」
+- **使用者端待辦**：5 個活動都還沒設活動期間與負責人（摘要卡目前只有一張「未指派」）；ISE 2027 建議期間 2026/11/19–2027/2/26、依通路目標 email 750 / social 150 / qr 30（但 EDM 的 750 是用灌水前的點擊率估的，偏高）
+- **活動啟動器 B / C 批**（A 批 = 引導式流程已上線，#77）：
+  - **B**：電商促銷範本（每列各自的 Amazon Attribution 網址，規格看 skill 的 `type-ecommerce-promo.md`）；多市場展開（選市場 → 每列複製並加 `_us` / `_de` / `_jp` 後綴、各自目的網址）
+  - **C**：活動頁「衡量計畫」分頁，用啟動器填的資料產出 skill 那份一頁計畫（`plan-template.md`）
+  - 已知限制：精靈內不能改 source；若啟用 UTM 白名單但沒含 `mailchimp` / `pr` / `intercom`，那幾列會建立失敗。另外 `pr` / `intercom` 不在 `lib/utils/utm.ts` 的內建 referral 清單
+- **活動規劃 skill**（`skills/campaign-link-planner/`）— 給行銷同事用的跨 agent skill，產出 CSV 匯入檔 + 一頁衡量計畫。改匯入格式（`api/links/batch-csv`）、UTM 清單（`lib/utils/utm.ts`）或啟動器範本 / 命名時，要同步改 skill 的 `references/` 與 `scripts/validate_links_csv.py`。分享用 zip：`cd skills && zip -r campaign-link-planner.zip campaign-link-planner -x "*/__pycache__/*" "*.DS_Store"`（目前版本已放在使用者的 `~/Downloads`）。**PR #78（skill 文字跟上工具現況）待合併**
 - **UX 審查剩餘項目**（2026-11-18 審查，高影響已全做）：
   - Batch create 的活動欄是自由輸入（應改用 `CampaignCombobox`，打錯會多出新活動）
   - 編輯存檔後 `/links` 篩選全被重設（篩選只有 campaign 進 URL；可同步到 URL + `router.back()`）
@@ -151,23 +159,14 @@ Prisma schema 用 camelCase（`userId`），但 DB 欄位名是 snake_case（`us
   - 依裝置導向（iOS / Android / 桌機）— 有 App 下載需求才做，可沿用 `variants` 結構
   - 預覽圖**上傳**（目前只能貼 URL）— 專案沒裝 Supabase SDK、沒用 Storage，要加需新增 `SUPABASE_URL` + service role key（Zeabur 事件後多一把高權限 key 要慎重）
   - 建立表單沒有預覽覆寫區塊（刻意：預覽是建立後才爬，先看結果再改）
-- **ESLint 剩 24 個問題**（12 errors / 12 warnings）— 都是死碼、`no-unescaped-entities`、3 個 `static-components`、2 個 `set-state-in-effect`（`useMediaQuery` + kickstart）。`no-html-link-for-pages` 已歸零
+- **ESLint 剩 21 個問題**（10 errors / 11 warnings）— 6 個 unused vars、4 個 `no-unescaped-entities`、3 個 `static-components`、3 個 `no-img-element`、2 個 `no-unsafe-function-type`、2 個 `exhaustive-deps`、1 個 `set-state-in-effect`（`useMediaQuery`）
 - **`social_prduct_launch` 的拼字錯誤** — utm_campaign 值拼成 `prduct`，但它有 3 條有效的 LinkedIn 連結、9 次點擊，改名會變更已發佈貼文的 utm 參數、切斷 GA 資料連續性。**建議維持現狀**，除非行銷端明確要求
 - **`/api/user/profile` 的「最後一個 admin」保護從未生效** — 見 Pitfall #26
 - **`ALLOWED_EMAILS` env 退役 — 前提已滿足，可執行** — 2026-08-31 查證 4 位使用者**全部**都有 WorkspaceMember row，所以 signIn gate 的條件 2 就足以放行，條件 4 已無作用。刪除步驟：先從 Vercel production env 移除（`vercel env rm ALLOWED_EMAILS production`），觀察一輪確認沒人被擋，再拿掉 `lib/auth.ts` 的 legacy 分支與本檔的相關描述。⚠️ 先確保 `BOOTSTRAP_EMAILS` 有值，那是唯一的緊急開機管道
-- **Zeabur 資安事件後續（2026-08-27 事件，08-31 處理）** — 這個專案早期部署在 Zeabur，後來搬到 Vercel 但 **DB 一直是同一個 Supabase**。Zeabur 遭入侵導致該專案的 `DATABASE_URL` 外洩，而搬家時沒換過密碼 → 外洩的憑證在事件當下是有效的。
-  - ✅ 已完成：Supabase 密碼輪替、Vercel `DATABASE_URL`/`DIRECT_URL` 更新 + redeploy、清空所有 Session（17 筆）、刪除所有 Zeabur 專案
-  - **當時 Zeabur 有哪些變數（Zeabur 專案已刪、無法再查，以下由 git history 重建）**：`zeabur.json` 加於 2026-01-18、Vercel env 建於 04-17~18，所以 Zeabur 時期的集合 = commit `bb1c1ab` 的 `.env.example` 七項：`DATABASE_URL` / `AUTH_SECRET` / `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `IP_HASH_SALT` / `NEXT_PUBLIC_APP_URL` / `NEXT_PUBLIC_SHORT_URL`。
-    **Upstash token（04-18 引入）與 `BOOTSTRAP_EMAILS`（04-23 引入）都晚於搬家，從未進過 Zeabur — 不需輪替。**
-  - ⬜ 待辦：查 Supabase 連線紀錄有無異常來源。剩下三個機密都**不符合** Zeabur 信中的比對條件（名稱清單 + AWS/GitHub/Anthropic/OpenRouter/OpenAI/Stripe 值格式），但那是**第二封、範圍已擴大過一次**的通知，不宜全信：
-    - `AUTH_SECRET` — **建議輪替**（`openssl rand -base64 32` → 更新 Vercel → redeploy）
-    - `GOOGLE_CLIENT_SECRET` — 看保守程度。Google Cloud Console 加新 secret → 更新 Vercel → 驗證登入 → 才刪舊的
-    - `IP_HASH_SALT` — 傾向不動，見下
-  - ⚠️ **`IP_HASH_SALT` 若外洩要特別處理** — salt 一旦已知，4,000+ 筆 `Click.ipHash` 就能被反推回真實 IP（IPv4 只有 2^32），等於「匿名點擊紀錄」變成「可識別個人的瀏覽紀錄」。輪替 salt 會讓新舊 hash 對不起來，要接受去重統計斷一次
-  - 💡 **輪替 `AUTH_SECRET` 的最佳時機是「剛清空 session 之後」** — 它簽章 session cookie，平常換會把所有人踢出去；session 已經是空的時候換，額外成本為零
+- **Zeabur 資安事件後續**（2026-08 外洩舊 `DATABASE_URL`；密碼輪替、清 Session 已完成）— ⬜ 查 Supabase 連線紀錄有無異常來源；⬜ 建議輪替 `AUTH_SECRET`；`GOOGLE_CLIENT_SECRET` 看保守程度；`IP_HASH_SALT` 傾向不動（外洩會讓 ipHash 可反推真實 IP）。完整紀錄與步驟見 [`docs/security-zeabur-2026-08.md`](docs/security-zeabur-2026-08.md)
 - **i18n 末端 spot-check** — 仍有硬編碼英文：LinksClient（PageHeader 標題「Link Management」、`N of N links`、批次操作 toast）、LinkTableRow / LinkMobileCard 的 Scheduled / regions badge、編輯頁 A/B variants 區塊、`analytics/page.tsx` 的「Share report」按鈕（**操作指南照畫面寫 Share report，改中文時手冊要一起改**）與 `"click volume and uniques"`、Tag 篩選的「All Tags」
-- **行動裝置 card view 擴展** — 目前只有 `/links` 有手機 card view。Campaign Leaderboard / Campaign Detail Links tab 還是橫向 scroll
-- **Mobile-only：edit link 表單 + Kickstart wizard** — 表格 + A/B variant editor 在手機操作彆扭，建議走桌面
+- **行動裝置 card view 擴展** — 目前只有 `/links` 有手機 card view。Campaign Leaderboard / Campaign Detail Links tab（`minWidth: 1120`）還是橫向 scroll
+- **Mobile-only：edit link 表單** — A/B variant editor 在手機操作彆扭，建議走桌面（活動啟動器已是 RWD，只有確認步驟的表格要橫向捲動）
 - **Observability** — Prod 只有 `console.error`。建議 Sentry / OpenTelemetry
 - **Conversion UI 已隱藏但 infra 還在** — 使用者團隊目前不走 `/track.js` 追蹤，Dashboard 的 CVR / Conversion 欄位都移除。未來要重啟時，DB / API / 歸因邏輯完全 intact — 只要把 UI 加回來即可。相關檔案看 `commit 90d93d3`
 
@@ -278,11 +277,16 @@ Prisma datasource 需 `directUrl` 才能讓 `db push` 繞過 pgbouncer — schem
 31. **要看需要登入的畫面：本機 harness + mock API，不要動正式 Session** — dashboard 頁的 server layout 會 `auth()` 擋掉，Google OAuth 也無法自動登入。做法：在 worktree 暫建 `src/app/[locale]/zz-preview/page.tsx`，用 `<Providers session={假 session}>` 包要看的 client 元件（`LinksClient`、`campaigns/[name]/page` 的 default export…），`next dev` 起來後用 `playwright-cli run-code` 的 `page.route('**/api/**')` 回 mock JSON（資料可用唯讀 prisma script 從正式 DB 匯出到 scratchpad）。**harness 目錄絕不能 commit**；刪掉後也要 `rm -rf .next`，不然 `tsc` 會因 `.next/dev/types` 殘留報錯。下載類功能可用 `page.waitForEvent('download')` 取檔，QR 可在頁面裡用 `BarcodeDetector` 解碼驗證
 
 
+32. **共用 query key 時，快取裡的資料形狀必須一模一樣** — React Query 用 key 分享快取，兩個頁面同一個 key 卻存不同形狀（例：一邊存 `{ members }`、一邊存陣列），先載入的那頁會讓另一頁讀到錯的形狀而炸掉。要不同形狀就用 `select` 轉換、queryFn 回傳原樣；或者 key 加後綴。`["campaign-links", name, ...]` 存的是**陣列**、`["workspace-members", wsId]` 存 `{ members }`、`["campaign-goal", name]` 存整份活動紀錄（更新時要 merge）
+
+33. **不要跑 `prisma format`** — 它會重排整個 `schema.prisma` 的對齊，一個欄位的改動變成上百行 diff。手動加欄位、照既有縮排即可；`prisma validate` 在 worktree 沒 `.env` 時會報 `DIRECT_URL` 找不到，那不是 schema 錯（用 `prisma generate` 確認即可）
+
 ## 詳細文件
 
 | 文件 | 內容 |
 |---|---|
-| [`docs/architecture.md`](docs/architecture.md) | 14 節架構與資料流完整說明（快取策略、權限模型、歸因、匯出…）；#15 之後的新項目目前只寫在本檔 Architecture 摘要 |
+| [`docs/architecture.md`](docs/architecture.md) | 25 節架構與資料流完整說明（快取策略與共用 query key 表、權限模型、歸因、匯出、掃描點擊、活動期間、下鑽、目標、負責人…） |
 | [`docs/file-structure.md`](docs/file-structure.md) | 完整檔案樹與各目錄職責 |
 | [`README.md`](README.md) | 功能清單、快速開始、部署指南（給人看的） |
 | [`docs/env-setup-guide.md`](docs/env-setup-guide.md) | 環境變數逐項設定說明 |
+| [`docs/security-zeabur-2026-08.md`](docs/security-zeabur-2026-08.md) | Zeabur 資安事件：外洩範圍、已做與待做的輪替步驟 |

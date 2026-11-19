@@ -32,11 +32,12 @@
 |------|------|
 | **Campaign 管理** | 建立行銷活動（Campaign），設定預設 UTM Source / Medium、顯示名稱、描述 |
 | **Campaign 自動綁定** | 建連結時填 `utm_campaign` 自動建 Campaign row；填同名就綁同一個 — 使用者不用額外「建 Campaign」 |
-| **活動狀態生命週期** | Draft → Active → Completed → Archived 四階段管理 |
-| **KPI 目標追蹤** | 每個 Campaign 可設 `goalClicks` 目標，Detail 頁顯示進度條 + 達標慶祝 |
-| **活動排行榜** | Campaigns 列表顯示每個活動的 clicks / 7 天趨勢（sparkline + ±%）/ 最後活動時間 / goal 達成率，可排序；期間可選 7 / 30 / 90 天或全部期間 |
-| **多 Campaign 比較** | 列表勾選 2-4 個 → 上方顯示 daily clicks overlay 折線；進 `/campaigns/compare` 看 side-by-side 深度比較（winner cards + 每活動 top source/medium/link） |
-| **Campaign Detail 三 tabs** | Overview（目標 + 趨勢）/ Traffic（來源/裝置/地區拆解）/ Links（活動內每條連結 + 獨立訪客數 + 佔比 + 7 天趨勢 + 最後點擊）；趨勢與流量可切全部期間 / 90 / 30 天（預設全部期間）；頁首可直接「新增連結」（帶入活動）與「分享報告」 |
+| **活動期間與狀態** | 每個活動可設開始 / 結束日（台灣時間、含頭尾）；狀態依日期自動顯示即將開始 / 進行中 / 已結束；「封存」把活動從列表收起來，短網址照常運作 |
+| **活動負責人** | 每個活動指派一位負責人（KPI 歸屬）；列表有負責人欄與篩選（含「我的活動」），上方的負責人摘要卡顯示每人進行中 / 達標 / 落後進度幾檔 |
+| **KPI 目標追蹤** | 目標可設總數或**依通路**（email / social / qr…各一個數字）；每個通路一條進度條，進行中的活動會標出「照時間今天應該到哪裡」，落後的以橘色提醒。達成率一律以活動期間的點擊計算，超過 100% 照實顯示 |
+| **活動排行榜** | Campaigns 列表顯示每個活動的負責人 / 狀態 / clicks / 7 天趨勢（sparkline + ±%）/ 最後活動時間 / 目標達成率，可排序；期間預設「各活動期間」，也可選 7 / 30 / 90 天或全部期間 |
+| **多 Campaign 比較** | 列表勾選 2-4 個 → 上方顯示 daily clicks overlay 折線；進 `/campaigns/compare` 看 side-by-side 深度比較（winner cards + 每活動 top source/medium/link）；每日點擊可「依日期」或「對齊開始日」（第 0 天 = 各活動開始日），比較不同時間舉辦的展會 |
+| **Campaign Detail 三 tabs** | Overview（目標 + 趨勢）/ Traffic（來源、媒介、內容、連結、國家、來源網站**點一下就篩選**，整頁數字跟著變）/ Links（每條連結的目的網址、獨立訪客、佔比、全期間走勢 + 高峰日，**點一列就地展開**該連結的細節）；期間可切活動期間 / 全部期間 / 90 / 30 天；頁首可「新增連結」（帶入活動）、「分享報告」、封存 |
 | **活動標籤** | 為活動加上標籤分類，方便搜尋篩選 |
 | **跨頁面 Campaign 篩選** | 在連結、分析頁面皆可依 Campaign 篩選 |
 | **Orphan Links 提醒** | Campaigns 頁自動列出沒綁 Campaign 的連結（含目的網址 + 最後點擊時間），一鍵跳去補綁 |
@@ -47,10 +48,11 @@
 |------|------|
 | **點擊追蹤** | 即時記錄每次點擊，含重複點擊去重（2 秒窗口）與 Bot 偵測 |
 | **測試點擊排除** | 團隊自己測連結的點擊可標記為「測試」而非刪除，分析預設排除、可隨時切回來看；活動層級可一鍵軟重設，同一批能整批還原 |
+| **郵件掃描點擊排除** | 企業信箱的安全掃描（收信時自動打開信裡所有連結的機器）標記為「疑似郵件掃描點擊」並預設排除——B2B 名單的 EDM 這類點擊常佔一半以上。勾「含測試與疑似機器點擊」可加回來 |
 | **轉換追蹤 (Conversion Tracking)** | Landing page 放一段 snippet（`/track.js`）或後端 webhook 呼叫 `/api/track`，透過 session token 歸因回來源連結；支援 event name / value / currency / externalId（idempotency） |
 | **CVR 顯示** | 連結列表 / Campaign 列表 / Compare 頁都自動算 CVR；超過 0 才顯示，避免雜訊 |
 | **趨勢圖表** | 視覺化呈現點擊數據（支援 24h / 7d / 30d / 90d / 全部期間 / 自訂範圍；分析資料保留約兩年） |
-| **來源分析** | 追蹤流量來源（Referrer） |
+| **來源網站** | 依網站合併 Referrer（Mailchimp、LinkedIn、Facebook、Google Ads 等用品牌名，Android App 轉成 App 名），另列「無來源網站」 |
 | **裝置分析** | Mobile / Tablet / Desktop 分佈 |
 | **瀏覽器分析** | Chrome / Safari / Firefox 等統計 |
 | **作業系統** | iOS / Android / Windows / macOS 分佈 |
@@ -71,14 +73,15 @@
 | **工作區角色** | Owner / Admin / Member / Viewer 四級。OWNER/ADMIN 可管成員 + 跨人編輯任何資料；MEMBER/VIEWER 只能改自己建的，但都看得到工作區全員資料 |
 | **成員邀請（Targeted Invite Link）** | 不寄 email — 產生帶 token 的連結，自己貼 Slack/Email 給對方；對方 Google 登入後 hook 自動加入工作區。連結 7 天到期，UI 留著過期記錄 + 一鍵重發 |
 | **Campaign 刪除模式** | 「只刪 Campaign」連結保留可用；「刪除並停用所有連結」連結同步 PAUSED — 給整批清測試專案用 |
-| **共享報告** | 產生公開分享連結，支援密碼保護、到期時間、最大瀏覽次數；scope 可選單一連結 / 整個 Campaign / 整個工作區。報告固定在產生當下的日期範圍（或全部期間），只算真實流量，含通路表現與連結排行，預設中文可切英文 |
+| **共享報告** | 產生公開分享連結，支援密碼保護、到期時間、最大瀏覽次數；scope 可選單一連結 / 整個 Campaign / 整個工作區。報告固定在產生當下的日期範圍（或全部期間），只算真實流量（排除測試與疑似掃描點擊），含通路表現與連結排行，活動報告顯示負責人，預設中文可切英文 |
 | **審計日誌** | 記錄所有操作（建立、更新、刪除、分享、邀請成員等） |
 
 ### 其他特色
 
 - **國際化 (i18n)** - 支援英文與繁體中文；UTM 參數名（`utm_source` 等）與產業縮寫（CVR / CTR / QR）刻意保留英文，對齊 GA / 外部工具
 - **切頁瞬間完成** - 所有 dashboard 頁面走 React Query client cache，第一次進站後切換 tabs 零網路延遲；每頁右上角「Sync」按鈕手動強制重抓 + 顯示「最後同步時間」
-- **行動裝置基本操作** - `/links` 在手機自動切 card view；KPI / page header / 表格觸控目標 ≥44px；複雜表單（A/B variant 編輯、Kickstart 寬表）建議走桌面
+- **行動裝置基本操作** - `/links` 在手機自動切 card view；KPI / page header / 表格觸控目標 ≥44px；活動啟動器為 RWD；A/B variant 編輯建議走桌面
+- **活動規劃 skill** - `skills/campaign-link-planner/` 是給行銷同事用的 AI 助理 skill（Claude / Codex 等），問答後產出 CSV 匯入檔與一頁成效衡量計畫，適合多國市場、電商促銷或從長篇企劃規劃；命名規則與活動啟動器一致
 - **品牌短域名** - 短網址走 `go.engenius.ai`（custom domain），Dashboard 走 `mkt-shortlink.vercel.app`；middleware 自動把 `go.engenius.ai/<code>` rewrite 到 `/s/<code>`，短域名其他路徑 302 回品牌站避免暴露 dashboard
 - **軟刪除** - 已刪除連結保留於資料庫，可供稽核
 - **連結生命週期** - 排程啟用（`startsAt`）/ 到期（`expiresAt`）/ 最大點擊次數（`maxClicks`）

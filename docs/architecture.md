@@ -70,12 +70,14 @@ SyncButton click → qc.invalidateQueries(pageKeys) → 強制重抓當頁
 
 | Key | 內容 | 使用頁 |
 |---|---|---|
-| `["analytics-raw"]` | 90d × 10k 筆 raw clicks（~2MB） | `/analytics`、Campaign Detail、Compare |
+| `["analytics-raw", "real-only" \| "with-internal"]` | 730 天 × 10k 筆 raw clicks（~2MB；`real-only` 已排除測試與疑似掃描點擊） | `/analytics`、Campaign Detail、Compare、Kickstart（目標參考值） |
 | `["campaigns-summary", window]` | leaderboard / 時序 / orphans | `/campaigns`、Compare |
-| `["links", 500]` | 連結列表（含 trend、`createdBy`；Redis key `links-list-v3`） | `/links` |
+| `["links", 500]` | 連結列表（含 trend、`createdBy`；Redis key `links-list-v4`） | `/links` |
 | `["links-trash"]` | 已軟刪除的連結（上限 200） | `/links/trash`；刪除後由 LinksClient invalidate |
-| `["campaign-links", name]` | 某活動下的 links | Campaign Detail |
-| `["campaign-goal", name]` | 該活動的 goalClicks | Campaign Detail |
+| `["campaign-links", name, "real-only" \| "with-internal"]` | 某活動下的 links（快取形狀是**陣列**） | Campaign Detail、Kickstart（既有活動模式） |
+| `["campaign-goal", name]` | `/api/utm-campaigns/[name]` 的活動紀錄：goal / goalByMedium / 期間 / 狀態 / 負責人（key 名稱是歷史包袱） | Campaign Detail |
+| `["workspace-members", wsId]` | 工作區成員，快取形狀 `{ members }` | 設定 → 成員、`useWorkspaceMembers()`（只用 `select` 轉換） |
+| `["check-code", code]` | 短碼是否可用（staleTime 60s） | Kickstart 確認步驟 |
 | `["tags"]` / `["templates"]` / `["workspace-utm-settings"]` / `["utm-campaigns"]` | 共用資源 | 多處 |
 
 **`QueryClient` 預設值**（`lib/query/client.ts`）：
@@ -246,3 +248,70 @@ const scoped = await prisma.shortLink.findMany({
 - **點擊衰減曲線（golden window）** — 從該活動第一次點擊起算的逐時累積 + 每小時點擊。**只在 filter 到單一 campaign 或 link 時才顯示**（全站混在一起沒有意義）
 - **7×24 熱度圖** — 星期 × 小時。⚠️ 用的是 **viewer 瀏覽器時區**，不是 UTC 也不是 workspace 時區
 - **城市排行** — GeoIP 解析，前 15 名。準確度依地區差異很大，UI 上有註明
+
+## 15. 社群分享預覽覆寫
+
+`ShortLink.ogOverride{Title,Description,Image}`（全 nullable，只在編輯頁設定）。`/s/[code]` 在「有覆寫值 **且** `isPreviewCrawler(ua)`」時回 200 HTML（自訂 `og:*` + meta refresh，`private, no-store`），**不轉址也不記點擊**。邏輯在 `lib/social-preview.ts`；空欄位 fallback 到爬到的 `og*` → `title`。分支刻意放在 geo 檢查**之前**（FB/LINE 從美國機房抓）。
+
+## 16. 垃圾桶
+
+`/links/trash` + `GET /api/links/trash`（上限 200、不走 Redis）+ `POST /api/links/[id]/restore`（`canUserActOnResource`、寫 `RESTORE_LINK`）。query key `["links-trash"]`，LinksClient 的刪除會 invalidate 它。
+
+## 17. 分享報告期間與內容
+
+`ShareToken.rangeWindow` 存 `all` / `YYYY-MM-DD..YYYY-MM-DD`（台灣時間、含頭尾）/ 舊的 `7d` 等滾動值，解析全在 `lib/share-period.ts`。UI 一律產生固定日期（滾動視窗會讓主管隔週打開數字變了）。報告排除測試與疑似掃描點擊；活動報告的副標顯示負責人**名字**（公開頁，不露 email / 頭像）。
+
+## 18. QR 下載
+
+一律走 `lib/qr-export.ts`（`qrcode` 套件現場產 1024px PNG / 真向量 SVG + 中央 logo），不要從畫面上的小 canvas `toDataURL`。
+
+## 19. 列表建立者
+
+`ShortLink.createdById` **沒有 Prisma relation**，`lib/link-creators.ts` 用一次 `user.findMany` 批次查名字，`/api/links`（Redis key `links-list-v4`）與 `/api/export/links` 共用。要在別處顯示建立者就用它，別每列各查一次。
+
+## 20. 建立連結流程
+
+`/links/new` 是 server page，讀 `?utmCampaign=` / `?template=`（模板依 workspace 成員資格查）後把 `prefill` 傳給 `CreateLinkForm`；建立成功**留在原頁**顯示短網址 + QR，不 redirect 回 `/links`。其他入口（活動頁「新增連結」、模板頁「使用」）都靠這兩個參數。
+
+## 21. 疑似掃描點擊（`Click.isSuspectedBot`）
+
+規則只有一條：UA 是 Chromium 且主版號 < 100（`lib/click-quality.ts`）。企業郵件安全閘道會在 EDM 寄出後幾分鐘內開遍所有連結（2026-11 查：EDM 點擊 57% 來自同一個 `Chrome/79` UA，跨 150+ 個 IP）。
+
+- 跟 `isInternal` 一樣**標記不刪除**、不計入 `clickCount`
+- 所有統計用 `countedClickWhere(includeExcluded)` 取「算數的點擊」；raw SQL 寫 `AND is_internal = false AND is_suspected_bot = false`
+- 「含測試與疑似機器點擊」開關會兩者一起放回；`/api/analytics/raw` 的 meta 有 `excludedByLink`，活動頁只顯示自己連結被排除的數量
+- 歷史資料用 `scripts/flag-suspected-bot-clicks.mjs` 回填（可 `--undo`，idempotent），**改規則時兩邊要同步**
+- IP 爆量規則（同 IP 一分鐘內 3+ 條連結）試過，會誤抓連看多篇 LinkedIn 的真人，已放棄
+
+## 22. 活動期間與狀態
+
+`Campaign.startDate/endDate` 存「台灣時間當天 00:00」，含頭尾兩天；所有換算在 `lib/campaign-period.ts`（`dayToStoredDate` / `periodBoundsMs` / `periodTimestampWhere` / `campaignPhase`）。
+
+- **狀態由日期推算**（即將開始 / 進行中 / 已結束），只有「封存」是手動（`status=ARCHIVED`，連結照常運作）；舊的 DRAFT / COMPLETED 視同 ACTIVE
+- 活動列表、活動頁、比較頁的預設期間都是「活動期間」（沒設就是全部期間）。列表的 `period` 模式抓 730 天 payload、讀每列的 `periodClicks`
+- `campaigns-summary` 對有期間的活動各跑一次 `click.count`（活動數很少），沒期間的用全期間 groupBy
+- 編輯走 `PATCH /api/utm-campaigns/[name]`（goalClicks / goalByMedium / startDate / endDate / status / ownerId / displayName 皆選填，找不到 Campaign row 會建立）；`/api/campaigns/[id]` 的 PATCH 沒有 UI 在用
+- ⚠️ 這個 PATCH 的回應與 `["campaign-goal", name]` 快取共用同一份紀錄，前端更新時要 **merge**，不要用只有 goal 的物件覆寫（曾讓期間列暫時消失）
+
+## 23. 活動頁下鑽
+
+- 流量分頁的每個清單（source / medium / content / 連結 / 國家 / 來源網站）都是篩選器，走 `computeAnalytics` 的 `source/medium/content`（連結層）與 `country/referrer`（點擊層）
+- `linkId` 也必須符合 campaign / tag 範圍（`linkPasses`），避免拿別的活動的 id 看到別人的數字；`/analytics` 選連結時會自動拿掉不符的篩選
+- 來源網站依網站合併在 `lib/analytics/referrer.ts`（品牌族群表、`android-app://` 套件名、IP 原樣、共用網域如 `github.io` 保留子網域），`NO_REFERRER` 代表無 referrer
+- 連結分頁點一列就地展開 `components/campaigns/CampaignLinkDetail.tsx`；表格用 `table-layout: fixed`（除連結欄外都有固定寬度，**寬度含 padding**）
+- 從活動頁編輯連結帶 `?returnTo=/campaigns/<name>`（編輯頁只接受 `^/campaigns/[^/?#]+$`，存檔後回到連結**目前**所屬的活動）
+- 比較頁「對齊開始日」以日期差算第 0 天（開始日前為負天數，最多 60 天；95% 點擊後再 7 天截尾，最長 120 天）。時間軸是 UTC 日、開始日是台灣日，差 8 小時屬已知近似；折線 / 圖例 / 欄位共用 `CAMPAIGN_PALETTE`
+
+## 24. 依通路的點擊目標
+
+- `Campaign.goalByMedium`（Json，`{ "<utm_medium>": clicks }`，可為空）；有設時 API 讓 `goalClicks` = 加總，所以活動列表 / 比較頁照舊只讀 `goalClicks`
+- 只存總數或清除目標時 API 把 `goalByMedium` 設回 `Prisma.DbNull`，避免拆分跟總數對不上
+- 進度參考線（`lib/campaign-goal.ts` 的 `goalPaceFraction`）= 活動期間已經過的比例 × 目標，只在「進行中且有開始與結束日」時顯示；第一版是線性
+- 目標卡在 `components/campaigns/CampaignGoalCard.tsx`。分母一律是活動期間點擊、不封頂
+
+## 25. 活動負責人
+
+- `Campaign.ownerId`（FK → users，`onDelete: SetNull`，有 `@@index`）是**明確指派**的 KPI 負責人，不要拿 `createdById` 代替（活動多半是第一條連結自動建出來的）
+- 指派走 `PATCH /api/utm-campaigns/[name]` 的 `ownerId`，API 會檢查對方是該 workspace 成員，並寫進稽核紀錄
+- 成員清單用 `components/campaigns/CampaignOwner.tsx` 的 `useWorkspaceMembers()`——它跟 設定 → 成員 **共用 query key `["workspace-members", wsId]` 與快取形狀 `{ members }`**，只用 `select` 轉換，不要改成存陣列
+- 活動列表的負責人摘要卡**刻意不加總點擊**（不同活動量級差百倍），只算進行中 / 達標 / 落後進度幾檔
