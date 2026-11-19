@@ -15,7 +15,6 @@ import {
   Loader2,
   Plus,
   ExternalLink,
-  Target,
   Pencil,
   Settings2,
   X,
@@ -58,6 +57,8 @@ import {
 } from "@/lib/analytics/compute";
 import { MiniSpark } from "@/components/analytics/MiniSpark";
 import { CampaignLinkDetail } from "@/components/campaigns/CampaignLinkDetail";
+import { CampaignGoalCard, type GoalSaveBody } from "@/components/campaigns/CampaignGoalCard";
+import { goalPaceFraction, parseGoalByMedium } from "@/lib/campaign-goal";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ShareModal } from "@/components/analytics/ShareModal";
 import { SyncButton } from "@/components/layout/SyncButton";
@@ -96,6 +97,8 @@ const PHASE_BADGE: Record<CampaignPhase, string> = {
 interface CampaignRecord {
   id: string;
   goalClicks: number | null;
+  /** Raw Json column; read through parseGoalByMedium(). */
+  goalByMedium: unknown;
   startDate: string | null;
   endDate: string | null;
   status: string;
@@ -145,9 +148,6 @@ export default function CampaignDetailPage() {
   const [archiving, setArchiving] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
-  const [editingGoal, setEditingGoal] = useState(false);
-  const [goalInput, setGoalInput] = useState("");
-  const [goalSaving, setGoalSaving] = useState(false);
 
   // Delete dialog: two outcomes — `unlink` keeps short URLs functional,
   // `pauseAll` stops every link in this campaign at once. Defaults to
@@ -360,59 +360,34 @@ export default function CampaignDetailPage() {
     return { byLink: out, sparkMax };
   }, [raw, links]);
 
-  const saveGoal = async () => {
-    const parsed = parseInt(goalInput, 10);
-    if (isNaN(parsed) || parsed < 1) return;
-    setGoalSaving(true);
-    try {
-      const response = await fetch(`/api/utm-campaigns/${encodeURIComponent(campaignName)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goalClicks: parsed }),
-      });
-      if (response.ok) {
-        // Optimistic update + invalidate both the goal query and the
-        // Campaigns leaderboard so goal progress % stays consistent.
-        // Merge — the same cache entry also holds the period / archive
-        // record, which a plain overwrite used to wipe until refetch.
-        qc.setQueryData(goalKey, (old: typeof goalData) =>
-          old ? { ...old, goalClicks: parsed } : old,
-        );
-        qc.invalidateQueries({ queryKey: goalKey });
-        qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
-        setEditingGoal(false);
-        success(t("goalSaved"));
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setGoalSaving(false);
+  // Goal editor (CampaignGoalCard) → PATCH. Merge into the cached record:
+  // the same entry holds the period / archive fields, which a plain
+  // overwrite used to wipe until the refetch landed.
+  const saveGoal = async (body: GoalSaveBody) => {
+    const response = await fetch(`/api/utm-campaigns/${encodeURIComponent(campaignName)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      alert(`HTTP ${response.status}`);
+      throw new Error(`HTTP ${response.status}`);
     }
-  };
-
-  const clearGoal = async () => {
-    setGoalSaving(true);
-    try {
-      const response = await fetch(`/api/utm-campaigns/${encodeURIComponent(campaignName)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goalClicks: null }),
-      });
-      if (response.ok) {
-        qc.setQueryData(goalKey, (old: typeof goalData) =>
-          old ? { ...old, goalClicks: null } : old,
-        );
-        qc.invalidateQueries({ queryKey: goalKey });
-        qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
-        setGoalInput("");
-        setEditingGoal(false);
-        success(t("goalRemoved"));
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setGoalSaving(false);
-    }
+    const saved = (await response.json()) as { goalClicks: number | null; goalByMedium: unknown };
+    qc.setQueryData(goalKey, (old: typeof goalData) =>
+      old
+        ? {
+            ...old,
+            goalClicks: saved.goalClicks,
+            campaignRecord: old.campaignRecord
+              ? { ...old.campaignRecord, goalClicks: saved.goalClicks, goalByMedium: saved.goalByMedium }
+              : old.campaignRecord,
+          }
+        : old,
+    );
+    qc.invalidateQueries({ queryKey: goalKey });
+    qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
+    success(saved.goalClicks ? t("goalSaved") : t("goalRemoved"));
   };
 
   const totalClicks = links.reduce((sum, l) => sum + l._count.clicks, 0);
@@ -425,18 +400,36 @@ export default function CampaignDetailPage() {
   // Goal progress always counts the campaign period (all time when no
   // dates are set) — the same denominator the campaign list uses,
   // whichever window is selected here.
-  const goalBaseClicks = useMemo(() => {
-    if (!periodSet) return totalClicks;
-    if (!raw) return null;
-    const linkIds = new Set(links.map((l) => l.id));
-    let n = 0;
-    for (const c of raw.clicks) {
-      if (!linkIds.has(c.shortLinkId)) continue;
-      const ts = new Date(c.timestamp).getTime();
-      if (ts >= periodBounds.fromMs && ts <= periodBounds.toMs) n++;
+  // …in total and per utm_medium (for per-channel goals).
+  const goalBasis = useMemo(() => {
+    const byMedium: Record<string, number> = {};
+    if (!periodSet) {
+      for (const l of links) {
+        if (l.utmMedium) byMedium[l.utmMedium] = (byMedium[l.utmMedium] ?? 0) + l._count.clicks;
+      }
+      return { total: totalClicks, byMedium };
     }
-    return n;
+    if (!raw) return null;
+    const mediumOf = new Map(links.map((l) => [l.id, l.utmMedium]));
+    let total = 0;
+    for (const c of raw.clicks) {
+      if (!mediumOf.has(c.shortLinkId)) continue;
+      const ts = new Date(c.timestamp).getTime();
+      if (ts < periodBounds.fromMs || ts > periodBounds.toMs) continue;
+      total++;
+      const m = mediumOf.get(c.shortLinkId);
+      if (m) byMedium[m] = (byMedium[m] ?? 0) + 1;
+    }
+    return { total, byMedium };
   }, [periodSet, totalClicks, raw, links, periodBounds.fromMs, periodBounds.toMs]);
+  const goalByMedium = parseGoalByMedium(record?.goalByMedium);
+  const campaignMediums = useMemo(
+    () => Array.from(new Set(links.map((l) => l.utmMedium).filter((m): m is string => Boolean(m)))).sort(),
+    [links],
+  );
+  // Pace line only while the campaign is running inside a full period.
+  const [nowMs] = useState(() => Date.now());
+  const goalPace = phase === "running" ? goalPaceFraction(record, nowMs) : null;
 
   const phaseLabel = (p: CampaignPhase) =>
     p === "running"
@@ -1148,113 +1141,16 @@ export default function CampaignDetailPage() {
       {/* Overview tab */}
       {activeTab === "overview" && (
         <>
-          {/* Goal card */}
-          <div className="goal-card">
-            <div className="goal-head">
-              <div className="section-title">
-                <Target size={14} style={{ color: "var(--data-violet)" }} />
-                {t("clickGoal")}
-                {goalClicks && (
-                  <span className="muted" style={{ fontFamily: "var(--font-mono)", fontWeight: 400, fontSize: 11.5 }}>
-                    {goalBaseClicks !== null ? goalBaseClicks.toLocaleString() : "—"} / {goalClicks.toLocaleString()}
-                  </span>
-                )}
-                {goalClicks && (
-                  <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>
-                    · {periodSet ? t("goalBasisPeriod") : t("goalBasisAll")}
-                  </span>
-                )}
-              </div>
-              <div className="row" style={{ gap: 4 }}>
-                {goalClicks && !editingGoal && (
-                  <button
-                    className="btn btn-ghost"
-                    style={{ padding: "4px 6px" }}
-                    onClick={clearGoal}
-                    title={t("removeGoal")}
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-                <button
-                  className="btn btn-ghost"
-                  style={{ padding: "4px 6px" }}
-                  onClick={() => {
-                    setEditingGoal(!editingGoal);
-                    setGoalInput(goalClicks ? String(goalClicks) : "");
-                  }}
-                  title={t("editGoal")}
-                >
-                  <Pencil size={13} />
-                </button>
-              </div>
-            </div>
-
-            {editingGoal ? (
-              <div className="row" style={{ gap: 8 }}>
-                <input
-                  type="number"
-                  min={1}
-                  value={goalInput}
-                  onChange={(e) => setGoalInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") saveGoal();
-                    if (e.key === "Escape") setEditingGoal(false);
-                  }}
-                  placeholder={t("goalPlaceholder")}
-                  className="input"
-                  style={{ flex: 1, height: 32 }}
-                  autoFocus
-                />
-                <button
-                  className="btn btn-primary"
-                  onClick={saveGoal}
-                  disabled={!goalInput || goalSaving}
-                >
-                  {goalSaving ? <Loader2 size={13} className="animate-spin" /> : tCommon("save")}
-                </button>
-                <button className="btn btn-secondary" onClick={() => setEditingGoal(false)}>
-                  {tCommon("cancel")}
-                </button>
-              </div>
-            ) : goalClicks && goalBaseClicks === null ? (
-              <div className="goal-progress" />
-            ) : goalClicks && goalBaseClicks !== null ? (
-              (() => {
-                const pct = (goalBaseClicks / goalClicks) * 100;
-                const reached = goalBaseClicks >= goalClicks;
-                return (
-                  <>
-                    <div className="goal-progress">
-                      <div style={{ width: `${Math.min(pct, 100)}%` }} />
-                    </div>
-                    <div className="row-between" style={{ marginTop: 4 }}>
-                      <span
-                        style={{
-                          fontSize: 11.5,
-                          fontWeight: 500,
-                          color: reached ? "var(--ok-fg)" : "var(--data-violet)",
-                        }}
-                      >
-                        {reached
-                          ? `${t("goalReached")} ${t("goalPct", { pct: Math.round(pct) })}`
-                          : t("goalPct", { pct: pct < 10 ? pct.toFixed(1) : Math.round(pct) })}
-                      </span>
-                      {!reached && (
-                        <span className="muted" style={{ fontSize: 11.5 }}>
-                          {t("clicksRemaining", { n: (goalClicks - goalBaseClicks).toLocaleString() })}
-                        </span>
-                      )}
-                    </div>
-                  </>
-                );
-              })()
-            ) : (
-              <p className="placeholder" style={{ margin: 0 }}>
-                {t("setGoalHint")}
-              </p>
-            )}
-          </div>
+          <CampaignGoalCard
+            goalClicks={goalClicks}
+            goalByMedium={goalByMedium}
+            basis={goalBasis}
+            basisLabel={periodSet ? t("goalBasisPeriod") : t("goalBasisAll")}
+            pace={goalPace}
+            showPaceHint={Boolean(goalClicks) && !(record?.startDate && record?.endDate) && phase !== "archived"}
+            mediums={campaignMediums}
+            onSave={saveGoal}
+          />
 
           {/* Trend chart */}
           <div className="card card-padded">

@@ -847,7 +847,19 @@
       "detailPeakDay": "Peak day",
       "filterTrafficByLink": "Show only this link in Traffic",
       "expandLink": "Expand link details",
-      "collapseLink": "Collapse link details"
+      "collapseLink": "Collapse link details",
+      "goalModeTotal": "Total",
+      "goalModeChannel": "By channel",
+      "goalChannelHint": "Set a goal per utm_medium; the total is their sum. Leave a channel empty for no goal.",
+      "goalTotalAuto": "Total goal {n}",
+      "goalNoChannels": "None of this campaign's links have a utm_medium, so only a total goal is possible",
+      "goalAhead": "{n} ahead of pace",
+      "goalBehind": "{n} behind pace",
+      "goalExpected": "pace target {n}",
+      "goalPaceLegend": "Grey line = where an even pace over the campaign period would be today",
+      "goalPaceHint": "Set the campaign's start and end dates to get a pace line (where you should be today).",
+      "goalUnassigned": "Channels without a goal (still counted in the total): {list}",
+      "goalTotalLabel": "Total"
     },
     "allTime": "All time",
     "clicksAllTime": "Clicks (all time)",
@@ -858,7 +870,8 @@
     "periodPresetLong": "each campaign's period",
     "clicksIn": "Clicks ({window})",
     "periodOngoing": "ongoing",
-    "goalBasisTooltip": "Goal progress always counts the campaign period (all time if none is set), regardless of the window selected above"
+    "goalBasisTooltip": "Goal progress always counts the campaign period (all time if none is set), regardless of the window selected above",
+    "goalPaceTooltip": "Even pace would be {pct}% today (grey line)"
   },
   "compare": {
     "title": "Compare {n} campaigns",

@@ -847,7 +847,19 @@
       "detailPeakDay": "高峰日",
       "filterTrafficByLink": "在「流量」分頁只看這條連結",
       "expandLink": "展開連結細節",
-      "collapseLink": "收合連結細節"
+      "collapseLink": "收合連結細節",
+      "goalModeTotal": "總數",
+      "goalModeChannel": "依通路",
+      "goalChannelHint": "依 utm_medium 分別填目標，總目標自動加總；不填的通路就不設目標。",
+      "goalTotalAuto": "總目標 {n}",
+      "goalNoChannels": "這個活動的連結都沒有設定 utm_medium，只能設總數",
+      "goalAhead": "超前進度 {n}",
+      "goalBehind": "落後進度 {n}",
+      "goalExpected": "照進度應有 {n}",
+      "goalPaceLegend": "灰色直線 = 照時間平均分配，今天應該到的位置",
+      "goalPaceHint": "設定活動期間的開始日與結束日，就會出現進度參考線（今天應該到哪裡）。",
+      "goalUnassigned": "未設目標的通路（點擊仍算進總數）：{list}",
+      "goalTotalLabel": "總計"
     },
     "allTime": "全部期間",
     "clicksAllTime": "點擊數（全部期間）",
@@ -858,7 +870,8 @@
     "periodPresetLong": "各活動期間",
     "clicksIn": "點擊數（{window}）",
     "periodOngoing": "持續中",
-    "goalBasisTooltip": "目標進度一律以活動期間計算（沒設期間就是全部期間），不受上方期間切換影響"
+    "goalBasisTooltip": "目標進度一律以活動期間計算（沒設期間就是全部期間），不受上方期間切換影響",
+    "goalPaceTooltip": "照進度今天應達 {pct}%（灰色直線）"
   },
   "compare": {
     "title": "比較 {n} 個活動",

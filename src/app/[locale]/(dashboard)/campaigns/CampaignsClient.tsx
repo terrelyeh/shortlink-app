@@ -37,6 +37,7 @@ import { TrendCell, type TrendState } from "@/components/analytics/TrendCell";
 import { SyncButton } from "@/components/layout/SyncButton";
 import { formatRelativeTime } from "@/lib/utils/format";
 import { storedDateToDay, type CampaignPhase } from "@/lib/campaign-period";
+import { goalPaceFraction } from "@/lib/campaign-goal";
 
 interface CampaignRow {
   id: string | null;
@@ -125,6 +126,7 @@ export default function CampaignsClient() {
   // Default = each campaign's own period, so the numbers match the
   // campaign page (it defaults to the same window).
   const [window, setWindow] = useState<string>("period");
+  const [nowMs] = useState(() => Date.now());
   const isPeriod = window === "period";
   const shownClicks = useCallback(
     (c: CampaignRow) => (isPeriod ? (c.periodClicks ?? c.clicks) : c.clicks),
@@ -595,23 +597,50 @@ export default function CampaignsClient() {
                     </td>
                     <td>
                       {c.goalPct !== null && c.goalClicks ? (
-                        <div className="bar-cell" title={t("goalBasisTooltip")}>
-                          <div className="bar-track" style={{ minWidth: 50 }}>
+                        (() => {
+                          // Pace line: where an even pace would be today
+                          // (running campaigns with both dates only).
+                          const pace = c.phase === "running" ? goalPaceFraction(c, nowMs) : null;
+                          const reached = c.goalPct >= 100;
+                          const behind = !reached && pace !== null && c.goalPct < pace * 100;
+                          return (
                             <div
-                              className="bar-fill"
-                              style={{
-                                width: `${Math.min(100, c.goalPct)}%`,
-                                background: c.goalPct >= 100 ? "var(--data-emerald)" : "var(--data-violet)",
-                              }}
-                            />
-                          </div>
-                          <span
-                            className="num"
-                            style={{ color: c.goalPct >= 100 ? "var(--ok-fg)" : "var(--ink-400)" }}
-                          >
-                            {c.goalPct.toFixed(0)}%
-                          </span>
-                        </div>
+                              className="bar-cell"
+                              title={
+                                pace !== null
+                                  ? `${t("goalBasisTooltip")}\n${t("goalPaceTooltip", { pct: Math.round(pace * 100) })}`
+                                  : t("goalBasisTooltip")
+                              }
+                            >
+                              <div className="bar-track-wrap">
+                                <div className="bar-track" style={{ minWidth: 50 }}>
+                                  <div
+                                    className="bar-fill"
+                                    style={{
+                                      width: `${Math.min(100, c.goalPct)}%`,
+                                      background: reached
+                                        ? "var(--data-emerald)"
+                                        : behind
+                                          ? "var(--data-amber)"
+                                          : "var(--data-violet)",
+                                    }}
+                                  />
+                                </div>
+                                {!reached && pace !== null && pace > 0 && pace < 1 && (
+                                  <span className="bar-pace" style={{ left: `${pace * 100}%` }} />
+                                )}
+                              </div>
+                              <span
+                                className="num"
+                                style={{
+                                  color: reached ? "var(--ok-fg)" : behind ? "var(--warn-fg)" : "var(--ink-400)",
+                                }}
+                              >
+                                {c.goalPct.toFixed(0)}%
+                              </span>
+                            </div>
+                          );
+                        })()
                       ) : (
                         <span className="placeholder">{t("noGoal")}</span>
                       )}

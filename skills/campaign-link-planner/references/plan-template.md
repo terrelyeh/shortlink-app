@@ -18,11 +18,15 @@ Fill every section; keep it to roughly one printed page. Write in the user's lan
 ## 2. 目標
 | 指標 | 目標 | 怎麼訂的 |
 |---|---|---|
-| 總點擊（全部期間） | <n> | <basis, or （待校正）> |
-| <split, e.g. 各市場佔比 / 各 QR 位置> | <…> | <…> |
+| 總點擊（活動期間） | <n>（= 下面各通路加總） | <basis, or （待校正）> |
+| <utm_medium, e.g. email> | <n> | <basis> |
+| <utm_medium, e.g. social> | <n> | <basis> |
+| <utm_medium, e.g. qr> | <n> | <basis> |
 | <downstream: 詢價表單 / 名單 / 訂單> | <n> | <where it's measured: GA4 / CRM / Amazon> |
 
-上線後在活動頁設定目標點擊數 <n>，進度條會自動顯示。
+Give one row per `utm_medium` the CSV actually uses (the tool's goal editor is per medium, so use the exact medium values). Then:
+
+上線後在活動頁：① 設定活動期間 <start> ～ <end>；② 目標卡 → 鉛筆 →「依通路」，填 <medium> <n>、<medium> <n>…（總目標自動加總）。每個通路會有自己的進度條，並標出「照時間應該到哪裡」。
 
 ## 3. 每個階段看什麼、在哪看
 | 時間 | 要回答的問題 | 去哪看 |
@@ -30,7 +34,7 @@ Fill every section; keep it to roughly one printed page. Write in the user's lan
 | <before go-live> | 連結都能開嗎？預覽卡片對嗎？ | 每條按「測試短網址」（有設生效時間的，生效後再測）；社群連結用預覽除錯工具 |
 | <early days> | <…> | 活動頁「流量」「連結」分頁 |
 | <mid> | <…> | 分析頁 7×24 熱度圖 / 點擊衰減曲線 / 城市排行 |
-| <weekly / daily> | 進度跟得上目標嗎？ | 活動頁目標進度條 |
+| <weekly / daily> | 進度跟得上目標嗎？哪個通路落後？ | 活動頁目標卡：各通路進度條上的參考線（超前 / 落後） |
 | 結案 | 整體成效、下次怎麼調 | 見第 5 節 |
 
 ## 4. 判斷規則
