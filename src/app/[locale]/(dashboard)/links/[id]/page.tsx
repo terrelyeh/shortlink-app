@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useRouter } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -75,6 +75,13 @@ interface LinkData {
 
 export default function EditLinkPage() {
   const params = useParams();
+  // Where to go after saving / for the back link. Only campaign pages are
+  // accepted (the campaign page's Links tab passes its own path), so the
+  // param can't be used as an open redirect.
+  const searchParams = useSearchParams();
+  const returnToParam = searchParams.get("returnTo");
+  const returnTo =
+    returnToParam && /^\/campaigns\/[^/?#]+$/.test(returnToParam) ? returnToParam : null;
   const router = useRouter();
   const t = useTranslations("links");
   const tCommon = useTranslations("common");
@@ -322,7 +329,7 @@ export default function EditLinkPage() {
       qc.invalidateQueries({ queryKey: ["campaign-links"] });
       qc.invalidateQueries({ queryKey: ["utm-campaigns"] });
       toast.success(t("updateSuccess"));
-      router.push("/links");
+      router.push(returnTo ?? "/links");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update link");
       setSaving(false);
@@ -364,11 +371,11 @@ export default function EditLinkPage() {
     <div className="max-w-5xl mx-auto">
       <div className="mb-6">
         <Link
-          href="/links"
+          href={returnTo ?? "/links"}
           className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 transition-colors group"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-          <span className="font-medium">{t("title")}</span>
+          <span className="font-medium">{returnTo ? t("backToCampaign") : t("title")}</span>
         </Link>
       </div>
 

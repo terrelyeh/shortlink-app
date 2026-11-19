@@ -10,6 +10,8 @@
  *   - past that we truncate and show a banner
  */
 
+import { referrerSite } from "./referrer";
+
 export interface RawClick {
   shortLinkId: string;
   timestamp: string; // ISO
@@ -65,7 +67,12 @@ export interface ComputedAnalytics {
   devices: { name: string; value: number }[];
   browsers: { name: string; value: number }[];
   operatingSystems: { name: string; value: number }[];
+  /** One row per site (lib/analytics/referrer.ts), not per URL. */
   referrers: { name: string; value: number }[];
+  /** Full referrer URLs — useful once a referrer site filter is applied. */
+  referrerUrls: { name: string; value: number }[];
+  /** Clicks with no referrer (email apps, QR, in-app browsers…). */
+  noReferrer: number;
   countries: { name: string; value: number }[];
   cities: { name: string; country: string | null; value: number }[];
   /** Hour-by-hour curve from the first click in the window. Useful to
@@ -91,8 +98,12 @@ export interface ComputedAnalytics {
     mediums: { name: string; clicks: number }[];
     campaignSource: { campaign: string; source: string; clicks: number }[];
     campaignContent: { campaign: string; content: string; clicks: number }[];
+    contents: { name: string; clicks: number }[];
   };
 }
+
+/** Value of ComputeFilters.referrer that selects clicks with no referrer. */
+export const NO_REFERRER = "__none__";
 
 export interface ComputeFilters {
   /** inclusive */
@@ -109,6 +120,13 @@ export interface ComputeFilters {
   campaign?: string | null;
   /** Filter to links that carry this tag */
   tagId?: string;
+  /** Drill-down: link-level UTM values (exact match). */
+  source?: string;
+  medium?: string;
+  content?: string;
+  /** Drill-down: click-level. `referrer` is a site from referrerSite(), or NO_REFERRER. */
+  country?: string;
+  referrer?: string;
 }
 
 function sortAndSlice(map: Map<string, number>, limit = 10) {
@@ -126,28 +144,37 @@ export function computeAnalytics(
   raw: RawAnalyticsData,
   filters: ComputeFilters,
 ): ComputedAnalytics {
-  const { rangeStart, rangeEnd, linkId, campaign, tagId } = filters;
+  const { rangeStart, rangeEnd, linkId, campaign, tagId, source, medium, content, country, referrer } =
+    filters;
 
   // --- 1. Determine the set of link IDs this view cares about ---
   const linksById = new Map<string, LinkMeta>();
   for (const l of raw.links) linksById.set(l.id, l);
 
-  let eligibleLinkIds: Set<string>;
-  if (linkId) {
-    eligibleLinkIds = new Set([linkId]);
-  } else {
-    eligibleLinkIds = new Set();
-    for (const l of raw.links) {
-      if (campaign !== null && campaign !== undefined) {
-        if (campaign === "__none__") {
-          if (l.utmCampaign) continue;
-        } else if (l.utmCampaign !== campaign) {
-          continue;
-        }
+  // Link-level filters (campaign scope, tag, UTM drill-down). A linkId
+  // narrows to one link but still has to pass them, so a stale id can't
+  // pull another campaign's numbers into a campaign view.
+  const linkPasses = (l: LinkMeta) => {
+    if (campaign !== null && campaign !== undefined) {
+      if (campaign === "__none__") {
+        if (l.utmCampaign) return false;
+      } else if (l.utmCampaign !== campaign) {
+        return false;
       }
-      if (tagId && !l.tagIds.includes(tagId)) continue;
-      eligibleLinkIds.add(l.id);
     }
+    if (tagId && !l.tagIds.includes(tagId)) return false;
+    if (source && l.utmSource !== source) return false;
+    if (medium && l.utmMedium !== medium) return false;
+    if (content && l.utmContent !== content) return false;
+    return true;
+  };
+
+  const eligibleLinkIds = new Set<string>();
+  if (linkId) {
+    const l = linksById.get(linkId);
+    if (!l || linkPasses(l)) eligibleLinkIds.add(linkId);
+  } else {
+    for (const l of raw.links) if (linkPasses(l)) eligibleLinkIds.add(l.id);
   }
 
   // --- 2. Filter clicks to current range & eligible links ---
@@ -159,8 +186,25 @@ export function computeAnalytics(
   const inRange: RawClick[] = [];
   let prevPeriodCount = 0;
 
+  // Click-level drill-down (memoise the site per raw referrer string).
+  const siteCache = new Map<string, string | null>();
+  const siteOf = (r: string | null) => {
+    if (!r) return null;
+    let v = siteCache.get(r);
+    if (v === undefined) {
+      v = referrerSite(r);
+      siteCache.set(r, v);
+    }
+    return v;
+  };
+  const clickMatches = (c: RawClick) =>
+    (!country || c.country === country) &&
+    (!referrer ||
+      (referrer === NO_REFERRER ? !c.referrer : siteOf(c.referrer) === referrer));
+
   for (const c of raw.clicks) {
     if (!eligibleLinkIds.has(c.shortLinkId)) continue;
+    if ((country || referrer) && !clickMatches(c)) continue;
     const t = new Date(c.timestamp).getTime();
     if (t >= startMs && t <= endMs) {
       inRange.push(c);
@@ -226,6 +270,8 @@ export function computeAnalytics(
   const osMap = new Map<string, number>();
   const referrerMap = new Map<string, number>();
   const countryMap = new Map<string, number>();
+  const referrerUrlMap = new Map<string, number>();
+  let noReferrer = 0;
   // Key by "country|city" so two cities with the same name in
   // different countries don't collapse together.
   const cityMap = new Map<string, { country: string | null; count: number }>();
@@ -244,7 +290,11 @@ export function computeAnalytics(
     const osn = c.os || "Unknown";
     osMap.set(osn, (osMap.get(osn) || 0) + 1);
     if (c.referrer) {
-      referrerMap.set(c.referrer, (referrerMap.get(c.referrer) || 0) + 1);
+      const site = siteOf(c.referrer) ?? c.referrer;
+      referrerMap.set(site, (referrerMap.get(site) || 0) + 1);
+      referrerUrlMap.set(c.referrer, (referrerUrlMap.get(c.referrer) || 0) + 1);
+    } else {
+      noReferrer += 1;
     }
     if (c.country) {
       countryMap.set(c.country, (countryMap.get(c.country) || 0) + 1);
@@ -335,6 +385,7 @@ export function computeAnalytics(
   const campaignMap = new Map<string, number>();
   const sourceMap = new Map<string, number>();
   const mediumMap = new Map<string, number>();
+  const contentMap = new Map<string, number>();
   const campaignSourceMap = new Map<
     string,
     { campaign: string; source: string; clicks: number }
@@ -364,6 +415,9 @@ export function computeAnalytics(
         meta.utmMedium,
         (mediumMap.get(meta.utmMedium) || 0) + clicks,
       );
+    }
+    if (meta.utmContent) {
+      contentMap.set(meta.utmContent, (contentMap.get(meta.utmContent) || 0) + clicks);
     }
     if (meta.utmCampaign && meta.utmSource) {
       const k = `${meta.utmCampaign}|${meta.utmSource}`;
@@ -401,6 +455,8 @@ export function computeAnalytics(
     browsers: toNameValue(browserMap),
     operatingSystems: toNameValue(osMap),
     referrers: toNameValue(referrerMap).slice(0, 10),
+    referrerUrls: toNameValue(referrerUrlMap).slice(0, 10),
+    noReferrer,
     countries: toNameValue(countryMap).slice(0, 10),
     cities,
     decay,
@@ -410,6 +466,7 @@ export function computeAnalytics(
       campaigns: sortAndSlice(campaignMap),
       sources: sortAndSlice(sourceMap),
       mediums: sortAndSlice(mediumMap),
+      contents: sortAndSlice(contentMap, 15),
       campaignSource: sortByClicksDesc(
         Array.from(campaignSourceMap.values()),
         15,
@@ -423,7 +480,7 @@ export function computeAnalytics(
 }
 
 /** YYYY-MM-DD in the viewer's timezone (same basis as the hour heatmap). */
-function localDayKey(d: Date): string {
+export function localDayKey(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
