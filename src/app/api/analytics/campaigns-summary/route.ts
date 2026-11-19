@@ -29,6 +29,7 @@ import { countedClickWhere } from "@/lib/click-quality";
 import { resolveWorkspaceScope } from "@/lib/workspace";
 import { cached, cacheKey } from "@/lib/cache";
 import { classifyTrend, type TrendState } from "@/components/analytics/TrendCell";
+import { campaignPhase, hasPeriod, periodTimestampWhere } from "@/lib/campaign-period";
 
 const DEFAULT_DAYS = 30;
 // 730 so the "all time" preset covers past exhibition seasons.
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
     // so v3 cached payloads (which mixed test clicks into the totals)
     // don't haunt the leaderboard for up to 60s.
     const key = cacheKey(
-      "campaigns-summary-v6",
+      "campaigns-summary-v7",
       session.user.id,
       scope.workspaceId ?? "_",
       days,
@@ -108,6 +109,21 @@ export async function GET(request: NextRequest) {
       });
 
       const linkIds = links.map((l) => l.id);
+
+      // Campaign row per name (first link that carries the FK wins) and
+      // the link ids that belong to each name — needed up front so the
+      // per-campaign period counts can join the Promise.all below.
+      const campaignByName = new Map<string, NonNullable<(typeof links)[number]["campaign"]>>();
+      const linkIdsByName = new Map<string, string[]>();
+      for (const l of links) {
+        const name = l.campaign?.name ?? l.utmCampaign;
+        if (!name) continue;
+        if (l.campaign && !campaignByName.has(name)) campaignByName.set(name, l.campaign);
+        const arr = linkIdsByName.get(name) ?? [];
+        arr.push(l.id);
+        linkIdsByName.set(name, arr);
+      }
+      const periodNames = [...linkIdsByName.keys()].filter((n) => hasPeriod(campaignByName.get(n)));
       // Windowed click counts + a per-(link, day) breakdown for the
       // overlay chart on /campaigns. Raw SQL because Prisma groupBy
       // can't bucket by day. The breakdown stays small (links × days ≤
@@ -130,7 +146,7 @@ export async function GET(request: NextRequest) {
       const last7From = new Date(nowMs - 7 * 86_400_000);
       const prev7From = new Date(nowMs - 14 * 86_400_000);
 
-      const [windowClicks, windowConversions, dailyRaw, lastClicks, last7Clicks, prev7Clicks] = linkIds.length > 0
+      const [windowClicks, windowConversions, dailyRaw, lastClicks, last7Clicks, prev7Clicks, allTimeClicks, periodCounts] = linkIds.length > 0
         ? await Promise.all([
             prisma.click.groupBy({
               by: ["shortLinkId"],
@@ -178,8 +194,37 @@ export async function GET(request: NextRequest) {
               where: { shortLinkId: { in: linkIds }, timestamp: { gte: prev7From, lt: last7From }, ...clickFilter },
               _count: { _all: true },
             }),
+            // All-time per link — the "campaign period" figure for
+            // campaigns that have no dates set.
+            prisma.click.groupBy({
+              by: ["shortLinkId"],
+              where: { shortLinkId: { in: linkIds }, ...clickFilter },
+              _count: { _all: true },
+            }),
+            // One count per campaign that has dates (a handful at most).
+            Promise.all(
+              periodNames.map((name) =>
+                prisma.click
+                  .count({
+                    where: {
+                      shortLinkId: { in: linkIdsByName.get(name)! },
+                      timestamp: periodTimestampWhere(campaignByName.get(name)),
+                      ...clickFilter,
+                    },
+                  })
+                  .then((n) => [name, n] as const),
+              ),
+            ),
           ])
-        : [[], [], [], [], [], []];
+        : [[], [], [], [], [], [], [], []];
+
+      const allTimeMap = new Map(
+        (allTimeClicks as { shortLinkId: string; _count: { _all: number } }[]).map((r) => [
+          r.shortLinkId,
+          r._count._all,
+        ]),
+      );
+      const periodClicksByName = new Map(periodCounts as (readonly [string, number])[]);
 
       const windowClicksMap = new Map(
         (windowClicks as { shortLinkId: string; _count: { _all: number } }[]).map((r) => [
@@ -222,6 +267,11 @@ export async function GET(request: NextRequest) {
         // don't want those to keep haunting the leaderboard if every
         // remaining link is non-active.
         hasActiveLink: boolean;
+        startDate: Date | null;
+        endDate: Date | null;
+        // Clicks inside the campaign's own period (all time if unset) —
+        // independent of the `days` window. Goal progress uses this.
+        periodClicks: number;
       }
       const buckets = new Map<string, Bucket>();
       const orphanLinks: typeof links = [];
@@ -233,15 +283,19 @@ export async function GET(request: NextRequest) {
           continue;
         }
         if (!buckets.has(campaignName)) {
+          const cRow = campaignByName.get(campaignName);
           buckets.set(campaignName, {
-            id: link.campaign?.id ?? null,
+            id: cRow?.id ?? null,
             name: campaignName,
-            displayName: link.campaign?.displayName ?? null,
-            description: link.campaign?.description ?? null,
-            status: link.campaign?.status ?? null,
-            goalClicks: link.campaign?.goalClicks ?? null,
-            defaultSource: link.campaign?.defaultSource ?? null,
-            defaultMedium: link.campaign?.defaultMedium ?? null,
+            displayName: cRow?.displayName ?? null,
+            description: cRow?.description ?? null,
+            status: cRow?.status ?? null,
+            goalClicks: cRow?.goalClicks ?? null,
+            defaultSource: cRow?.defaultSource ?? null,
+            defaultMedium: cRow?.defaultMedium ?? null,
+            startDate: cRow?.startDate ?? null,
+            endDate: cRow?.endDate ?? null,
+            periodClicks: 0,
             linkCount: 0,
             clicks: 0,
             conversions: 0,
@@ -252,12 +306,19 @@ export async function GET(request: NextRequest) {
         const b = buckets.get(campaignName)!;
         b.linkCount += 1;
         b.clicks += windowClicksMap.get(link.id) ?? 0;
+        b.periodClicks += allTimeMap.get(link.id) ?? 0;
         b.conversions += windowConversionsMap.get(link.id) ?? 0;
         if (link.status === "ACTIVE") b.hasActiveLink = true;
         const linkLast = lastClickMap.get(link.id);
         if (linkLast && (!b.lastClickAt || linkLast > b.lastClickAt)) {
           b.lastClickAt = linkLast;
         }
+      }
+
+      // Campaigns with dates: replace the all-time sum with the period count.
+      for (const [name, n] of periodClicksByName) {
+        const b = buckets.get(name);
+        if (b) b.periodClicks = n;
       }
 
       const campaigns = Array.from(buckets.values())
@@ -280,13 +341,17 @@ export async function GET(request: NextRequest) {
           conversions: b.conversions,
           cvr: b.clicks > 0 ? (b.conversions / b.clicks) * 100 : 0,
           goalClicks: b.goalClicks,
-          // Goal progress uses all-time clickCount-like totals in the
-          // window, not the goal's lifetime clicks. Marketers asked
-          // "how close are we in this period?" rather than "since
-          // forever?" — the latter is visible on the detail page.
+          startDate: b.startDate?.toISOString() ?? null,
+          endDate: b.endDate?.toISOString() ?? null,
+          phase: campaignPhase(b),
+          periodClicks: b.periodClicks,
+          // Goal progress always uses the campaign period (all time when
+          // no dates are set) — the same denominator as the campaign page,
+          // whatever window the list is showing. Not capped: 130% is
+          // information.
           goalPct:
             b.goalClicks && b.goalClicks > 0
-              ? Math.min((b.clicks / b.goalClicks) * 100, 100)
+              ? (b.periodClicks / b.goalClicks) * 100
               : null,
           lastClickAt: b.lastClickAt,
         }))

@@ -61,6 +61,8 @@
 
 21. **疑似掃描點擊（`Click.isSuspectedBot`）** — 規則只有一條：UA 是 Chromium 且主版號 < 100（`lib/click-quality.ts`）。企業郵件安全閘道會在 EDM 寄出後幾分鐘內開遍所有連結（2026-11 查：EDM 點擊 57% 來自同一個 `Chrome/79` UA）。跟 `isInternal` 一樣**標記不刪除**、不計入 `clickCount`，所有統計用 `countedClickWhere(includeExcluded)` 取「算數的點擊」——**新寫 click 查詢一律用它**，不要只寫 `isInternal: false`。「含測試與疑似機器點擊」開關會兩者一起放回。歷史資料用 `scripts/flag-suspected-bot-clicks.mjs` 回填（可 `--undo`），**改規則時兩邊要同步**。IP 爆量規則試過、會誤抓連看多篇 LinkedIn 的真人，已放棄
 
+22. **活動期間與狀態** — `Campaign.startDate/endDate` 存「台灣時間當天 00:00」，含頭尾兩天；所有換算在 `lib/campaign-period.ts`（`periodBoundsMs` / `periodTimestampWhere` / `campaignPhase`）。**狀態由日期推算**（即將開始 / 進行中 / 已結束），只有「封存」是手動（`status=ARCHIVED`，連結照常運作）；舊的 DRAFT / COMPLETED 視同 ACTIVE。活動列表、活動頁、比較頁的預設期間都是「活動期間」（沒設就是全部期間），**目標進度一律用活動期間的點擊當分母、不封頂**，不跟著期間切換。編輯走 `PATCH /api/utm-campaigns/[name]`（goal / startDate / endDate / status 皆選填）；`/api/campaigns/[id]` 的 PATCH 沒有 UI 在用
+
 ## Conventions
 
 ### Server / Client split 命名

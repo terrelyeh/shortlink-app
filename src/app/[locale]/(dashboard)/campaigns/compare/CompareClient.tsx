@@ -21,6 +21,7 @@ import { MultiCampaignChart } from "@/components/analytics/MultiCampaignChart";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SyncButton } from "@/components/layout/SyncButton";
 import { computeAnalytics, type RawAnalyticsData } from "@/lib/analytics/compute";
+import { periodBoundsMs, type CampaignPhase } from "@/lib/campaign-period";
 
 interface CampaignRow {
   id: string | null;
@@ -34,6 +35,10 @@ interface CampaignRow {
   cvr: number;
   goalClicks: number | null;
   goalPct: number | null;
+  startDate: string | null;
+  endDate: string | null;
+  phase: CampaignPhase;
+  periodClicks: number;
 }
 
 interface SummaryResponse {
@@ -45,7 +50,10 @@ interface SummaryResponse {
   meta: { days: number };
 }
 
+// Same presets as the campaign list; "period" = each campaign's own dates.
 const windowPresets: { value: string; days: number }[] = [
+  { value: "period", days: 730 },
+  { value: "all", days: 730 },
   { value: "7d", days: 7 },
   { value: "30d", days: 30 },
   { value: "90d", days: 90 },
@@ -58,20 +66,35 @@ const COLUMN_COLORS = [
   "var(--data-amber)",
 ];
 
-function statusClass(status: string | null): string {
-  if (status === "ACTIVE") return "active";
-  if (status === "COMPLETED") return "completed";
-  if (status === "DRAFT") return "draft";
-  if (status === "ARCHIVED") return "archived";
-  return "draft";
-}
+const PHASE_BADGE: Record<CampaignPhase, string> = {
+  running: "active",
+  upcoming: "draft",
+  ended: "completed",
+  archived: "archived",
+};
 
 export default function CompareClient({ initialNames }: { initialNames: string[] }) {
   const router = useRouter();
   const t = useTranslations("compare");
+  const tCampaigns = useTranslations("campaigns");
 
   const [names, setNames] = useState<string[]>(initialNames);
-  const [window, setWindow] = useState<string>("30d");
+  const [window, setWindow] = useState<string>("period");
+  // Fixed at mount so the breakdown memo stays pure.
+  const [now] = useState(() => Date.now());
+  const isPeriod = window === "period";
+  const shown = useCallback(
+    (c: CampaignRow) => (isPeriod ? (c.periodClicks ?? c.clicks) : c.clicks),
+    [isPeriod],
+  );
+  const phaseLabel = (p: CampaignPhase) =>
+    p === "running"
+      ? tCampaigns("statusActive")
+      : p === "upcoming"
+        ? tCampaigns("statusUpcoming")
+        : p === "ended"
+          ? tCampaigns("statusCompleted")
+          : tCampaigns("statusArchived");
 
   // Share keys with other pages: campaigns-summary + analytics-raw so the
   // leaderboard and /analytics hit the same cache entries.
@@ -81,7 +104,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
   const { data: summary, isLoading: summaryLoading } = useQuery<SummaryResponse>({
     queryKey: summaryKey,
     queryFn: async () => {
-      const preset = windowPresets.find((p) => p.value === window) ?? windowPresets[1];
+      const preset = windowPresets.find((p) => p.value === window) ?? windowPresets[0];
       const res = await fetch(`/api/analytics/campaigns-summary?days=${preset.days}`);
       if (!res.ok) throw new Error("Failed to load campaigns summary");
       return (await res.json()) as SummaryResponse;
@@ -115,10 +138,10 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
 
   const perCampaignBreakdown = useMemo(() => {
     if (!raw) return {};
-    const end = new Date();
-    const start = new Date();
     const days = windowPresets.find((p) => p.value === window)?.days ?? 30;
-    start.setDate(end.getDate() - days);
+    const windowStart = new Date(now - days * 86_400_000);
+    const sinceMs = new Date(raw.meta.since).getTime();
+    const byName = new Map((summary?.campaigns ?? []).map((c) => [c.name, c]));
 
     const out: Record<
       string,
@@ -129,9 +152,11 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
       }
     > = {};
     for (const name of names) {
+      // In "period" mode each column uses its own campaign's dates.
+      const b = isPeriod ? periodBoundsMs(byName.get(name)) : null;
       const computed = computeAnalytics(raw, {
-        rangeStart: start,
-        rangeEnd: end,
+        rangeStart: b ? new Date(Math.max(b.fromMs, sinceMs)) : windowStart,
+        rangeEnd: b ? new Date(Math.min(b.toMs, now)) : new Date(now),
         campaign: name,
       });
       out[name] = {
@@ -146,7 +171,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
       };
     }
     return out;
-  }, [raw, names, window]);
+  }, [raw, names, window, isPeriod, summary, now]);
 
   const overlaySeries = useMemo(() => {
     if (!summary?.timeseries) return null;
@@ -160,19 +185,23 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
 
   const winners = useMemo(() => {
     if (selectedCampaigns.length === 0) return null;
-    const best = <K extends keyof CampaignRow>(key: K, min = 0): CampaignRow | null => {
+    const best = (get: (c: CampaignRow) => number | null): CampaignRow | null => {
       let top: CampaignRow | null = null;
+      let topV = 0;
       for (const c of selectedCampaigns) {
-        const v = (c[key] as number | null) ?? 0;
-        if (v > min && (top === null || v > (top[key] as number))) top = c;
+        const v = get(c) ?? 0;
+        if (v > 0 && (top === null || v > topV)) {
+          top = c;
+          topV = v;
+        }
       }
       return top;
     };
     return {
-      clicks: best("clicks"),
-      goalPct: best("goalPct"),
+      clicks: best(shown),
+      goalPct: best((c) => c.goalPct),
     };
-  }, [selectedCampaigns]);
+  }, [selectedCampaigns, shown]);
 
   if (initialNames.length === 0) {
     return (
@@ -191,6 +220,11 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
   }
 
   const days = summary?.meta.days ?? 30;
+  const windowLabel = isPeriod
+    ? t("windowPeriod")
+    : window === "all"
+      ? t("windowAll")
+      : t("lastNd", { days });
 
   return (
     <>
@@ -198,7 +232,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
         back={t("backToCampaigns")}
         onBack={() => router.push("/campaigns")}
         title={t("title", { n: names.length })}
-        description={t("subtitle", { days })}
+        description={t("subtitleWindow", { window: windowLabel })}
         actions={
           <>
             <SyncButton queryKeys={[[...summaryKey], [...rawKey]]} />
@@ -209,7 +243,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                   className={window === p.value ? "active" : ""}
                   onClick={() => setWindow(p.value)}
                 >
-                  {p.value}
+                  {p.value === "period" ? t("presetPeriod") : p.value === "all" ? t("windowAll") : p.value}
                 </button>
               ))}
             </div>
@@ -236,7 +270,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                 icon={<MousePointerClick size={12} />}
                 label={t("mostClicks")}
                 winner={winners.clicks}
-                format={(c) => c.clicks.toLocaleString()}
+                format={(c) => shown(c).toLocaleString()}
                 emptyHint={t("noData")}
               />
               <WinnerCard
@@ -257,7 +291,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                   <LineChartIcon size={14} style={{ color: "var(--ink-400)" }} />
                   {t("dailyClicks")}
                   <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
-                    · {t("lastNd", { days })}
+                    · {isPeriod || window === "all" ? t("windowAll") : t("lastNd", { days })}
                   </span>
                 </div>
                 <div className="row" style={{ gap: 12, fontSize: 11.5 }}>
@@ -309,10 +343,10 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                         {c.displayName || c.name}
                       </div>
                       <div className="compare-col-meta">
-                        {c.status && (
-                          <span className={`badge ${statusClass(c.status)}`}>
+                        {c.id && (
+                          <span className={`badge ${PHASE_BADGE[c.phase ?? "running"]}`}>
                             <span className="badge-dot" />
-                            {c.status}
+                            {phaseLabel(c.phase ?? "running")}
                           </span>
                         )}
                         <span>·</span>
@@ -332,9 +366,9 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                   <div className="compare-metrics" style={{ gridTemplateColumns: "1fr" }}>
                     <div>
                       <div className="compare-metric-label">
-                        {t("clicksLastNd", { days })}
+                        {t("clicksIn", { window: windowLabel })}
                       </div>
-                      <div className="compare-metric-val">{c.clicks.toLocaleString()}</div>
+                      <div className="compare-metric-val">{shown(c).toLocaleString()}</div>
                     </div>
                   </div>
 
@@ -351,7 +385,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                             color: "var(--ink-500)",
                           }}
                         >
-                          {c.clicks.toLocaleString()} / {c.goalClicks.toLocaleString()}
+                          {(c.periodClicks ?? c.clicks).toLocaleString()} / {c.goalClicks.toLocaleString()}
                         </span>
                       </div>
                       <div className="goal-progress" style={{ margin: 0 }}>
@@ -384,7 +418,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                   <div className="compare-row">
                     <div className="compare-row-label">{t("topSources")}</div>
                     {breakdown && breakdown.sources.length > 0 ? (
-                      <BreakdownList rows={breakdown.sources} total={c.clicks} pillClass="pill-source" />
+                      <BreakdownList rows={breakdown.sources} total={shown(c)} pillClass="pill-source" />
                     ) : (
                       <div className="placeholder">{t("noData")}</div>
                     )}
@@ -393,7 +427,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                   <div className="compare-row">
                     <div className="compare-row-label">{t("topMediums")}</div>
                     {breakdown && breakdown.mediums.length > 0 ? (
-                      <BreakdownList rows={breakdown.mediums} total={c.clicks} pillClass="pill-medium" />
+                      <BreakdownList rows={breakdown.mediums} total={shown(c)} pillClass="pill-medium" />
                     ) : (
                       <div className="placeholder">{t("noData")}</div>
                     )}
