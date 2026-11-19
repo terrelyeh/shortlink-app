@@ -15,7 +15,7 @@ function buildClickFilter(token: {
 }): Prisma.ClickWhereInput {
   // Real traffic only — same default as every dashboard view. Test clicks
   // (?_test=1) used to leak into reports sent to managers.
-  const where: Prisma.ClickWhereInput = { isInternal: false };
+  const where: Prisma.ClickWhereInput = { isInternal: false, isSuspectedBot: false };
 
   if (token.shortLinkId) {
     where.shortLinkId = token.shortLinkId;

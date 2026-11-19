@@ -223,6 +223,7 @@ export async function POST(
         where: {
           shortLinkId: { in: linkIds },
           isInternal: false,
+          isSuspectedBot: false,
         },
         _count: { _all: true },
       });

@@ -10,6 +10,7 @@ import { cacheEnabled, cacheSetIfAbsent } from "@/lib/cache";
 import { appendSessionParam, parseVariants, pickVariant } from "@/lib/variants";
 import { auth } from "@/lib/auth";
 import { hasPreviewOverride, isPreviewCrawler, renderPreviewHtml } from "@/lib/social-preview";
+import { isSuspectedBotUserAgent } from "@/lib/click-quality";
 
 // Query param that flags a click as internal pre-launch testing. Stripped
 // before the redirect so it doesn't leak into the destination URL or
@@ -334,6 +335,7 @@ async function recordClick({
   }
 
   const { device, os, browser } = parseUserAgent(userAgent);
+  const suspectedBot = isSuspectedBotUserAgent(userAgent);
   if (!geo.country) {
     console.warn(`[click] No geo data for code: ${code}`);
   }
@@ -359,10 +361,13 @@ async function recordClick({
         country: geo.country,
         city: geo.city,
         isInternal,
+        isSuspectedBot: suspectedBot,
       },
     }),
   ];
-  if (!isInternal) {
+  // Scanner clicks are kept for forensics but, like test clicks, don't
+  // count toward clickCount (so they can't burn maxClicks either).
+  if (!isInternal && !suspectedBot) {
     ops.push(
       prisma.shortLink.update({
         where: { id: shortLinkId },

@@ -458,7 +458,7 @@ export default function AnalyticsPage() {
           filter callouts pattern: prominent enough that users know the
           number isn't raw, but dismissable in spirit (toggle off in the
           toolbar). */}
-      {!includeInternal && (raw?.meta.excludedInternal ?? 0) > 0 && (
+      {!includeInternal && ((raw?.meta.excludedInternal ?? 0) > 0 || (raw?.meta.excludedBot ?? 0) > 0) && (
         <div
           style={{
             display: "flex",
@@ -474,7 +474,12 @@ export default function AnalyticsPage() {
           }}
         >
           <span style={{ fontVariantNumeric: "tabular-nums" }}>
-            {t("filteredTestClicks", { n: raw?.meta.excludedInternal ?? 0 })}
+            {t("filteredExcluded", {
+              parts: [
+                (raw?.meta.excludedInternal ?? 0) > 0 ? t("excludedTestPart", { n: raw?.meta.excludedInternal ?? 0 }) : null,
+                (raw?.meta.excludedBot ?? 0) > 0 ? t("excludedBotPart", { n: (raw?.meta.excludedBot ?? 0).toLocaleString() }) : null,
+              ].filter(Boolean).join("、"),
+            })}
           </span>
           <button
             type="button"

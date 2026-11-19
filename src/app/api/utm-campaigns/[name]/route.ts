@@ -1,3 +1,4 @@
+import { countedClickWhere } from "@/lib/click-quality";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -58,7 +59,7 @@ export async function GET(
       },
       select: {
         id: true,
-        _count: { select: { clicks: true } },
+        _count: { select: { clicks: { where: countedClickWhere(false) } } },
       },
     });
 

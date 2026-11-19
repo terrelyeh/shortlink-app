@@ -321,11 +321,11 @@
     "allLinks": "Link: All",
     "clearFilter": "Clear filter",
     "trendNew": "new",
-    "includeTest": "Include test clicks",
-    "includeTestTip": "By default, clicks from the 'Test link' button (?_test=1) or from logged-in workspace members visiting their own short links are excluded. Toggle on to see them.",
-    "filteredTestClicks": "{n} test click(s) filtered out (from 'Test link' button or workspace members)",
-    "realTrafficOnly": "Real traffic only (test clicks hidden)",
-    "includingTestClicks": "Including test clicks (?_test=1 + workspace-member clicks)",
+    "includeTest": "Include test & suspected bot clicks",
+    "includeTestTip": "Two kinds of clicks are excluded by default: test clicks ('Test link' button with ?_test=1, or workspace members opening their own links) and suspected mail-security scanner clicks (outdated browsers that auto-open every link in an EDM). Toggle on to see everything.",
+    "filteredTestClicks": "{n} test click(s) excluded (from 'Test link' button or workspace members)",
+    "realTrafficOnly": "Real traffic only (test and suspected bot clicks hidden)",
+    "includingTestClicks": "Including test and suspected bot clicks (unfiltered)",
     "showAll": "Show all",
     "viewingLinkAnalytics": "Viewing link analytics",
     "viewingCampaignAnalytics": "Viewing campaign analytics",
@@ -376,7 +376,10 @@
       }
     },
     "rangeAll": "All time",
-    "rangeBeforeWindow": "Data before {date} isn't loaded"
+    "rangeBeforeWindow": "Data before {date} isn't loaded",
+    "filteredExcluded": "Excluded: {parts}",
+    "excludedTestPart": "{n} test click(s)",
+    "excludedBotPart": "{n} suspected mail-scanner click(s)"
   },
   "share": {
     "title": "Share Report",
@@ -727,7 +730,7 @@
       "exportLinks": "Link breakdown",
       "exportLinksHint": "One row per link: clicks, unique visitors, last click",
       "exportDaily": "Daily trend (long format)",
-      "exportDailyHint": "Date × link (last 90d), ideal for pivot tables / charts",
+      "exportDailyHint": "Date × link (for the selected period), ideal for pivot tables / charts",
       "resetClicksTooltip": "Reset click counters (soft reset, reversible)",
       "resetDialogTitle": "Reset clicks for \"{name}\"?",
       "resetDialogBody": "This flags all {count} real click(s) across {links} link(s) in this campaign as test data. KPIs / charts will drop to 0 immediately.",

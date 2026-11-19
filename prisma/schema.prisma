@@ -298,6 +298,10 @@ model Click {
   // specific reset without bringing back every test click ever. Null
   // for clicks flagged at redirect time.
   resetBatchId String? @map("reset_batch_id")
+  // Automated link scanner (e.g. corporate mail security opening every
+  // EDM link). Recorded, excluded from counts by default like isInternal,
+  // and does not increment ShortLink.clickCount. Rule: lib/click-quality.ts.
+  isSuspectedBot Boolean @default(false) @map("is_suspected_bot")
 
   shortLink   ShortLink   @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
   conversions Conversion[]
