@@ -743,6 +743,7 @@ table.data td.muted { color: var(--ink-500); }
 /* Status badges */
 .badge {
   display: inline-flex;
+  white-space: nowrap;
   align-items: center;
   gap: 5px;
   padding: 3px 10px;
@@ -879,6 +880,31 @@ table.data td.muted { color: var(--ink-500); }
   letter-spacing: 0.08em;
   font-weight: 600;
 }
+
+.campaign-period-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--ink-300);
+}
+.campaign-period-dates { font-variant-numeric: tabular-nums; }
+.campaign-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background: var(--neutral-bg);
+  color: var(--neutral-fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.campaign-notice > span { flex: 1; min-width: 200px; }
 
 /* Section blocks */
 .section-title {

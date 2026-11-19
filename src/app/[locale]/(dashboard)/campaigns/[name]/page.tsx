@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useRouter } from "@/i18n/routing";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Link2,
@@ -30,6 +30,9 @@ import {
   Table2,
   CalendarRange,
   Share2,
+  Archive,
+  ArchiveRestore,
+  CalendarDays,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
@@ -37,6 +40,13 @@ import { ClicksChart } from "@/components/analytics/ClicksChart";
 import { PieChartComponent } from "@/components/analytics/PieChartComponent";
 import { TrendCell, classifyTrend, type TrendState } from "@/components/analytics/TrendCell";
 import { formatRelativeTime } from "@/lib/utils/format";
+import {
+  campaignPhase,
+  type CampaignPhase,
+  hasPeriod,
+  periodBoundsMs,
+  storedDateToDay,
+} from "@/lib/campaign-period";
 import { computeAnalytics, type RawAnalyticsData } from "@/lib/analytics/compute";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ShareModal } from "@/components/analytics/ShareModal";
@@ -57,6 +67,22 @@ interface CampaignLink {
 }
 
 type TabId = "overview" | "traffic" | "links";
+type RangeId = "period" | "all" | "90d" | "30d";
+
+const PHASE_BADGE: Record<CampaignPhase, string> = {
+  running: "active",
+  upcoming: "draft",
+  ended: "completed",
+  archived: "archived",
+};
+
+interface CampaignRecord {
+  id: string;
+  goalClicks: number | null;
+  startDate: string | null;
+  endDate: string | null;
+  status: string;
+}
 
 /**
  * Campaign Detail page — the marketer's daily "mission control" for one
@@ -74,16 +100,29 @@ export default function CampaignDetailPage() {
   const tAnalytics = useTranslations("analytics");
   const tShare = useTranslations("share");
   const campaignName = decodeURIComponent(params.name as string);
+  const locale = useLocale();
+  const fmtDay = (day: string) => {
+    const [y, m, d] = day.split("-").map(Number);
+    return new Intl.DateTimeFormat(locale, { year: "numeric", month: "short", day: "numeric" }).format(
+      new Date(y, m - 1, d),
+    );
+  };
 
   const qc = useQueryClient();
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
-  // Chart / Traffic window. Defaults to the campaign's whole history —
-  // campaigns are usually reviewed after they end (a fixed 30-day window
-  // showed exhibition campaigns as empty a few months later).
-  const [trendRange, setTrendRange] = useState<"all" | "90d" | "30d">("all");
+  // Chart / Traffic / KPI window. null = the default: the campaign period
+  // when one is set, otherwise all time (campaigns are usually reviewed
+  // after they end — a fixed 30-day window showed exhibition campaigns as
+  // empty a few months later). Resolved below once the record loads.
+  const [rangeChoice, setRangeChoice] = useState<RangeId | null>(null);
+  const [editingPeriod, setEditingPeriod] = useState(false);
+  const [startInput, setStartInput] = useState("");
+  const [endInput, setEndInput] = useState("");
+  const [periodSaving, setPeriodSaving] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
   const [editingGoal, setEditingGoal] = useState(false);
@@ -144,15 +183,26 @@ export default function CampaignDetailPage() {
   });
   const links = useMemo(() => linksData ?? [], [linksData]);
 
+  // Campaign record (goal, period, archive). Key name is historical.
   const { data: goalData } = useQuery({
     queryKey: goalKey,
     queryFn: async () => {
       const response = await fetch(`/api/utm-campaigns/${encodeURIComponent(campaignName)}`);
-      if (!response.ok) return { goalClicks: null as number | null };
-      return (await response.json()) as { goalClicks: number | null };
+      if (!response.ok) return { goalClicks: null as number | null, campaignRecord: null };
+      return (await response.json()) as {
+        goalClicks: number | null;
+        campaignRecord: CampaignRecord | null;
+      };
     },
   });
   const goalClicks = goalData?.goalClicks ?? null;
+  const record = goalData?.campaignRecord ?? null;
+  const periodSet = hasPeriod(record);
+  const periodBounds = periodBoundsMs(record);
+  const phase = campaignPhase(record ?? { startDate: null, endDate: null, status: "ACTIVE" });
+  const trendRange: RangeId = rangeChoice ?? (periodSet ? "period" : "all");
+  const startDay = storedDateToDay(record?.startDate);
+  const endDay = storedDateToDay(record?.endDate);
 
   const { data: raw, isLoading: rawLoading } = useQuery<RawAnalyticsData>({
     queryKey: rawKey,
@@ -183,16 +233,32 @@ export default function CampaignDetailPage() {
     return parts.join("、");
   }, [raw, links, tAnalytics]);
 
+  // Concrete [start, end] for the selected window. Open period ends fall
+  // back to the oldest raw click / now.
+  const rangeDates = useMemo(() => {
+    const now = Date.now();
+    const sinceMs = raw ? new Date(raw.meta.since).getTime() : now - 730 * 86_400_000;
+    if (trendRange === "period") {
+      return {
+        start: new Date(Math.max(periodBounds.fromMs, sinceMs)),
+        end: new Date(Math.min(periodBounds.toMs, now)),
+      };
+    }
+    if (trendRange === "all") return { start: new Date(sinceMs), end: new Date(now) };
+    return {
+      start: new Date(now - (trendRange === "90d" ? 90 : 30) * 86_400_000),
+      end: new Date(now),
+    };
+  }, [raw, trendRange, periodBounds.fromMs, periodBounds.toMs]);
+
   const computed = useMemo(() => {
     if (!raw) return null;
-    const rangeEnd = new Date();
-    const rangeStart =
-      trendRange === "all" ? new Date(raw.meta.since) : new Date();
-    if (trendRange !== "all") {
-      rangeStart.setDate(rangeEnd.getDate() - (trendRange === "90d" ? 90 : 30));
-    }
-    return computeAnalytics(raw, { rangeStart, rangeEnd, campaign: campaignName });
-  }, [raw, campaignName, trendRange]);
+    return computeAnalytics(raw, {
+      rangeStart: rangeDates.start,
+      rangeEnd: rangeDates.end,
+      campaign: campaignName,
+    });
+  }, [raw, campaignName, rangeDates]);
 
   // Per-link metrics from the raw click stream — single pass over all
   // clicks keyed by shortLinkId, so we don't re-scan N times per link.
@@ -312,6 +378,39 @@ export default function CampaignDetailPage() {
   const totalClicks = links.reduce((sum, l) => sum + l._count.clicks, 0);
   const activeLinks = links.filter((l) => l.status === "ACTIVE").length;
   const totalCampaignClicks = totalClicks || 1;
+  // KPI numbers follow the selected window (same window as the campaign
+  // list's default, so the two pages agree).
+  const rangeClicks = computed?.summary.totalClicks ?? null;
+
+  // Goal progress always counts the campaign period (all time when no
+  // dates are set) — the same denominator the campaign list uses,
+  // whichever window is selected here.
+  const goalBaseClicks = useMemo(() => {
+    if (!periodSet) return totalClicks;
+    if (!raw) return null;
+    const linkIds = new Set(links.map((l) => l.id));
+    let n = 0;
+    for (const c of raw.clicks) {
+      if (!linkIds.has(c.shortLinkId)) continue;
+      const ts = new Date(c.timestamp).getTime();
+      if (ts >= periodBounds.fromMs && ts <= periodBounds.toMs) n++;
+    }
+    return n;
+  }, [periodSet, totalClicks, raw, links, periodBounds.fromMs, periodBounds.toMs]);
+
+  const phaseLabel = (p: CampaignPhase) =>
+    p === "running"
+      ? tCampaigns("statusActive")
+      : p === "upcoming"
+        ? tCampaigns("statusUpcoming")
+        : p === "ended"
+          ? tCampaigns("statusCompleted")
+          : tCampaigns("statusArchived");
+
+  const rangeLabel = (r: RangeId) =>
+    r === "period"
+      ? t("rangePeriod")
+      : tAnalytics(r === "all" ? "rangeAll" : r === "90d" ? "range90d" : "range30d");
 
   // Campaign-level 7d trend — sub-line on the "Total clicks" KPI so users
   // see "全時段 X / 最近 7 天 Y ↑Z%" without context-switching to /analytics.
@@ -337,6 +436,55 @@ export default function CampaignDetailPage() {
     campaignTrend.last7d,
     campaignTrend.prev7d,
   );
+
+  const patchCampaign = async (body: Record<string, unknown>) => {
+    const res = await fetch(`/api/utm-campaigns/${encodeURIComponent(campaignName)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    qc.invalidateQueries({ queryKey: goalKey });
+    qc.invalidateQueries({ queryKey: ["campaigns-summary"], refetchType: "all" });
+  };
+
+  const openPeriodEditor = () => {
+    setStartInput(startDay ?? "");
+    setEndInput(endDay ?? "");
+    setEditingPeriod(true);
+  };
+
+  const savePeriod = async (clear = false) => {
+    setPeriodSaving(true);
+    try {
+      await patchCampaign(
+        clear
+          ? { startDate: null, endDate: null }
+          : { startDate: startInput || null, endDate: endInput || null },
+      );
+      // Back to the default window so the page shows the new period.
+      setRangeChoice(null);
+      setEditingPeriod(false);
+      success(clear ? t("periodCleared") : t("periodSaved"));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setPeriodSaving(false);
+    }
+  };
+
+  const toggleArchive = async () => {
+    const archive = phase !== "archived";
+    setArchiving(true);
+    try {
+      await patchCampaign({ status: archive ? "ARCHIVED" : "ACTIVE" });
+      success(archive ? t("archivedToast") : t("unarchivedToast"));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setArchiving(false);
+    }
+  };
 
   const copyLink = async (shortUrl: string, id: string) => {
     await navigator.clipboard.writeText(shortUrl);
@@ -445,14 +593,7 @@ export default function CampaignDetailPage() {
         isOpen={shareOpen}
         onClose={() => setShareOpen(false)}
         campaignFilter={campaignName}
-        period={
-          trendRange === "all"
-            ? "all"
-            : {
-                start: new Date(Date.now() - (trendRange === "90d" ? 90 : 30) * 86_400_000),
-                end: new Date(),
-              }
-        }
+        period={trendRange === "all" ? "all" : rangeDates}
       />
       <PageHeader
         back={t("backToCampaigns")}
@@ -465,6 +606,35 @@ export default function CampaignDetailPage() {
             <div>
               <div className="campaign-kind">{t("utmCampaignBadge")}</div>
               <h1>{campaignName}</h1>
+              {/* Period + derived status. Status follows the dates; only
+                  "archived" is set by hand. */}
+              <div className="campaign-period-line">
+                {record && (
+                  <span className={`badge ${PHASE_BADGE[phase]}`}>
+                    <span className="badge-dot" />
+                    {phaseLabel(phase)}
+                  </span>
+                )}
+                <CalendarDays size={13} style={{ color: "var(--ink-400)" }} />
+                {periodSet ? (
+                  <span className="campaign-period-dates">
+                    {startDay ? fmtDay(startDay) : t("periodOpenStart")}
+                    {" – "}
+                    {endDay ? fmtDay(endDay) : t("periodOpenEnd")}
+                  </span>
+                ) : (
+                  <span className="muted">{t("periodNotSet")}</span>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ padding: "2px 6px", fontSize: 12 }}
+                  onClick={openPeriodEditor}
+                  title={t("editPeriod")}
+                >
+                  {periodSet ? <Pencil size={12} /> : t("setPeriod")}
+                </button>
+              </div>
             </div>
           </div>
         }
@@ -528,7 +698,7 @@ export default function CampaignDetailPage() {
                       </span>
                     </a>
                     <a
-                      href={`/api/export/campaigns?format=link-daily&days=${trendRange === "all" ? 730 : trendRange === "90d" ? 90 : 30}&campaign=${encodeURIComponent(
+                      href={`/api/export/campaigns?format=link-daily&days=${Math.min(730, Math.ceil((Date.now() - rangeDates.start.getTime()) / 86_400_000))}&campaign=${encodeURIComponent(
                         campaignName,
                       )}${includeInternal ? "&includeInternal=1" : ""}`}
                       className="export-menu-item"
@@ -565,6 +735,14 @@ export default function CampaignDetailPage() {
             </button>
             <button
               className="btn btn-ghost"
+              onClick={toggleArchive}
+              disabled={archiving || !record}
+              title={phase === "archived" ? t("unarchiveTooltip") : t("archiveTooltip")}
+            >
+              {phase === "archived" ? <ArchiveRestore size={13} /> : <Archive size={13} />}
+            </button>
+            <button
+              className="btn btn-ghost"
               onClick={() => {
                 setPauseLinksOnDelete(false);
                 setDeleteOpen(true);
@@ -594,6 +772,23 @@ export default function CampaignDetailPage() {
             <p className="text-sm text-slate-500 mb-4">
               {t("deleteDialogBody", { count: links.length })}
             </p>
+            {phase !== "archived" && record && (
+              <div className="mb-3 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center justify-between gap-3">
+                <span>{t("deleteSuggestArchive")}</span>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ flexShrink: 0 }}
+                  disabled={archiving || deleting}
+                  onClick={async () => {
+                    await toggleArchive();
+                    setDeleteOpen(false);
+                  }}
+                >
+                  <Archive size={13} /> {t("archiveInstead")}
+                </button>
+              </div>
+            )}
 
             <label
               className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
@@ -689,6 +884,67 @@ export default function CampaignDetailPage() {
         </div>
       )}
 
+      {phase === "archived" && (
+        <div className="campaign-notice">
+          <Archive size={14} />
+          <span>{t("archivedBanner")}</span>
+          <button type="button" className="btn btn-secondary" onClick={toggleArchive} disabled={archiving}>
+            <ArchiveRestore size={13} /> {t("unarchive")}
+          </button>
+        </div>
+      )}
+
+      {editingPeriod && (
+        <div className="card card-padded" style={{ marginBottom: 16 }}>
+          <div className="section-title" style={{ marginBottom: 4 }}>
+            <CalendarDays size={14} style={{ color: "var(--ink-400)" }} />
+            {t("periodTitle")}
+          </div>
+          <p className="muted" style={{ fontSize: 12, margin: "0 0 10px" }}>
+            {t("periodHelp")}
+          </p>
+          <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
+              {t("periodStart")}
+              <input
+                type="date"
+                className="input"
+                style={{ height: 32 }}
+                value={startInput}
+                max={endInput || undefined}
+                onChange={(e) => setStartInput(e.target.value)}
+              />
+            </label>
+            <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
+              {t("periodEnd")}
+              <input
+                type="date"
+                className="input"
+                style={{ height: 32 }}
+                value={endInput}
+                min={startInput || undefined}
+                onChange={(e) => setEndInput(e.target.value)}
+              />
+            </label>
+            <button
+              className="btn btn-primary"
+              onClick={() => savePeriod(false)}
+              disabled={periodSaving || (!startInput && !endInput) || Boolean(startInput && endInput && startInput > endInput)}
+            >
+              {periodSaving ? <Loader2 size={13} className="animate-spin" /> : tCommon("save")}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setEditingPeriod(false)} disabled={periodSaving}>
+              {tCommon("cancel")}
+            </button>
+            {periodSet && (
+              <button className="btn btn-ghost" onClick={() => savePeriod(true)} disabled={periodSaving}>
+                {t("periodClear")}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Test-click filter — between hero and KPI row so the indicator
           + toggle is immediately near the numbers it affects. The toggle
           itself is a small inline checkbox; the banner only appears when
@@ -764,7 +1020,7 @@ export default function CampaignDetailPage() {
           <div className="kpi-label">
             <MousePointerClick size={12} /> {t("kpiTotalClicks")}
           </div>
-          <div className="kpi-value">{totalClicks.toLocaleString()}</div>
+          <div className="kpi-value">{rangeClicks !== null ? rangeClicks.toLocaleString() : "—"}</div>
           {/* Sub-line: "全時段 · 最近 7 天 N ↑X%" — the all-time number
               is the headline, the 7-day breakdown gives recency context
               so users don't have to bounce to /analytics for it. */}
@@ -772,7 +1028,7 @@ export default function CampaignDetailPage() {
             className="kpi-sub"
             style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}
           >
-            <span>{t("kpiAllTime")}</span>
+            <span>{rangeLabel(trendRange)}</span>
             <span style={{ color: "var(--ink-500)" }}>·</span>
             <span>
               {tAnalytics("range7d")}{" "}
@@ -802,7 +1058,11 @@ export default function CampaignDetailPage() {
             <BarChart3 size={12} /> {t("kpiAvgClicks")}
           </div>
           <div className="kpi-value">
-            {links.length > 0 ? Math.round(totalClicks / links.length).toLocaleString() : "0"}
+            {rangeClicks === null
+              ? "—"
+              : links.length > 0
+                ? Math.round(rangeClicks / links.length).toLocaleString()
+                : "0"}
           </div>
           <div className="kpi-sub">{t("kpiPerLink")}</div>
         </div>
@@ -832,13 +1092,13 @@ export default function CampaignDetailPage() {
       </div>
         {activeTab !== "links" && (
           <div className="segmented" style={{ marginBottom: 22, flexShrink: 0 }}>
-            {(["all", "90d", "30d"] as const).map((r) => (
+            {((periodSet ? ["period", "all", "90d", "30d"] : ["all", "90d", "30d"]) as RangeId[]).map((r) => (
               <button
                 key={r}
                 className={trendRange === r ? "active" : ""}
-                onClick={() => setTrendRange(r)}
+                onClick={() => setRangeChoice(r)}
               >
-                {tAnalytics(r === "all" ? "rangeAll" : r === "90d" ? "range90d" : "range30d")}
+                {rangeLabel(r)}
               </button>
             ))}
           </div>
@@ -856,7 +1116,12 @@ export default function CampaignDetailPage() {
                 {t("clickGoal")}
                 {goalClicks && (
                   <span className="muted" style={{ fontFamily: "var(--font-mono)", fontWeight: 400, fontSize: 11.5 }}>
-                    {totalClicks.toLocaleString()} / {goalClicks.toLocaleString()}
+                    {goalBaseClicks !== null ? goalBaseClicks.toLocaleString() : "—"} / {goalClicks.toLocaleString()}
+                  </span>
+                )}
+                {goalClicks && (
+                  <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>
+                    · {periodSet ? t("goalBasisPeriod") : t("goalBasisAll")}
                   </span>
                 )}
               </div>
@@ -912,14 +1177,16 @@ export default function CampaignDetailPage() {
                   {tCommon("cancel")}
                 </button>
               </div>
-            ) : goalClicks ? (
+            ) : goalClicks && goalBaseClicks === null ? (
+              <div className="goal-progress" />
+            ) : goalClicks && goalBaseClicks !== null ? (
               (() => {
-                const pct = Math.min((totalClicks / goalClicks) * 100, 100);
-                const reached = totalClicks >= goalClicks;
+                const pct = (goalBaseClicks / goalClicks) * 100;
+                const reached = goalBaseClicks >= goalClicks;
                 return (
                   <>
                     <div className="goal-progress">
-                      <div style={{ width: `${pct}%` }} />
+                      <div style={{ width: `${Math.min(pct, 100)}%` }} />
                     </div>
                     <div className="row-between" style={{ marginTop: 4 }}>
                       <span
@@ -929,11 +1196,13 @@ export default function CampaignDetailPage() {
                           color: reached ? "var(--ok-fg)" : "var(--data-violet)",
                         }}
                       >
-                        {reached ? t("goalReached") : t("goalPct", { pct: pct.toFixed(1) })}
+                        {reached
+                          ? `${t("goalReached")} ${t("goalPct", { pct: Math.round(pct) })}`
+                          : t("goalPct", { pct: pct < 10 ? pct.toFixed(1) : Math.round(pct) })}
                       </span>
                       {!reached && (
                         <span className="muted" style={{ fontSize: 11.5 }}>
-                          {t("clicksRemaining", { n: (goalClicks - totalClicks).toLocaleString() })}
+                          {t("clicksRemaining", { n: (goalClicks - goalBaseClicks).toLocaleString() })}
                         </span>
                       )}
                     </div>
@@ -953,7 +1222,7 @@ export default function CampaignDetailPage() {
               <LineChartIcon size={14} style={{ color: "var(--ink-400)" }} />
               {t("clicksTitle")}
               <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
-                {tAnalytics(trendRange === "all" ? "rangeAll" : trendRange === "90d" ? "range90d" : "range30d")}
+                {rangeLabel(trendRange)}
               </span>
             </div>
             {rawLoading ? (

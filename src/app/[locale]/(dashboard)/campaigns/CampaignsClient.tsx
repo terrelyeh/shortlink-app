@@ -36,6 +36,7 @@ import { MultiCampaignChart } from "@/components/analytics/MultiCampaignChart";
 import { TrendCell, type TrendState } from "@/components/analytics/TrendCell";
 import { SyncButton } from "@/components/layout/SyncButton";
 import { formatRelativeTime } from "@/lib/utils/format";
+import { storedDateToDay, type CampaignPhase } from "@/lib/campaign-period";
 
 interface CampaignRow {
   id: string | null;
@@ -51,6 +52,10 @@ interface CampaignRow {
   cvr: number;
   goalClicks: number | null;
   goalPct: number | null;
+  startDate: string | null;
+  endDate: string | null;
+  phase: CampaignPhase;
+  periodClicks: number;
   lastClickAt: string | null;
   sparkline: number[];
   trendState: TrendState;
@@ -86,26 +91,30 @@ const MAX_SELECTION = 4;
 
 type SortKey = "clicks" | "goalPct" | "name";
 
+// "period" = each campaign's own start–end dates (all time when unset).
+// It fetches the 730-day payload and reads `periodClicks` per row.
 const windowPresets: { value: string; labelKey: string; days: number }[] = [
+  { value: "period", labelKey: "periodPreset", days: 730 },
   { value: "7d", labelKey: "last7Days", days: 7 },
   { value: "30d", labelKey: "last30Days", days: 30 },
   { value: "90d", labelKey: "last90Days", days: 90 },
   { value: "all", labelKey: "allTime", days: 730 },
 ];
 
-function statusClass(status: string | null): string {
-  switch (status) {
-    case "ACTIVE":
-      return "active";
-    case "DRAFT":
-      return "draft";
-    case "COMPLETED":
-      return "completed";
-    case "ARCHIVED":
-      return "archived";
-    default:
-      return "draft";
-  }
+const PHASE_BADGE: Record<CampaignPhase, string> = {
+  running: "active",
+  upcoming: "draft",
+  ended: "completed",
+  archived: "archived",
+};
+
+/** "11/19 – 2/26" style short period for the list row; null when unset. */
+function shortPeriod(c: { startDate: string | null; endDate: string | null }, openEnd: string): string | null {
+  const s = storedDateToDay(c.startDate);
+  const e = storedDateToDay(c.endDate);
+  if (!s && !e) return null;
+  const fmt = (d: string) => `${d.slice(0, 4)}/${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  return `${s ? fmt(s) : "…"} – ${e ? fmt(e) : openEnd}`;
 }
 
 export default function CampaignsClient() {
@@ -113,7 +122,22 @@ export default function CampaignsClient() {
   const tCommon = useTranslations("common");
   const router = useRouter();
 
-  const [window, setWindow] = useState<string>("30d");
+  // Default = each campaign's own period, so the numbers match the
+  // campaign page (it defaults to the same window).
+  const [window, setWindow] = useState<string>("period");
+  const isPeriod = window === "period";
+  const shownClicks = useCallback(
+    (c: CampaignRow) => (isPeriod ? (c.periodClicks ?? c.clicks) : c.clicks),
+    [isPeriod],
+  );
+  const phaseLabel = (p: CampaignPhase) =>
+    p === "running"
+      ? t("statusActive")
+      : p === "upcoming"
+        ? t("statusUpcoming")
+        : p === "ended"
+          ? t("statusCompleted")
+          : t("statusArchived");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [sortKey, setSortKey] = useState<SortKey>("clicks");
@@ -123,7 +147,7 @@ export default function CampaignsClient() {
   // Export honors the currently-selected time window so the CSV matches
   // what's on screen.
   const exportDays =
-    (windowPresets.find((p) => p.value === window) ?? windowPresets[1]).days;
+    (windowPresets.find((p) => p.value === window) ?? windowPresets[0]).days;
 
   const toggleSelected = useCallback((name: string) => {
     setSelected((prev) => {
@@ -139,7 +163,7 @@ export default function CampaignsClient() {
   const { data, isLoading: loading } = useQuery<SummaryResponse>({
     queryKey,
     queryFn: async () => {
-      const preset = windowPresets.find((p) => p.value === window) ?? windowPresets[1];
+      const preset = windowPresets.find((p) => p.value === window) ?? windowPresets[0];
       const res = await fetch(`/api/analytics/campaigns-summary?days=${preset.days}`);
       if (!res.ok) throw new Error("Failed to fetch campaigns summary");
       return (await res.json()) as SummaryResponse;
@@ -150,10 +174,11 @@ export default function CampaignsClient() {
     if (!data) return [];
     const q = searchQuery.trim().toLowerCase();
     const filtered = data.campaigns.filter((c) => {
+      const phase = c.phase ?? "running";
       if (statusFilter) {
-        if (c.status !== statusFilter) return false;
+        if (phase !== statusFilter) return false;
       } else {
-        if (c.status === "ARCHIVED") return false;
+        if (phase === "archived") return false;
       }
       if (q) {
         const hay = [c.name, c.displayName, c.description]
@@ -167,20 +192,23 @@ export default function CampaignsClient() {
     return [...filtered].sort((a, b) => {
       if (sortKey === "name") return a.name.localeCompare(b.name);
       if (sortKey === "goalPct") return (b.goalPct ?? -1) - (a.goalPct ?? -1);
-      return b.clicks - a.clicks;
+      return shownClicks(b) - shownClicks(a);
     });
-  }, [data, searchQuery, statusFilter, sortKey]);
+  }, [data, searchQuery, statusFilter, sortKey, shownClicks]);
 
   const totals = useMemo(() => {
-    if (!data) return { clicks: 0, withGoal: 0, active: 0, drafts: 0, archived: 0 };
+    if (!data) return { clicks: 0, withGoal: 0, visible: 0, active: 0, upcoming: 0, ended: 0, archived: 0 };
+    const visible = data.campaigns.filter((c) => c.phase !== "archived");
     return {
-      clicks: data.campaigns.reduce((s, c) => s + c.clicks, 0),
-      withGoal: data.campaigns.filter((c) => c.goalClicks).length,
-      active: data.campaigns.filter((c) => c.status === "ACTIVE").length,
-      drafts: data.campaigns.filter((c) => c.status === "DRAFT").length,
-      archived: data.campaigns.filter((c) => c.status === "ARCHIVED").length,
+      clicks: visible.reduce((s, c) => s + shownClicks(c), 0),
+      withGoal: visible.filter((c) => c.goalClicks).length,
+      visible: visible.length,
+      active: data.campaigns.filter((c) => (c.phase ?? "running") === "running").length,
+      upcoming: data.campaigns.filter((c) => c.phase === "upcoming").length,
+      ended: data.campaigns.filter((c) => c.phase === "ended").length,
+      archived: data.campaigns.filter((c) => c.phase === "archived").length,
     };
-  }, [data]);
+  }, [data, shownClicks]);
 
   const overlaySeries = useMemo(() => {
     if (!data?.timeseries || selected.size < 2) return null;
@@ -192,7 +220,12 @@ export default function CampaignsClient() {
     return out;
   }, [data, selected]);
 
-  const maxClicks = Math.max(1, ...campaigns.map((c) => c.clicks));
+  const maxClicks = Math.max(1, ...campaigns.map((c) => shownClicks(c)));
+  const windowLabel = isPeriod
+    ? t("periodPresetLong")
+    : window === "all"
+      ? t("allTime")
+      : t("lastNd", { days: data?.meta.days ?? 30 });
 
   return (
     <>
@@ -295,17 +328,17 @@ export default function CampaignsClient() {
           </div>
           <div className="kpi-value">{data ? totals.active : "—"}</div>
           <div className="kpi-sub">
-            <strong>{totals.drafts}</strong> {t("drafts")} · <strong>{totals.archived}</strong> {t("archivedCount")}
+            <strong>{totals.upcoming}</strong> {t("statusUpcoming")} · <strong>{totals.ended}</strong> {t("statusCompleted")} · <strong>{totals.archived}</strong> {t("archivedCount")}
           </div>
         </div>
         <div className="kpi">
           <div className="kpi-label">
-            <MousePointerClick size={12} /> {window === "all" ? t("clicksAllTime") : t("clicksLastNd", { days: data?.meta.days ?? 30 })}
+            <MousePointerClick size={12} /> {t("clicksIn", { window: windowLabel })}
           </div>
           <div className="kpi-value">{data ? totals.clicks.toLocaleString() : "—"}</div>
           <div className="kpi-sub">
-            {data && data.campaigns.length > 0
-              ? t("acrossNCampaigns", { n: data.campaigns.length })
+            {data && totals.visible > 0
+              ? t("acrossNCampaigns", { n: totals.visible })
               : "—"}
           </div>
         </div>
@@ -314,7 +347,7 @@ export default function CampaignsClient() {
             <Flag size={12} /> {t("campaignsWithGoal")}
           </div>
           <div className="kpi-value">
-            {data ? `${totals.withGoal} / ${data.campaigns.length}` : "—"}
+            {data ? `${totals.withGoal} / ${totals.visible}` : "—"}
           </div>
           <div className="kpi-sub muted">
             {totals.withGoal === 0 ? t("setGoalsToTrack") : t("trackingTowardTarget")}
@@ -331,7 +364,7 @@ export default function CampaignsClient() {
               className={window === p.value ? "active" : ""}
               onClick={() => setWindow(p.value)}
             >
-              {p.value}
+              {p.value === "period" ? t("periodPreset") : p.value === "all" ? t("allTime") : p.value}
             </button>
           ))}
         </div>
@@ -358,10 +391,10 @@ export default function CampaignsClient() {
         <div className="chip-row">
           {[
             { k: "", l: t("allStatuses") || "All Statuses" },
-            { k: "ACTIVE", l: t("statusActive") },
-            { k: "DRAFT", l: t("statusDraft") },
-            { k: "COMPLETED", l: t("statusCompleted") },
-            { k: "ARCHIVED", l: t("statusArchived") },
+            { k: "running", l: t("statusActive") },
+            { k: "upcoming", l: t("statusUpcoming") },
+            { k: "ended", l: t("statusCompleted") },
+            { k: "archived", l: t("statusArchived") },
           ].map((s) => (
             <button
               key={s.k || "all"}
@@ -382,7 +415,7 @@ export default function CampaignsClient() {
               <LineChartIcon size={14} style={{ color: "var(--brand-500)" }} />
               {t("compareTitle", { n: selected.size })}
               <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
-                · {window === "all" ? t("allTime") : t("dailyClicksSuffix", { days: data.meta.days })}
+                · {window === "all" || isPeriod ? t("allTime") : t("dailyClicksSuffix", { days: data.meta.days })}
               </span>
             </div>
             <div className="row" style={{ gap: 6 }}>
@@ -413,7 +446,7 @@ export default function CampaignsClient() {
           <div className="tbl-head-title">
             <Trophy size={14} style={{ color: "var(--data-amber)" }} />
             {t("leaderboard")}
-            <span className="muted">· {window === "all" ? t("allTime") : t("lastNd", { days: data?.meta.days ?? 30 })}</span>
+            <span className="muted">· {windowLabel}</span>
             {selected.size > 0 && (
               <span style={{ color: "var(--brand-600)", fontSize: 11.5, marginLeft: 4 }}>
                 {t("selected", { n: selected.size })} {selected.size < 2 && t("pickMoreHint")}
@@ -498,19 +531,18 @@ export default function CampaignsClient() {
                             {c.name}
                           </span>
                         )}
+                        {shortPeriod(c, t("periodOngoing")) && (
+                          <span style={{ fontSize: 11, color: "var(--ink-500)", fontVariantNumeric: "tabular-nums" }}>
+                            {shortPeriod(c, t("periodOngoing"))}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td>
-                      {c.status ? (
-                        <span className={`badge ${statusClass(c.status)}`}>
+                      {c.id ? (
+                        <span className={`badge ${PHASE_BADGE[c.phase ?? "running"]}`}>
                           <span className="badge-dot" />
-                          {c.status === "ACTIVE"
-                            ? t("statusActive")
-                            : c.status === "DRAFT"
-                              ? t("statusDraft")
-                              : c.status === "COMPLETED"
-                                ? t("statusCompleted")
-                                : t("statusArchived")}
+                          {phaseLabel(c.phase ?? "running")}
                         </span>
                       ) : (
                         <span className="muted" style={{ fontSize: 11, fontStyle: "italic" }}>
@@ -524,10 +556,10 @@ export default function CampaignsClient() {
                         <div className="bar-track">
                           <div
                             className="bar-fill"
-                            style={{ width: `${(c.clicks / maxClicks) * 100}%` }}
+                            style={{ width: `${(shownClicks(c) / maxClicks) * 100}%` }}
                           />
                         </div>
-                        <span className="num">{c.clicks.toLocaleString()}</span>
+                        <span className="num">{shownClicks(c).toLocaleString()}</span>
                       </div>
                     </td>
                     <td>
@@ -563,7 +595,7 @@ export default function CampaignsClient() {
                     </td>
                     <td>
                       {c.goalPct !== null && c.goalClicks ? (
-                        <div className="bar-cell">
+                        <div className="bar-cell" title={t("goalBasisTooltip")}>
                           <div className="bar-track" style={{ minWidth: 50 }}>
                             <div
                               className="bar-fill"

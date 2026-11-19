@@ -4,10 +4,23 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveWorkspaceScope } from "@/lib/workspace";
 import { z } from "zod";
+import { DAY_RE, dayToStoredDate } from "@/lib/campaign-period";
 
-const patchSchema = z.object({
-  goalClicks: z.number().int().min(1).nullable(),
-});
+// Every field is optional so the goal editor, the period editor and the
+// archive button can each send only what they change.
+const patchSchema = z
+  .object({
+    goalClicks: z.number().int().min(1).nullable().optional(),
+    // Whole days in Taiwan time ("2027-01-05"), inclusive. null clears.
+    startDate: z.string().regex(DAY_RE).nullable().optional(),
+    endDate: z.string().regex(DAY_RE).nullable().optional(),
+    // Only archive / unarchive is user-facing; other phases follow the dates.
+    status: z.enum(["ACTIVE", "ARCHIVED"]).optional(),
+  })
+  .refine((v) => !(v.startDate && v.endDate && v.startDate > v.endDate), {
+    message: "startDate must be on or before endDate",
+    path: ["endDate"],
+  });
 
 // GET /api/utm-campaigns/[name] - get campaign stats + goal
 export async function GET(
@@ -197,7 +210,7 @@ export async function DELETE(
   }
 }
 
-// PATCH /api/utm-campaigns/[name] - set/update goalClicks
+// PATCH /api/utm-campaigns/[name] - goal, period (start/end day) and archive
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ name: string }> }
@@ -215,7 +228,21 @@ export async function PATCH(
     const workspaceId = scope.workspaceId;
 
     const body = await request.json();
-    const { goalClicks } = patchSchema.parse(body);
+    const parsed = patchSchema.parse(body);
+    const data: {
+      goalClicks?: number | null;
+      startDate?: Date | null;
+      endDate?: Date | null;
+      status?: "ACTIVE" | "ARCHIVED";
+    } = {};
+    if (parsed.goalClicks !== undefined) data.goalClicks = parsed.goalClicks;
+    if (parsed.startDate !== undefined) {
+      data.startDate = parsed.startDate ? dayToStoredDate(parsed.startDate) : null;
+    }
+    if (parsed.endDate !== undefined) {
+      data.endDate = parsed.endDate ? dayToStoredDate(parsed.endDate) : null;
+    }
+    if (parsed.status !== undefined) data.status = parsed.status;
 
     // Find or create Campaign record
     let campaign = await prisma.campaign.findFirst({
@@ -228,15 +255,15 @@ export async function PATCH(
     if (campaign) {
       campaign = await prisma.campaign.update({
         where: { id: campaign.id },
-        data: { goalClicks },
+        data,
       });
     } else {
       try {
         campaign = await prisma.campaign.create({
           data: {
             name: campaignName,
-            goalClicks,
             status: "ACTIVE",
+            ...data,
             createdById: session.user.id,
             workspaceId: workspaceId || undefined,
           },
@@ -252,12 +279,31 @@ export async function PATCH(
         if (!raced) throw err;
         campaign = await prisma.campaign.update({
           where: { id: raced.id },
-          data: { goalClicks },
+          data,
         });
       }
     }
 
-    return NextResponse.json({ success: true, goalClicks: campaign.goalClicks });
+    // Period and archive changes affect what everyone sees — log them.
+    // (Goal edits never were logged; kept that way.)
+    if (data.startDate !== undefined || data.endDate !== undefined || data.status !== undefined) {
+      await prisma.auditLog.create({
+        data: {
+          userId: session.user.id,
+          action: "UPDATE_CAMPAIGN",
+          targetId: campaign.id,
+          metadata: { name: campaignName, changes: parsed },
+        },
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      goalClicks: campaign.goalClicks,
+      startDate: campaign.startDate,
+      endDate: campaign.endDate,
+      status: campaign.status,
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
