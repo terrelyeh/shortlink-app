@@ -2,6 +2,8 @@
 
 import { useCallback, useRef, useState } from "react";
 import Papa from "papaparse";
+import { useQueryClient } from "@tanstack/react-query";
+import { invalidateAfterLinksCreated } from "@/lib/query/invalidate-links";
 import { Link } from "@/i18n/routing";
 import {
   Upload,
@@ -61,6 +63,7 @@ interface ImportResponse {
 }
 
 export default function CSVImportClient() {
+  const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<Record<string, string>[] | null>(null);
@@ -149,6 +152,7 @@ export default function CSVImportClient() {
         return;
       }
       setResponse(data as ImportResponse);
+      invalidateAfterLinksCreated(qc);
     } catch (err) {
       setServerError(err instanceof Error ? err.message : "Network error");
     } finally {

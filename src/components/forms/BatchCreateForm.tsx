@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { invalidateAfterLinksCreated } from "@/lib/query/invalidate-links";
 import { useTranslations } from "next-intl";
 import { UTM_MEDIUMS, getSourcesForMedium } from "@/lib/utils/utm";
 import { Loader2, Download, Check, Copy, ChevronDown } from "lucide-react";
@@ -16,6 +18,7 @@ interface CreatedLink {
 }
 
 export function BatchCreateForm() {
+  const qc = useQueryClient();
   const t = useTranslations("utm");
   const tLinks = useTranslations("links");
 
@@ -70,6 +73,7 @@ export function BatchCreateForm() {
       }
 
       setCreatedLinks(data.links);
+      invalidateAfterLinksCreated(qc);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create links");
     } finally {
