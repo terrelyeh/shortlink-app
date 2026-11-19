@@ -15,7 +15,7 @@
 | **UTM 模板（選用）** | 儲存常用 UTM 組合為模板（通路級預設，如「EDM 週報」「FB 付費廣告」）；快速套用到新連結。**不綁定 campaign** — 同一個模板可橫跨多個活動。非必要，側欄放在下方「設定」旁 |
 | **批次建立（固定 URL + 多 content）** | 一次建立多個短網址變體（如多位 KOL 的追蹤連結） |
 | **CSV 匯入批次建立** | 每 row 獨立 URL / UTM / tags / 排程 / 地區限制，上限 500 row |
-| **活動啟動器 Kickstart** | `/campaigns/kickstart` 選 playbook（Product Launch / Exhibition Event）→ 一鍵展開 8–12 個頻道的追蹤連結；展會範本含 QR 海報 / 傳單通路，每一列可填自己的目的網址；偵測到既有活動時自動切擴充模式只建缺的，避免重複。`/links` 的「建立新連結 ▾」選單可進入批次建立 / CSV 匯入 / 活動啟動器 |
+| **活動啟動器 Kickstart** | `/campaigns/kickstart` 引導式 6 步：活動類型（展會 / 新品上市）→ 名稱、期間、負責人 → 目的網址 → 依時程勾選通路（可「再加一則」，QR 可各自指定目的網址）→ 依通路設目標（帶入過去平均值）→ 預覽確認（短碼即時檢查）→ 一次建好並寫入期間 / 負責人 / 目標。UTM、短碼、標題、標籤自動依活動規劃 skill 的命名規則產生；幫既有活動補連結時只建缺的 |
 | **社群分享預覽覆寫** | 編輯頁可自訂分享到 FB / LINE / LinkedIn / Threads 時的標題、描述、圖片；`/s/[code]` 對預覽爬蟲回一頁帶自訂 `og:*` 的 HTML，真人照常轉址。留空欄位沿用目的頁原本的 OG |
 | **垃圾桶與還原** | 刪除的連結進 `/links/trash`，建立者或 workspace OWNER/ADMIN 可一鍵還原，短網址與點擊紀錄不變 |
 | **OG 縮圖自動抓取** | 建連結後背景抓目標頁的 `og:image` / `og:title` 作為預覽縮圖 |
@@ -262,7 +262,7 @@ src/
 │   │   │   ├── templates/     # UTM 模板
 │   │   │   ├── audit-log/     # 審計日誌
 │   │   │   ├── settings/      # 個人設定 + 成員管理 + 工作區設定 + UTM Governance tab
-│   │   │   └── campaigns/kickstart/  # Playbook 一鍵建整套追蹤連結 wizard
+│   │   │   └── campaigns/kickstart/  # 引導式活動啟動器
 │   │   ├── invite/[token]/    # 受邀者落地頁 + 自己包 SessionProvider
 │   │   └── page.tsx           # 根頁 → 登入時 redirect 到 /campaigns
 │   ├── auth/                  # NextAuth 認證頁
@@ -285,7 +285,7 @@ src/
 │   ├── workspace.ts           # resolveWorkspaceScope (auto-fallback) + canUserActOnResource
 │   ├── fetch-workspace.ts     # patch window.fetch 自動塞 x-workspace-id header
 │   ├── hooks/useMediaQuery.ts # SSR-safe matchMedia hook（mobile 切換用）
-│   ├── campaign-playbooks.ts  # Kickstart wizard 的 playbook 定義
+│   ├── kickstart/             # 活動啟動器範本與命名規則
 │   ├── ratelimit.ts           # 速率限制（重導向 + /api/track）
 │   ├── cache.ts + cache-scopes.ts  # Redis wrapper + versioned invalidation
 │   ├── geoip.ts               # IP 地理位置查詢

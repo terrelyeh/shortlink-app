@@ -31,7 +31,7 @@ These match the ShortLink tool's built-in UTM lists and the team's UTM 使用指
 Prefer the tool's built-in values so dropdowns and whitelists match:
 
 - social / cpc / display: `linkedin`, `facebook`, `instagram`, `threads`, `x`, `youtube`, `line`, `google`, `bing`, `amazon`
-- email: `newsletter` (or the platform: `hubspot`, `mailchimp`)
+- email: `mailchimp` — the team's standard (it's what EDMs are sent with). Don't mix in `newsletter`: one campaign using both splits its report in two. Use another platform's name only if the email really goes out through it (`hubspot`).
 - referral: `pr` (press release), `partner` or `partner_<name>`, `distributor`, `website`, `intercom`
 - qr: `poster`, `flyer`, `standee`, `packaging`, `namecard`, `event`
 - influencer: the platform, or `kol_<name>` when tracking named creators
@@ -65,7 +65,7 @@ Optional but recommended: people paste these into posts and print them on poster
 
 ## tags — filters in the tool
 
-Comma-separated. Always include the market code in capitals when there is more than one market (`US`, `DE`). Optionally one campaign-wide tag (e.g. `computex2026`) — but don't duplicate the campaign name endlessly; the campaign filter already does that.
+Comma-separated. Always include the market code in capitals when there is more than one market (`US`, `DE`). Add the phase tag the tool's 活動啟動器 uses, so campaigns built either way filter alike: `展前` / `現場QR` / `展後` (exhibitions), `發表` / `追蹤` (launches); add `待換活動頁` to links that temporarily point at the homepage because the campaign page isn't live yet. Optionally one campaign-wide tag (e.g. `computex2026`) — but don't duplicate the campaign name endlessly; the campaign filter already does that.
 
 ## Things to leave alone unless asked
 
