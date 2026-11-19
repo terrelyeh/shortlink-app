@@ -43,7 +43,7 @@ Give one row per `utm_medium` the CSV actually uses (the tool's goal editor is p
 （3–5 rules, specific to this campaign）
 
 ## 5. 結案交付
-1. **給主管**：活動頁 →「分享報告」→ 全部期間（報告日期固定，之後打開數字不變）
+1. **給主管**：活動頁 →「分享報告」→ 活動期間（報告日期固定，之後打開數字不變；報告會顯示負責人）
 2. **自己分析**：分析頁篩選本活動 → 匯出 CSV → 樞紐分析「<market or position> × 通路」
 3. **跟上一檔比**：活動列表勾選兩個活動 →「比較」
 4. **對照 <GA4 / Amazon / CRM>**：用 `utm_campaign = <campaign>` 篩選 <what>

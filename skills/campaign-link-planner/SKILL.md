@@ -62,14 +62,16 @@ Save them as files when you can (`<campaign>_links.csv`, `<campaign>_plan.md`). 
 
 ### Step 6 — Hand-off message
 
-End with three short lines: how to import (連結管理 → 建立新連結旁的 ▾ → CSV 匯入 → 上傳 → 預覽 → 匯入), that a row which fails (e.g. custom code already taken) is skipped and the rest still import, and the one thing to do right after (set the goal on the campaign page; test each link with 「測試短網址」). Links with a `starts_at` show 「尚未啟用」 until that time, so say to test those right after they go live rather than at import.
+End with three short lines: how to import (連結管理 → 建立新連結旁的 ▾ → CSV 匯入 → 上傳 → 預覽 → 匯入), that a row which fails (e.g. custom code already taken) is skipped and the rest still import, and what to do right after: on the campaign page set the period, the owner (負責人) and the per-channel goals from plan section 2, then test each link with 「測試短網址」. Links with a `starts_at` show 「尚未啟用」 until that time, so say to test those right after they go live rather than at import.
 
 ## What the tool can and can't do (so you don't promise the wrong thing)
 
 - It counts **clicks before the landing page**. Sign-ups, enquiries and purchases are measured elsewhere — GA4 for own sites (filter by the same `utm_campaign`), Amazon's reports / Amazon Attribution for Amazon.
 - It does not know impressions or ad spend; CTR and cost per click need numbers from the ad platforms.
-- Bots and social preview crawlers are not counted; clicks opened via 「測試短網址」 are marked as tests and excluded.
-- Analytics keep about two years of clicks; the campaign page defaults to 全部期間.
+- Bots and social preview crawlers are not counted; suspected corporate email-scanner clicks (outdated-Chromium user agents) are flagged and excluded automatically; clicks opened via 「測試短網址」 are marked as tests and excluded. A 「含測試與疑似機器點擊」 toggle on the analytics and campaign pages adds them back.
+- Analytics keep about two years of clicks. Once a campaign has a period (start/end date), the campaign list and page default to that period (all time otherwise), and status (即將開始 / 進行中 / 已結束) follows the dates.
+- Goals can be set per channel (utm_medium); each gets a progress bar with a pace line for running campaigns. Each campaign can have one owner (負責人) for KPI tracking.
+- The tool has its own guided 活動啟動器 (行銷活動 → 活動啟動器) that builds a simple single-market exhibition or product launch in the browser with the same naming rules. Point users there when that's all they need; this skill is for multi-market or e-commerce campaigns, or when planning from a long brief.
 - Share reports freeze the date range when generated — good for sending to a manager.
 - This skill cannot see existing campaigns or links. Custom codes are global in the tool, so a clash is possible; the import reports it per row.
 
@@ -77,7 +79,7 @@ End with three short lines: how to import (連結管理 → 建立新連結旁�
 
 These are the things that make numbers look wrong later. Include only the ones relevant to this campaign's channels, in the plan's 注意事項:
 
-- **EDM**: corporate mail security scanners click every link within minutes of sending (common with B2B lists), so the first spike after a send is partly machines. Judge emails over 24–48 h, not the first hour.
+- **EDM**: corporate mail security scanners click every link within minutes of sending (common with B2B lists). The tool now excludes most of them automatically (「疑似郵件掃描點擊」), so EDM numbers are lower than older campaigns' — compare with past campaigns as they show today, not with numbers someone wrote down before. Still judge emails over 24–48 h, not the first hour.
 - **Trade shows**: visitors share the venue Wi-Fi, so 不重複訪客 undercounts badly — use total clicks per QR position. Print QR at roughly scan distance ÷ 10 (standee viewed from 3 m → ~30 cm; name card ≥ 2 cm) and print the short URL under it for people who can't scan.
 - **Booking / form tools** (Calendly, HubSpot forms): they usually keep the UTM parameters, so bookings can be traced back to the exact QR or post — say where to look.
 - **Instagram**: captions can't hold clickable links; the link goes in a Story link sticker or the bio. Don't plan an IG link as if it were a normal post link.
