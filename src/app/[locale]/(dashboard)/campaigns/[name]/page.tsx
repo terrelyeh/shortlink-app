@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { Fragment, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useRouter } from "@/i18n/routing";
 import { useLocale, useTranslations } from "next-intl";
@@ -33,12 +33,14 @@ import {
   Archive,
   ArchiveRestore,
   CalendarDays,
+  ChevronRight,
+  Filter,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
 import { ClicksChart } from "@/components/analytics/ClicksChart";
 import { PieChartComponent } from "@/components/analytics/PieChartComponent";
-import { TrendCell, classifyTrend, type TrendState } from "@/components/analytics/TrendCell";
+import { classifyTrend } from "@/components/analytics/TrendCell";
 import { formatRelativeTime } from "@/lib/utils/format";
 import {
   campaignPhase,
@@ -47,7 +49,15 @@ import {
   periodBoundsMs,
   storedDateToDay,
 } from "@/lib/campaign-period";
-import { computeAnalytics, type RawAnalyticsData } from "@/lib/analytics/compute";
+import {
+  computeAnalytics,
+  localDayKey,
+  NO_REFERRER,
+  type ComputeFilters,
+  type RawAnalyticsData,
+} from "@/lib/analytics/compute";
+import { MiniSpark } from "@/components/analytics/MiniSpark";
+import { CampaignLinkDetail } from "@/components/campaigns/CampaignLinkDetail";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ShareModal } from "@/components/analytics/ShareModal";
 import { SyncButton } from "@/components/layout/SyncButton";
@@ -68,6 +78,13 @@ interface CampaignLink {
 
 type TabId = "overview" | "traffic" | "links";
 type RangeId = "period" | "all" | "90d" | "30d";
+
+/** Traffic-tab drill-down. Each key narrows every number on the tab. */
+type Drill = Pick<ComputeFilters, "source" | "medium" | "content" | "country" | "referrer" | "linkId">;
+const DRILL_KEYS = ["linkId", "source", "medium", "content", "country", "referrer"] as const;
+
+/** Paths the link editor may send the user back to (no open redirect). */
+const campaignReturnTo = (name: string) => `/campaigns/${encodeURIComponent(name)}`;
 
 const PHASE_BADGE: Record<CampaignPhase, string> = {
   running: "active",
@@ -99,6 +116,7 @@ export default function CampaignDetailPage() {
   // the same UI shows up on /analytics — keeping one source of truth.
   const tAnalytics = useTranslations("analytics");
   const tShare = useTranslations("share");
+  const tLinks = useTranslations("links");
   const campaignName = decodeURIComponent(params.name as string);
   const locale = useLocale();
   const fmtDay = (day: string) => {
@@ -113,6 +131,8 @@ export default function CampaignDetailPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [drill, setDrill] = useState<Drill>({});
+  const [expandedLinkId, setExpandedLinkId] = useState<string | null>(null);
   // Chart / Traffic / KPI window. null = the default: the campaign period
   // when one is set, otherwise all time (campaigns are usually reviewed
   // after they end — a fixed 30-day window showed exhibition campaigns as
@@ -260,72 +280,84 @@ export default function CampaignDetailPage() {
     });
   }, [raw, campaignName, rangeDates]);
 
-  // Per-link metrics from the raw click stream — single pass over all
-  // clicks keyed by shortLinkId, so we don't re-scan N times per link.
-  // Covers: unique visitors (ipHash distinct), last click, 7d trend
-  // (last 7d vs previous 7d), and a 7-day sparkline.
-  // `raw.clicks` is capped at 90 days / 10k rows by the API; values
-  // beyond that window are simply absent — we surface "—" in the UI.
-  const perLinkMetrics = useMemo(() => {
-    const empty = () => ({
-      uniques: new Set<string>(),
-      lastClickAt: null as Date | null,
-      last7d: 0,
-      prev7d: 0,
-      daily: new Array(7).fill(0) as number[],
+  // Same window, narrowed by the Traffic tab's drill-down filters.
+  const drillActive = DRILL_KEYS.some((k) => drill[k]);
+  const traffic = useMemo(() => {
+    if (!raw) return null;
+    if (!drillActive) return computed;
+    return computeAnalytics(raw, {
+      rangeStart: rangeDates.start,
+      rangeEnd: rangeDates.end,
+      campaign: campaignName,
+      ...drill,
     });
-    const acc = new Map<string, ReturnType<typeof empty>>();
-    for (const l of links) acc.set(l.id, empty());
-    if (!raw) {
-      return new Map<
-        string,
-        {
-          uniqueClicks: number;
-          lastClickAt: Date | null;
-          trendPct: number | null;
-          trendState: "up" | "down" | "flat" | "new" | "dead" | "none";
-          sparkline: number[];
-        }
-      >();
-    }
-    const now = Date.now();
-    const DAY = 86400000;
+  }, [raw, campaignName, rangeDates, drill, drillActive, computed]);
+
+  const toggleDrill = (key: (typeof DRILL_KEYS)[number], value: string) =>
+    setDrill((d) => ({ ...d, [key]: d[key] === value ? undefined : value }));
+
+  // Per-link metrics from the raw click stream — one pass over all clicks
+  // keyed by shortLinkId: unique visitors (distinct ipHash), last click,
+  // a lifetime mini-trend and the busiest day. `raw.clicks` is capped
+  // (730 days / 10k rows) by the API; anything older is simply absent.
+  const perLinkMetrics = useMemo(() => {
+    type Out = {
+      uniqueClicks: number;
+      lastClickAt: Date | null;
+      lifetime: number[];
+      peak: { date: string; clicks: number } | null;
+    };
+    const out = new Map<string, Out>();
+    let sparkMax = 1;
+    if (!raw) return { byLink: out, sparkMax };
+    const acc = new Map<
+      string,
+      { uniques: Set<string>; lastClickAt: Date | null; days: Map<string, number> }
+    >();
+    for (const l of links) acc.set(l.id, { uniques: new Set(), lastClickAt: null, days: new Map() });
+    let firstMs = Infinity;
     for (const c of raw.clicks) {
       const m = acc.get(c.shortLinkId);
       if (!m) continue;
       if (c.ipHash) m.uniques.add(c.ipHash);
       const ts = new Date(c.timestamp);
+      firstMs = Math.min(firstMs, ts.getTime());
+      const dk = localDayKey(ts);
+      m.days.set(dk, (m.days.get(dk) ?? 0) + 1);
       if (!m.lastClickAt || ts > m.lastClickAt) m.lastClickAt = ts;
-      const ageMs = now - ts.getTime();
-      if (ageMs < 7 * DAY) {
-        m.last7d++;
-        const daysAgo = Math.floor(ageMs / DAY);
-        if (daysAgo >= 0 && daysAgo < 7) m.daily[6 - daysAgo]++;
-      } else if (ageMs < 14 * DAY) {
-        m.prev7d++;
+    }
+    // Lifetime mini-trend: every row shares one axis (campaign's first
+    // click → today) in ≤ 40 bins and one y-scale, so rows can be compared
+    // by eye. Bins are cut from today backwards so the newest bin is a
+    // full one (a partial last bin made every line dip at the right edge).
+    const axis: string[] = [];
+    if (Number.isFinite(firstMs)) {
+      const cur = new Date(firstMs);
+      cur.setHours(0, 0, 0, 0);
+      const todayKey = localDayKey(new Date());
+      for (let g = 0; g < 1000; g++) {
+        const k = localDayKey(cur);
+        axis.push(k);
+        if (k >= todayKey) break;
+        cur.setDate(cur.getDate() + 1);
       }
     }
-    const out = new Map<
-      string,
-      {
-        uniqueClicks: number;
-        lastClickAt: Date | null;
-        trendPct: number | null;
-        trendState: TrendState;
-        sparkline: number[];
-      }
-    >();
+    const per = Math.max(1, Math.ceil(axis.length / 40));
     for (const [id, m] of acc) {
-      const { trendState, trendPct } = classifyTrend(m.last7d, m.prev7d);
-      out.set(id, {
-        uniqueClicks: m.uniques.size,
-        lastClickAt: m.lastClickAt,
-        trendPct,
-        trendState,
-        sparkline: m.daily,
-      });
+      const lifetime: number[] = [];
+      for (let end = axis.length; end > 0; end -= per) {
+        let sum = 0;
+        for (let j = Math.max(0, end - per); j < end; j++) sum += m.days.get(axis[j]) ?? 0;
+        lifetime.unshift(sum);
+        sparkMax = Math.max(sparkMax, sum);
+      }
+      let peak: { date: string; clicks: number } | null = null;
+      for (const [date, clicks] of m.days) {
+        if (!peak || clicks > peak.clicks) peak = { date, clicks };
+      }
+      out.set(id, { uniqueClicks: m.uniques.size, lastClickAt: m.lastClickAt, lifetime, peak });
     }
-    return out;
+    return { byLink: out, sparkMax };
   }, [raw, links]);
 
   const saveGoal = async () => {
@@ -341,7 +373,12 @@ export default function CampaignDetailPage() {
       if (response.ok) {
         // Optimistic update + invalidate both the goal query and the
         // Campaigns leaderboard so goal progress % stays consistent.
-        qc.setQueryData(goalKey, { goalClicks: parsed });
+        // Merge — the same cache entry also holds the period / archive
+        // record, which a plain overwrite used to wipe until refetch.
+        qc.setQueryData(goalKey, (old: typeof goalData) =>
+          old ? { ...old, goalClicks: parsed } : old,
+        );
+        qc.invalidateQueries({ queryKey: goalKey });
         qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
         setEditingGoal(false);
         success(t("goalSaved"));
@@ -362,7 +399,10 @@ export default function CampaignDetailPage() {
         body: JSON.stringify({ goalClicks: null }),
       });
       if (response.ok) {
-        qc.setQueryData(goalKey, { goalClicks: null });
+        qc.setQueryData(goalKey, (old: typeof goalData) =>
+          old ? { ...old, goalClicks: null } : old,
+        );
+        qc.invalidateQueries({ queryKey: goalKey });
         qc.invalidateQueries({ queryKey: ["campaigns-summary"] });
         setGoalInput("");
         setEditingGoal(false);
@@ -1240,81 +1280,193 @@ export default function CampaignDetailPage() {
         </>
       )}
 
-      {/* Traffic tab */}
+      {/* Traffic tab — every list is clickable: picking a row narrows all
+          the numbers on the tab (chips at the top undo it). */}
       {activeTab === "traffic" && (
         <div className="stack" style={{ gap: 14 }}>
+          <div className="drill-bar">
+            <Filter size={13} style={{ color: "var(--ink-400)", flexShrink: 0 }} />
+            {!drillActive ? (
+              <span className="muted">{t("drillHint")}</span>
+            ) : (
+              <>
+                {DRILL_KEYS.filter((k) => drill[k]).map((k) => (
+                  <span key={k} className="drill-chip">
+                    {t(`drill_${k}`)}:{" "}
+                    <strong>
+                      {k === "linkId"
+                        ? (() => {
+                            const l = links.find((x) => x.id === drill.linkId);
+                            return l ? l.title || `/${l.code}` : drill.linkId;
+                          })()
+                        : k === "referrer" && drill.referrer === NO_REFERRER
+                          ? t("noReferrer")
+                          : drill[k]}
+                    </strong>
+                    <button
+                      type="button"
+                      aria-label={tCommon("remove")}
+                      onClick={() => setDrill((d) => ({ ...d, [k]: undefined }))}
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                ))}
+                <button type="button" className="btn btn-ghost" style={{ height: 26, fontSize: 12 }} onClick={() => setDrill({})}>
+                  {t("drillClear")}
+                </button>
+              </>
+            )}
+          </div>
+
           {rawLoading ? (
             <div className="card" style={{ padding: 48, display: "grid", placeItems: "center" }}>
               <Loader2 size={20} className="animate-spin" style={{ color: "var(--ink-500)" }} />
             </div>
-          ) : !computed || computed.summary.totalClicks === 0 ? (
+          ) : !traffic || traffic.summary.totalClicks === 0 ? (
             <div
               className="card"
               style={{ padding: 48, textAlign: "center", fontSize: 13, color: "var(--ink-500)" }}
             >
-              {t("noClicksInRange")}
+              {drillActive ? t("drillNoClicks") : t("noClicksInRange")}
             </div>
           ) : (
             <>
+              <div className="card card-padded">
+                <div className="section-title" style={{ marginBottom: 6, flexWrap: "wrap" }}>
+                  <LineChartIcon size={14} style={{ color: "var(--ink-400)" }} />
+                  {drillActive ? t("drillSliceTitle") : t("clicksTitle")}
+                  <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
+                    {rangeLabel(trendRange)} ·{" "}
+                    {t("drillSliceSummary", {
+                      clicks: traffic.summary.totalClicks.toLocaleString(),
+                      uniques: traffic.summary.uniqueVisitors.toLocaleString(),
+                    })}
+                    {drillActive && computed && computed.summary.totalClicks > 0 && (
+                      <>
+                        {" · "}
+                        {t("drillShareOfCampaign", {
+                          pct: Math.round((traffic.summary.totalClicks / computed.summary.totalClicks) * 100),
+                        })}
+                      </>
+                    )}
+                  </span>
+                </div>
+                <ClicksChart data={traffic.clicksByDay} height={220} />
+              </div>
+
               <div className="grid-2">
                 <TopList
                   title={t("topSources")}
                   subtitle={t("topSourcesHint")}
-                  rows={computed.utm.sources}
-                  total={computed.summary.totalClicks}
+                  rows={traffic.utm.sources}
+                  total={traffic.summary.totalClicks}
                   pillClass="pill-source"
                   noDataLabel={t("noData")}
+                  active={drill.source}
+                  onSelect={(v) => toggleDrill("source", v)}
                 />
                 <TopList
                   title={t("topMediums")}
                   subtitle={t("topMediumsHint")}
-                  rows={computed.utm.mediums}
-                  total={computed.summary.totalClicks}
+                  rows={traffic.utm.mediums}
+                  total={traffic.summary.totalClicks}
                   pillClass="pill-medium"
                   noDataLabel={t("noData")}
+                  active={drill.medium}
+                  onSelect={(v) => toggleDrill("medium", v)}
                 />
               </div>
+
+              <div className="grid-2">
+                <TopList
+                  title={t("topContents")}
+                  subtitle={t("topContentsHint")}
+                  rows={traffic.utm.contents}
+                  total={traffic.summary.totalClicks}
+                  pillClass="pill-content"
+                  noDataLabel={t("noData")}
+                  active={drill.content}
+                  onSelect={(v) => toggleDrill("content", v)}
+                />
+                <TopList
+                  title={t("topLinksTitle")}
+                  subtitle={t("topLinksHint")}
+                  rows={traffic.topLinks.map((l) => ({
+                    name: l.id,
+                    label: l.title || `/${l.code}`,
+                    clicks: l.clicks,
+                  }))}
+                  total={traffic.summary.totalClicks}
+                  pillClass="pill-campaign"
+                  noDataLabel={t("noData")}
+                  active={drill.linkId}
+                  onSelect={(v) => toggleDrill("linkId", v)}
+                />
+              </div>
+
+              <div className="grid-2">
+                <TopList
+                  title={t("topCountries")}
+                  rows={traffic.countries.map((c) => ({ name: c.name, clicks: c.value }))}
+                  total={traffic.summary.totalClicks}
+                  pillClass="pill-country"
+                  icon={<Globe2 size={14} style={{ color: "var(--ink-400)" }} />}
+                  noDataLabel={t("noData")}
+                  active={drill.country}
+                  onSelect={(v) => toggleDrill("country", v)}
+                />
+                <TopList
+                  title={t("referrerSites")}
+                  subtitle={t("referrerSitesHint")}
+                  rows={[
+                    ...traffic.referrers.map((r) => ({ name: r.name, clicks: r.value })),
+                    ...(traffic.noReferrer > 0
+                      ? [{ name: NO_REFERRER, label: t("noReferrer"), clicks: traffic.noReferrer }]
+                      : []),
+                  ]}
+                  total={traffic.summary.totalClicks}
+                  pillClass="pill-content"
+                  noDataLabel={t("noData")}
+                  active={drill.referrer}
+                  onSelect={(v) => toggleDrill("referrer", v)}
+                  limit={11}
+                />
+              </div>
+
+              {drill.referrer && drill.referrer !== NO_REFERRER && traffic.referrerUrls.length > 0 && (
+                <TopList
+                  title={t("referrerUrls")}
+                  rows={traffic.referrerUrls.map((r) => ({ name: r.name, clicks: r.value }))}
+                  total={traffic.summary.totalClicks}
+                  pillClass="pill-content"
+                  noDataLabel={t("noData")}
+                />
+              )}
 
               <div className="card card-padded">
                 <div className="section-title" style={{ marginBottom: 14 }}>
                   {t("audienceBreakdown")}
                 </div>
                 <div className="grid-3">
-                  <PieChartComponent data={computed.devices} title={t("device")} />
-                  <PieChartComponent data={computed.browsers} title={t("browser")} />
-                  <PieChartComponent data={computed.operatingSystems} title={t("os")} />
+                  <PieChartComponent data={traffic.devices} title={t("device")} />
+                  <PieChartComponent data={traffic.browsers} title={t("browser")} />
+                  <PieChartComponent data={traffic.operatingSystems} title={t("os")} />
                 </div>
-              </div>
-
-              <div className="grid-2">
-                <TopList
-                  title={t("topCountries")}
-                  rows={computed.countries.map((c) => ({ name: c.name, clicks: c.value }))}
-                  total={computed.summary.totalClicks}
-                  pillClass="pill-country"
-                  icon={<Globe2 size={14} style={{ color: "var(--ink-400)" }} />}
-                  noDataLabel={t("noData")}
-                />
-                <TopList
-                  title={t("topReferrers")}
-                  rows={computed.referrers.map((r) => ({ name: r.name, clicks: r.value }))}
-                  total={computed.summary.totalClicks}
-                  pillClass="pill-content"
-                  noDataLabel={t("noData")}
-                />
               </div>
             </>
           )}
         </div>
       )}
 
-      {/* Links tab */}
+      {/* Links tab — click a row to expand that link's numbers in place. */}
       {activeTab === "links" && (
         <div className="tbl-wrap">
           <div className="tbl-head">
             <div className="tbl-head-title">
               {t("linksInCampaign")}
               <span className="muted">{t("linksSortedByClicks", { n: links.length })}</span>
+              <span className="muted" style={{ fontSize: 11.5 }}>· {t("linksExpandHint")}</span>
             </div>
             <Link
               href={`/links/new?utmCampaign=${encodeURIComponent(campaignName)}`}
@@ -1343,35 +1495,67 @@ export default function CampaignDetailPage() {
             </div>
           ) : (
             <div className="table-scroll">
-            <table className="data">
+            <table className="data" style={{ tableLayout: "fixed", minWidth: 1080 }}>
               <thead>
                 <tr>
+                  <th style={{ width: 28 }}></th>
                   <th>{t("colLink")}</th>
-                  <th>{t("colCampaignSourceMediumContent")}</th>
-                  <th style={{ width: 100 }}>{tCampaigns("colStatus")}</th>
-                  <th className="num" style={{ width: 100 }}>
+                  <th style={{ width: 210, whiteSpace: "normal", lineHeight: 1.3 }}>{t("colSourceMediumContent")}</th>
+                  <th style={{ width: 96 }}>{tCampaigns("colStatus")}</th>
+                  <th className="num" style={{ width: 72 }}>
                     {tCampaigns("colClicks")}
                   </th>
-                  <th className="num" style={{ width: 80 }} title={t("colUniqueTooltip")}>
+                  <th className="num" style={{ width: 64 }} title={t("colUniqueTooltip")}>
                     {t("colUnique")}
                   </th>
-                  <th className="num" style={{ width: 75 }} title={t("colShareTooltip")}>
+                  <th className="num" style={{ width: 60 }} title={t("colShareTooltip")}>
                     {t("colShare")}
                   </th>
-                  <th style={{ width: 120 }} title={tCampaigns("col7dTrendTooltip")}>
-                    {t("col7dTrend")}
+                  <th style={{ width: 124 }} title={t("colLifetimeTooltip")}>
+                    {t("colLifetime")}
                   </th>
-                  <th style={{ width: 110 }}>{t("colLastClick")}</th>
-                  <th style={{ width: 140 }}>{tCommon("actions")}</th>
+                  <th style={{ width: 88 }}>{t("colLastClick")}</th>
+                  <th style={{ width: 56 }}></th>
                 </tr>
               </thead>
               <tbody>
                 {links.map((link) => {
                   const shortUrl = `${shortBaseUrl}/${link.code}`;
-                  const m = perLinkMetrics.get(link.id);
+                  const m = perLinkMetrics.byLink.get(link.id);
                   const sharePct = (link._count.clicks / totalCampaignClicks) * 100;
+                  const expanded = expandedLinkId === link.id;
+                  let dest = link.originalUrl;
+                  try {
+                    const u = new URL(link.originalUrl);
+                    dest = `${u.hostname.replace(/^www\./, "")}${u.pathname === "/" ? "" : u.pathname}`;
+                  } catch {
+                    /* keep raw */
+                  }
                   return (
-                    <tr key={link.id}>
+                    <Fragment key={link.id}>
+                    <tr
+                      className={`link-row ${expanded ? "expanded" : ""}`}
+                      onClick={() => {
+                        // Selecting text (e.g. to copy the URL) shouldn't toggle.
+                        if (window.getSelection()?.toString()) return;
+                        setExpandedLinkId(expanded ? null : link.id);
+                      }}
+                    >
+                      <td>
+                        <button
+                          type="button"
+                          className="link-row-toggle"
+                          aria-expanded={expanded}
+                          aria-controls={`link-detail-${link.id}`}
+                          aria-label={expanded ? t("collapseLink") : t("expandLink")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedLinkId(expanded ? null : link.id);
+                          }}
+                        >
+                          <ChevronRight size={14} className="link-row-chevron" />
+                        </button>
+                      </td>
                       <td>
                         <div style={{ minWidth: 0 }}>
                           <div
@@ -1380,7 +1564,7 @@ export default function CampaignDetailPage() {
                               fontSize: 13.5,
                               fontWeight: 500,
                               color: "var(--ink-100)",
-                              maxWidth: 220,
+                              maxWidth: 230,
                               overflow: "hidden",
                               textOverflow: "ellipsis",
                               whiteSpace: "nowrap",
@@ -1401,7 +1585,11 @@ export default function CampaignDetailPage() {
                             <button
                               className="btn btn-ghost"
                               style={{ padding: 2, height: "auto" }}
-                              onClick={() => copyLink(shortUrl, link.id)}
+                              title={tCommon("copy")}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyLink(shortUrl, link.id);
+                              }}
                             >
                               {copiedId === link.id ? (
                                 <Check size={11} style={{ color: "var(--ok-fg)" }} />
@@ -1410,24 +1598,31 @@ export default function CampaignDetailPage() {
                               )}
                             </button>
                           </div>
+                          <div className="link-row-dest" title={link.originalUrl}>
+                            → {dest}
+                          </div>
                         </div>
                       </td>
                       <td>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                          {link.utmCampaign ? (
-                            <span className="pill pill-campaign">{link.utmCampaign}</span>
-                          ) : (
-                            <span className="muted">—</span>
-                          )}
                           {link.utmSource && <span className="pill pill-source">{link.utmSource}</span>}
                           {link.utmMedium && <span className="pill pill-medium">{link.utmMedium}</span>}
                           {link.utmContent && <span className="pill pill-content">{link.utmContent}</span>}
+                          {!link.utmSource && !link.utmMedium && !link.utmContent && (
+                            <span className="muted">—</span>
+                          )}
                         </div>
                       </td>
                       <td>
                         <span className={`badge ${statusBadgeClass[link.status] || "draft"}`}>
                           <span className="badge-dot" />
-                          {link.status.charAt(0) + link.status.slice(1).toLowerCase()}
+                          {link.status === "ACTIVE"
+                            ? tLinks("active")
+                            : link.status === "PAUSED"
+                              ? tLinks("paused")
+                              : link.status === "ARCHIVED"
+                                ? tLinks("archived")
+                                : link.status}
                         </span>
                       </td>
                       <td className="num">{link._count.clicks.toLocaleString()}</td>
@@ -1448,12 +1643,16 @@ export default function CampaignDetailPage() {
                         )}
                       </td>
                       <td>
-                        {m && (m.sparkline.some((v) => v > 0) || m.trendState !== "none") ? (
-                          <TrendCell
-                            sparkline={m.sparkline}
-                            trendPct={m.trendPct}
-                            trendState={m.trendState}
-                          />
+                        {m && m.peak ? (
+                          <div className="lifetime-cell">
+                            <MiniSpark values={m.lifetime} max={perLinkMetrics.sparkMax} width={100} height={22} />
+                            <span>
+                              {t("peakDay", {
+                                date: `${m.peak.date.slice(0, 4) === String(new Date().getFullYear()) ? "" : `${m.peak.date.slice(0, 4)}/`}${Number(m.peak.date.slice(5, 7))}/${Number(m.peak.date.slice(8, 10))}`,
+                                n: m.peak.clicks.toLocaleString(),
+                              })}
+                            </span>
+                          </div>
                         ) : (
                           <span className="muted">—</span>
                         )}
@@ -1470,23 +1669,10 @@ export default function CampaignDetailPage() {
                           <span className="muted">—</span>
                         )}
                       </td>
-                      <td>
+                      <td onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                           <Link
-                            href={`/analytics?linkId=${link.id}`}
-                            style={{
-                              color: "var(--brand-600)",
-                              fontSize: 13,
-                              fontWeight: 500,
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 4,
-                            }}
-                          >
-                            {t("actionAnalytics")} <span style={{ fontSize: 10 }}>→</span>
-                          </Link>
-                          <Link
-                            href={`/links/${link.id}`}
+                            href={`/links/${link.id}?returnTo=${encodeURIComponent(campaignReturnTo(campaignName))}`}
                             title={t("actionEditSettings")}
                             style={{ color: "var(--ink-500)", display: "inline-flex" }}
                           >
@@ -1504,6 +1690,27 @@ export default function CampaignDetailPage() {
                         </div>
                       </td>
                     </tr>
+                    {expanded && (
+                      <tr className="link-detail-row" id={`link-detail-${link.id}`}>
+                        <td colSpan={10}>
+                          {raw ? (
+                            <CampaignLinkDetail
+                              raw={raw}
+                              linkId={link.id}
+                              originalUrl={link.originalUrl}
+                              campaignName={campaignName}
+                              onFilterTraffic={() => {
+                                setDrill({ linkId: link.id });
+                                setActiveTab("traffic");
+                              }}
+                            />
+                          ) : (
+                            <Loader2 size={16} className="animate-spin" style={{ color: "var(--ink-500)" }} />
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -1524,14 +1731,23 @@ function TopList({
   pillClass,
   icon,
   noDataLabel = "No data",
+  active,
+  onSelect,
+  limit = 8,
 }: {
   title: string;
   subtitle?: string;
-  rows: { name: string; clicks: number }[];
+  /** `name` is the filter value; `label` (optional) is what's shown. */
+  rows: { name: string; clicks: number; label?: string }[];
   total: number;
   pillClass: string;
   icon?: React.ReactNode;
   noDataLabel?: string;
+  /** Currently selected value (highlighted). */
+  active?: string;
+  /** Makes rows clickable — used for the Traffic tab drill-down. */
+  onSelect?: (name: string) => void;
+  limit?: number;
 }) {
   return (
     <div className="card card-padded">
@@ -1539,20 +1755,21 @@ function TopList({
         {icon}
         {title}
       </div>
-      <p className="section-sub">{subtitle || "\u00a0"}</p>
+      <p className="section-sub">{subtitle || " "}</p>
       {rows.length === 0 ? (
         <p className="placeholder" style={{ textAlign: "center", padding: "24px 0" }}>
           {noDataLabel}
         </p>
       ) : (
-        <div className="stack" style={{ gap: 10 }}>
-          {rows.slice(0, 8).map((row) => {
+        <div className="stack" style={{ gap: onSelect ? 2 : 10 }}>
+          {rows.slice(0, limit).map((row) => {
             const pct = total > 0 ? (row.clicks / total) * 100 : 0;
-            return (
-              <div key={row.name} className="row" style={{ gap: 12 }}>
-                <div style={{ minWidth: 80 }}>
-                  <span className={`pill ${pillClass}`} title={row.name}>
-                    {row.name || "—"}
+            const label = row.label ?? row.name;
+            const inner = (
+              <>
+                <div style={{ minWidth: 80, maxWidth: "55%", overflow: "hidden" }}>
+                  <span className={`pill ${pillClass}`} title={label} style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {label || "—"}
                   </span>
                 </div>
                 <div className="bar-track" style={{ flex: 1 }}>
@@ -1569,6 +1786,21 @@ function TopList({
                 >
                   {row.clicks.toLocaleString()}
                 </span>
+              </>
+            );
+            return onSelect ? (
+              <button
+                key={row.name}
+                type="button"
+                className={`toplist-row ${active === row.name ? "active" : ""}`}
+                onClick={() => onSelect(row.name)}
+                aria-pressed={active === row.name}
+              >
+                {inner}
+              </button>
+            ) : (
+              <div key={row.name} className="row" style={{ gap: 12 }}>
+                {inner}
               </div>
             );
           })}

@@ -26,7 +26,7 @@ import {
 
 // 8 distinct, high-contrast line colours. More than 4-5 overlaid lines
 // is visually unusable, so extras just wrap.
-const PALETTE = [
+export const CAMPAIGN_PALETTE = [
   "#03A9F4", // primary sky
   "#10b981", // emerald
   "#8b5cf6", // violet
@@ -44,9 +44,22 @@ interface Props {
   series: Record<string, number[]>;
   /** Height override; defaults to 260 which fits above a table well. */
   height?: number;
+  /** Fixed colour per campaign (so a page's own legend / columns match). */
+  colors?: Record<string, string>;
+  /** Replaces the date labels (axis + tooltip), e.g. "Day 3" when aligned. */
+  xLabels?: string[];
+  /** Hide the built-in legend when the page draws its own. */
+  showLegend?: boolean;
 }
 
-export function MultiCampaignChart({ dates, series, height = 260 }: Props) {
+export function MultiCampaignChart({
+  dates,
+  series,
+  height = 260,
+  colors,
+  xLabels,
+  showLegend = true,
+}: Props) {
   const campaignNames = Object.keys(series);
 
   // Reshape into Recharts-friendly rows: one object per day, keys are
@@ -54,8 +67,8 @@ export function MultiCampaignChart({ dates, series, height = 260 }: Props) {
   // parent already ran the expensive aggregation upstream.
   const data = dates.map((date, i) => {
     const row: Record<string, string | number> = {
-      date,
-      shortDate: date.slice(5), // "MM-DD" for axis
+      date: xLabels?.[i] ?? date,
+      shortDate: xLabels?.[i] ?? date.slice(5), // "MM-DD" for axis
     };
     for (const name of campaignNames) {
       row[name] = series[name]?.[i] ?? 0;
@@ -101,18 +114,20 @@ export function MultiCampaignChart({ dates, series, height = 260 }: Props) {
             return [n.toLocaleString(), "clicks"] as [string, string];
           }}
         />
+        {showLegend && (
         <Legend
           iconType="plainline"
           iconSize={18}
           wrapperStyle={{ fontSize: 12, paddingTop: 6 }}
           formatter={(value) => <span className="text-slate-600">{value}</span>}
         />
+        )}
         {campaignNames.map((name, idx) => (
           <Line
             key={name}
             type="monotone"
             dataKey={name}
-            stroke={PALETTE[idx % PALETTE.length]}
+            stroke={(colors?.[name] ?? CAMPAIGN_PALETTE[idx % CAMPAIGN_PALETTE.length])}
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 4 }}

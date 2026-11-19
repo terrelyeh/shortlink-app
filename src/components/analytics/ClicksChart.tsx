@@ -14,6 +14,7 @@ import { useLocale } from "next-intl";
 interface ClicksChartProps {
   /** `date` is YYYY-MM-DD (viewer's local day). */
   data: { date: string; clicks: number }[];
+  height?: number;
 }
 
 /** Parse YYYY-MM-DD as a local date — `new Date("2026-11-03")` would be UTC midnight. */
@@ -22,7 +23,7 @@ function parseDay(s: string): Date {
   return new Date(y, (m || 1) - 1, d || 1);
 }
 
-export function ClicksChart({ data }: ClicksChartProps) {
+export function ClicksChart({ data, height = 300 }: ClicksChartProps) {
   const locale = useLocale();
   const years = new Set(data.map((d) => d.date.slice(0, 4)));
   const thisYear = String(new Date().getFullYear());
@@ -45,7 +46,7 @@ export function ClicksChart({ data }: ClicksChartProps) {
   const showDots = data.length <= 45;
 
   return (
-    <ResponsiveContainer width="100%" height={300}>
+    <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
         <XAxis

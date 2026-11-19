@@ -350,7 +350,25 @@ export default function AnalyticsPage() {
         <div style={{ position: "relative", minWidth: 180 }}>
           <select
             value={selectedLinkId}
-            onChange={(e) => setSelectedLinkId(e.target.value)}
+            onChange={(e) => {
+              const id = e.target.value;
+              setSelectedLinkId(id);
+              // computeAnalytics requires the link to match the campaign /
+              // tag filters too — drop whichever this link doesn't satisfy
+              // instead of showing an empty page.
+              const meta = id ? raw?.links.find((l) => l.id === id) : undefined;
+              if (meta) {
+                if (
+                  selectedCampaign &&
+                  (selectedCampaign === "__none__"
+                    ? Boolean(meta.utmCampaign)
+                    : meta.utmCampaign !== selectedCampaign)
+                ) {
+                  setSelectedCampaign("");
+                }
+                if (selectedTagId && !meta.tagIds.includes(selectedTagId)) setSelectedTagId("");
+              }
+            }}
             disabled={loadingLinks}
             className={`input ${selectedLinkId ? "filter-active" : ""}`}
             style={{ height: 32, paddingLeft: 32, paddingRight: 28, appearance: "none", cursor: "pointer", width: "100%" }}

@@ -17,11 +17,11 @@ import {
   X,
   Flag,
 } from "lucide-react";
-import { MultiCampaignChart } from "@/components/analytics/MultiCampaignChart";
+import { CAMPAIGN_PALETTE, MultiCampaignChart } from "@/components/analytics/MultiCampaignChart";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SyncButton } from "@/components/layout/SyncButton";
 import { computeAnalytics, type RawAnalyticsData } from "@/lib/analytics/compute";
-import { periodBoundsMs, type CampaignPhase } from "@/lib/campaign-period";
+import { periodBoundsMs, storedDateToDay, type CampaignPhase } from "@/lib/campaign-period";
 
 interface CampaignRow {
   id: string | null;
@@ -59,12 +59,6 @@ const windowPresets: { value: string; days: number }[] = [
   { value: "90d", days: 90 },
 ];
 
-const COLUMN_COLORS = [
-  "var(--brand-500)",
-  "var(--data-violet)",
-  "var(--data-emerald)",
-  "var(--data-amber)",
-];
 
 const PHASE_BADGE: Record<CampaignPhase, string> = {
   running: "active",
@@ -173,15 +167,105 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
     return out;
   }, [raw, names, window, isPeriod, summary, now]);
 
-  const overlaySeries = useMemo(() => {
+  // One colour per campaign, by its position in the URL — chart lines,
+  // legend and column headers all read from this.
+  const colorFor = useCallback(
+    (name: string) => CAMPAIGN_PALETTE[Math.max(0, names.indexOf(name)) % CAMPAIGN_PALETTE.length],
+    [names],
+  );
+
+  // "calendar" = real dates; "aligned" = day 0 is each campaign's start
+  // date (or first click when no period is set), so a June show and a
+  // February show can be compared day by day.
+  const [align, setAlign] = useState<"calendar" | "aligned">("calendar");
+
+  const overlay = useMemo(() => {
     if (!summary?.timeseries) return null;
-    const out: Record<string, number[]> = {};
-    for (const name of names) {
-      const arr = summary.timeseries.perCampaign[name];
-      if (arr) out[name] = arr;
+    const { dates, perCampaign } = summary.timeseries;
+    const byName = new Map(summary.campaigns.map((c) => [c.name, c]));
+    const present = names.filter((n) => perCampaign[n]);
+    if (present.length < 2) return null;
+    const firstNz = (a: number[], from = 0) => {
+      for (let i = from; i < a.length; i++) if (a[i] > 0) return i;
+      return -1;
+    };
+    const lastNz = (a: number[]) => {
+      for (let i = a.length - 1; i >= 0; i--) if (a[i] > 0) return i;
+      return -1;
+    };
+
+    if (align === "calendar") {
+      // Trim the leading / trailing empty stretch (the "all time" axis is
+      // two years long and mostly zeros).
+      let lo = Infinity;
+      let hi = -1;
+      for (const n of present) {
+        const f = firstNz(perCampaign[n]);
+        if (f >= 0) lo = Math.min(lo, f);
+        hi = Math.max(hi, lastNz(perCampaign[n]));
+      }
+      if (hi < 0) return null;
+      lo = Math.max(0, lo - 2);
+      hi = Math.min(dates.length - 1, hi + 2);
+      const series: Record<string, number[]> = {};
+      for (const n of present) series[n] = perCampaign[n].slice(lo, hi + 1);
+      return { dates: dates.slice(lo, hi + 1), series, xLabels: undefined, startOutside: false };
     }
-    return Object.keys(out).length >= 2 ? out : null;
-  }, [summary, names]);
+
+    // Day 0 = start date (or first click). Clicks before day 0 — e.g.
+    // pre-show EDMs — are kept as negative days. The tail stops a week
+    // after each campaign has 95% of its clicks (max 120 days), so a
+    // trickle of late clicks doesn't stretch the axis over months.
+    //
+    // Day 0 is located by date difference, so a start date outside the
+    // window (earlier than 7/30/90d, or still upcoming) stays correct
+    // instead of falling back to "first click in the window". The axis
+    // is UTC days while start dates are Taiwan days, so a click between
+    // 00:00 and 08:00 Taiwan time on day 0 can show up on day −1.
+    const DAY_MS = 86_400_000;
+    const axis0 = Date.parse(`${dates[0]}T00:00:00Z`);
+    const MAX_PRE = 60;
+    const plan: { n: string; d0: number; pre: number; post: number }[] = [];
+    for (const n of present) {
+      const arr = perCampaign[n];
+      const startDay = storedDateToDay(byName.get(n)?.startDate);
+      const first = firstNz(arr);
+      const d0 = startDay ? Math.round((Date.parse(`${startDay}T00:00:00Z`) - axis0) / DAY_MS) : first;
+      if (d0 < 0 && !startDay) continue; // no start date and no clicks in the window
+      const from = first >= 0 && first < d0 ? Math.max(first, d0 - MAX_PRE) : d0;
+      // 95% of the clicks we'll actually draw (from `from` onwards).
+      let total = 0;
+      for (let i = Math.max(0, from); i < arr.length; i++) total += arr[i];
+      let cum = 0;
+      let p95 = d0;
+      for (let i = Math.max(0, from); i < arr.length && total > 0; i++) {
+        cum += arr[i];
+        if (cum >= total * 0.95) {
+          p95 = i;
+          break;
+        }
+      }
+      plan.push({ n, d0, pre: d0 - from, post: Math.max(p95 - d0, 0) + 7 });
+    }
+    if (plan.length < 2) return null;
+    const preLen = Math.max(...plan.map((p) => p.pre));
+    const postLen = Math.min(Math.max(...plan.map((p) => p.post), 14), 120);
+    const len = preLen + postLen + 1;
+    const series: Record<string, number[]> = {};
+    for (const n of present) series[n] = new Array(len).fill(0);
+    for (const { n, d0 } of plan) {
+      const arr = perCampaign[n];
+      for (let k = 0; k < len; k++) {
+        const src = d0 - preLen + k;
+        if (src >= 0 && src < arr.length) series[n][k] = arr[src];
+      }
+    }
+    const xLabels = Array.from({ length: len }, (_, i) => t("dayN", { n: i - preLen }));
+    // A start date outside the fetched window can't be lined up with
+    // the clicks around it — tell the user to widen the window.
+    const startOutside = plan.some((p) => p.d0 < 0 || p.d0 >= dates.length);
+    return { dates: xLabels, series, xLabels, startOutside };
+  }, [summary, names, align, t]);
 
   const winners = useMemo(() => {
     if (selectedCampaigns.length === 0) return null;
@@ -284,7 +368,7 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
           )}
 
           {/* Overlay chart */}
-          {overlaySeries && summary?.timeseries && (
+          {summary?.timeseries && names.filter((n) => summary.timeseries?.perCampaign[n]).length >= 2 && (
             <div className="card card-padded" style={{ marginBottom: 14 }}>
               <div className="row-between" style={{ marginBottom: 10 }}>
                 <div className="section-title">
@@ -294,14 +378,26 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                     · {isPeriod || window === "all" ? t("windowAll") : t("lastNd", { days })}
                   </span>
                 </div>
+                <div className="segmented" style={{ marginLeft: "auto", marginRight: 12 }}>
+                  <button className={align === "calendar" ? "active" : ""} onClick={() => setAlign("calendar")}>
+                    {t("alignCalendar")}
+                  </button>
+                  <button
+                    className={align === "aligned" ? "active" : ""}
+                    onClick={() => setAlign("aligned")}
+                    title={t("alignStartTooltip")}
+                  >
+                    {t("alignStart")}
+                  </button>
+                </div>
                 <div className="row" style={{ gap: 12, fontSize: 11.5 }}>
-                  {selectedCampaigns.map((c, i) => (
+                  {selectedCampaigns.map((c) => (
                     <div key={c.name} className="row" style={{ gap: 6 }}>
                       <span
                         style={{
                           width: 10,
                           height: 2,
-                          background: COLUMN_COLORS[i % COLUMN_COLORS.length],
+                          background: colorFor(c.name),
                           borderRadius: 1,
                           display: "inline-block",
                         }}
@@ -311,11 +407,24 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
                   ))}
                 </div>
               </div>
-              <MultiCampaignChart
-                dates={summary.timeseries.dates}
-                series={overlaySeries}
+              {overlay ? (
+                <MultiCampaignChart
+                dates={overlay.dates}
+                series={overlay.series}
+                xLabels={overlay.xLabels}
+                colors={Object.fromEntries(names.map((n) => [n, colorFor(n)]))}
+                showLegend={false}
                 height={280}
               />
+              ) : null}
+              {overlay?.startOutside && (
+                <p className="muted" style={{ fontSize: 12, margin: "8px 0 0" }}>{t("alignStartOutside")}</p>
+              )}
+              {!overlay && (
+                <div style={{ height: 120, display: "grid", placeItems: "center", fontSize: 13, color: "var(--ink-500)" }}>
+                  {align === "aligned" ? t("alignNoData") : t("noData")}
+                </div>
+              )}
             </div>
           )}
 
@@ -326,9 +435,9 @@ export default function CompareClient({ initialNames }: { initialNames: string[]
               gridTemplateColumns: `repeat(${Math.min(selectedCampaigns.length, 4)}, minmax(0, 1fr))`,
             }}
           >
-            {selectedCampaigns.map((c, idx) => {
+            {selectedCampaigns.map((c) => {
               const breakdown = perCampaignBreakdown[c.name];
-              const accent = COLUMN_COLORS[idx % COLUMN_COLORS.length];
+              const accent = colorFor(c.name);
               return (
                 <div key={c.name} className="compare-col">
                   <div
