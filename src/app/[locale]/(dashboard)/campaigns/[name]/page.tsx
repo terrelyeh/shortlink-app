@@ -59,6 +59,7 @@ import { MiniSpark } from "@/components/analytics/MiniSpark";
 import { CampaignLinkDetail } from "@/components/campaigns/CampaignLinkDetail";
 import { CampaignGoalCard, type GoalSaveBody } from "@/components/campaigns/CampaignGoalCard";
 import { goalPaceFraction, parseGoalByMedium } from "@/lib/campaign-goal";
+import { OwnerBadge, useWorkspaceMembers, type OwnerInfo } from "@/components/campaigns/CampaignOwner";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ShareModal } from "@/components/analytics/ShareModal";
 import { SyncButton } from "@/components/layout/SyncButton";
@@ -99,6 +100,8 @@ interface CampaignRecord {
   goalClicks: number | null;
   /** Raw Json column; read through parseGoalByMedium(). */
   goalByMedium: unknown;
+  ownerId: string | null;
+  owner: OwnerInfo | null;
   startDate: string | null;
   endDate: string | null;
   status: string;
@@ -506,6 +509,20 @@ export default function CampaignDetailPage() {
     }
   };
 
+  const { data: members } = useWorkspaceMembers();
+  const [ownerSaving, setOwnerSaving] = useState(false);
+  const changeOwner = async (ownerId: string | null) => {
+    setOwnerSaving(true);
+    try {
+      await patchCampaign({ ownerId });
+      success(ownerId ? t("ownerSaved") : t("ownerCleared"));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setOwnerSaving(false);
+    }
+  };
+
   const toggleArchive = async () => {
     const archive = phase !== "archived";
     setArchiving(true);
@@ -667,6 +684,29 @@ export default function CampaignDetailPage() {
                 >
                   {periodSet ? <Pencil size={12} /> : t("setPeriod")}
                 </button>
+                {/* Owner — the person whose KPI this campaign counts toward.
+                    The badge is the visible face of a native <select>
+                    stacked on top of it (keyboard / screen-reader friendly). */}
+                <span className="campaign-owner-group">
+                <span className="muted">{t("ownerLabel")}</span>
+                <label className="owner-picker" title={t("ownerChange")}>
+                  <OwnerBadge owner={record?.owner ?? null} size={18} />
+                  <ChevronDown size={12} style={{ color: "var(--ink-500)" }} />
+                  <select
+                    aria-label={t("ownerChange")}
+                    value={record?.ownerId ?? ""}
+                    disabled={!record || ownerSaving}
+                    onChange={(e) => changeOwner(e.target.value || null)}
+                  >
+                    <option value="">{tCampaigns("ownerUnassigned")}</option>
+                    {(members ?? []).map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name || m.email}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                </span>
               </div>
             </div>
           </div>

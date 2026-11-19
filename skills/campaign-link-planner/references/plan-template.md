@@ -26,7 +26,7 @@ Fill every section; keep it to roughly one printed page. Write in the user's lan
 
 Give one row per `utm_medium` the CSV actually uses (the tool's goal editor is per medium, so use the exact medium values). Then:
 
-上線後在活動頁：① 設定活動期間 <start> ～ <end>；② 目標卡 → 鉛筆 →「依通路」，填 <medium> <n>、<medium> <n>…（總目標自動加總）。每個通路會有自己的進度條，並標出「照時間應該到哪裡」。
+上線後在活動頁：① 設定活動期間 <start> ～ <end>，並指定負責人（活動名稱下方「負責人」）；② 目標卡 → 鉛筆 →「依通路」，填 <medium> <n>、<medium> <n>…（總目標自動加總）。每個通路會有自己的進度條，並標出「照時間應該到哪裡」。
 
 ## 3. 每個階段看什麼、在哪看
 | 時間 | 要回答的問題 | 去哪看 |

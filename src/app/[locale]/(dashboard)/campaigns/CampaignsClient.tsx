@@ -38,6 +38,14 @@ import { SyncButton } from "@/components/layout/SyncButton";
 import { formatRelativeTime } from "@/lib/utils/format";
 import { storedDateToDay, type CampaignPhase } from "@/lib/campaign-period";
 import { goalPaceFraction } from "@/lib/campaign-goal";
+import { useSession } from "next-auth/react";
+import {
+  OwnerAvatar,
+  OwnerBadge,
+  ownerLabel,
+  useWorkspaceMembers,
+  type OwnerInfo,
+} from "@/components/campaigns/CampaignOwner";
 
 interface CampaignRow {
   id: string | null;
@@ -57,6 +65,7 @@ interface CampaignRow {
   endDate: string | null;
   phase: CampaignPhase;
   periodClicks: number;
+  owner: OwnerInfo | null;
   lastClickAt: string | null;
   sparkline: number[];
   trendState: TrendState;
@@ -127,6 +136,21 @@ export default function CampaignsClient() {
   // campaign page (it defaults to the same window).
   const [window, setWindow] = useState<string>("period");
   const [nowMs] = useState(() => Date.now());
+  // Owner filter: "" = everyone, "__me__", "__none__" (unassigned) or a user id.
+  const [ownerFilter, setOwnerFilter] = useState<string>("");
+  const { data: session } = useSession();
+  const myId = session?.user?.id;
+  const { data: members } = useWorkspaceMembers();
+  const ownerMatches = useCallback(
+    (c: CampaignRow) => {
+      if (!ownerFilter) return true;
+      const id = c.owner?.id ?? null;
+      if (ownerFilter === "__none__") return id === null;
+      if (ownerFilter === "__me__") return Boolean(myId) && id === myId;
+      return id === ownerFilter;
+    },
+    [ownerFilter, myId],
+  );
   const isPeriod = window === "period";
   const shownClicks = useCallback(
     (c: CampaignRow) => (isPeriod ? (c.periodClicks ?? c.clicks) : c.clicks),
@@ -182,8 +206,9 @@ export default function CampaignsClient() {
       } else {
         if (phase === "archived") return false;
       }
+      if (!ownerMatches(c)) return false;
       if (q) {
-        const hay = [c.name, c.displayName, c.description]
+        const hay = [c.name, c.displayName, c.description, c.owner?.name]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -196,7 +221,46 @@ export default function CampaignsClient() {
       if (sortKey === "goalPct") return (b.goalPct ?? -1) - (a.goalPct ?? -1);
       return shownClicks(b) - shownClicks(a);
     });
-  }, [data, searchQuery, statusFilter, sortKey, shownClicks]);
+  }, [data, searchQuery, statusFilter, sortKey, shownClicks, ownerMatches]);
+
+  // KPI per owner. Deliberately counts campaigns (running / reached goal /
+  // behind pace), never sums clicks across campaigns — an EDM campaign and
+  // a booth-QR campaign differ by 100× and a sum would just rank channels.
+  const ownerSummary = useMemo(() => {
+    if (!data) return [];
+    const groups = new Map<
+      string,
+      { owner: OwnerInfo | null; total: number; running: number; withGoal: number; reached: number; behind: number }
+    >();
+    for (const c of data.campaigns) {
+      if (c.phase === "archived" || !c.id) continue;
+      const key = c.owner?.id ?? "__none__";
+      const g =
+        groups.get(key) ??
+        { owner: c.owner ?? null, total: 0, running: 0, withGoal: 0, reached: 0, behind: 0 };
+      g.total++;
+      if ((c.phase ?? "running") === "running") g.running++;
+      if (c.goalClicks && c.goalPct !== null) {
+        g.withGoal++;
+        if (c.goalPct >= 100) g.reached++;
+        else {
+          const pace = c.phase === "running" ? goalPaceFraction(c, nowMs) : null;
+          if (pace !== null && c.goalPct < pace * 100) g.behind++;
+        }
+      }
+      groups.set(key, g);
+    }
+    // Me first, then by name; unassigned last.
+    return [...groups.entries()]
+      .sort(([ka, a], [kb, b]) => {
+        if (ka === "__none__") return 1;
+        if (kb === "__none__") return -1;
+        if (ka === myId) return -1;
+        if (kb === myId) return 1;
+        return ownerLabel(a.owner!).localeCompare(ownerLabel(b.owner!));
+      })
+      .map(([key, g]) => ({ key, ...g }));
+  }, [data, nowMs, myId]);
 
   const totals = useMemo(() => {
     if (!data) return { clicks: 0, withGoal: 0, visible: 0, active: 0, upcoming: 0, ended: 0, archived: 0 };
@@ -357,6 +421,52 @@ export default function CampaignsClient() {
         </div>
       </div>
 
+      {/* Owner summary — campaign KPIs per person. Click to filter. */}
+      {ownerSummary.length > 0 && (
+        <div className="owner-cards">
+          {ownerSummary.map((g) => {
+            const filterKey = g.key === "__none__" ? "__none__" : g.key;
+            const active = ownerFilter === filterKey || (ownerFilter === "__me__" && g.key === myId);
+            return (
+              <button
+                key={g.key}
+                type="button"
+                className={`owner-card ${active ? "active" : ""}`}
+                onClick={() => setOwnerFilter(active ? "" : filterKey)}
+                aria-pressed={active}
+              >
+                <div className="owner-card-head">
+                  {g.owner ? (
+                    <>
+                      <OwnerAvatar owner={g.owner} size={22} />
+                      <span className="owner-name">
+                        {ownerLabel(g.owner)}
+                        {g.key === myId && <span className="muted"> {t("ownerMe")}</span>}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="owner-unassigned">{t("ownerUnassigned")}</span>
+                  )}
+                </div>
+                <div className="owner-card-stats">
+                  <span>{t("ownerCardRunning", { n: g.running, total: g.total })}</span>
+                  {g.withGoal > 0 ? (
+                    <>
+                      <span>{t("ownerCardReached", { n: g.reached, total: g.withGoal })}</span>
+                      {g.behind > 0 && (
+                        <span style={{ color: "var(--warn-fg)" }}>{t("ownerCardBehind", { n: g.behind })}</span>
+                      )}
+                    </>
+                  ) : (
+                    g.owner && <span className="muted">{t("ownerCardNoGoal")}</span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="toolbar">
         <div className="segmented">
@@ -389,6 +499,22 @@ export default function CampaignsClient() {
             </button>
           )}
         </div>
+        <select
+          className={`input ${ownerFilter ? "filter-active" : ""}`}
+          style={{ height: 32, width: "auto", minWidth: 150 }}
+          value={ownerFilter}
+          onChange={(e) => setOwnerFilter(e.target.value)}
+          aria-label={t("colOwner")}
+        >
+          <option value="">{t("ownerFilterAll")}</option>
+          {myId && <option value="__me__">{t("ownerFilterMine")}</option>}
+          <option value="__none__">{t("ownerUnassigned")}</option>
+          {(members ?? []).map((m) => (
+            <option key={m.id} value={m.id}>
+              {ownerLabel(m)}
+            </option>
+          ))}
+        </select>
         <div style={{ flex: 1 }} />
         <div className="chip-row">
           {[
@@ -479,7 +605,7 @@ export default function CampaignsClient() {
           </div>
         ) : campaigns.length === 0 ? (
           <div style={{ padding: 48, textAlign: "center", fontSize: 13, color: "var(--ink-500)" }}>
-            {searchQuery || statusFilter
+            {searchQuery || statusFilter || ownerFilter
               ? t("noCampaignsMatch")
               : t("noCampaignsYet")}
           </div>
@@ -490,6 +616,7 @@ export default function CampaignsClient() {
               <tr>
                 <th style={{ width: 36 }}></th>
                 <th>{t("title")}</th>
+                <th style={{ width: 150 }}>{t("colOwner")}</th>
                 <th style={{ width: 110 }}>{t("colStatus")}</th>
                 <th className="num" style={{ width: 70 }}>{t("colLinks")}</th>
                 <th className="num" style={{ width: 180 }}>{t("colClicks")}</th>
@@ -540,6 +667,7 @@ export default function CampaignsClient() {
                         )}
                       </div>
                     </td>
+                    <td>{c.id ? <OwnerBadge owner={c.owner ?? null} /> : <span className="muted">—</span>}</td>
                     <td>
                       {c.id ? (
                         <span className={`badge ${PHASE_BADGE[c.phase ?? "running"]}`}>

@@ -22,6 +22,7 @@ interface ScopeDescriptor {
   shortLinkTitle: string | null;
   shortLinkCreatedAt: string | null;
   campaignName: string | null;
+  ownerName?: string | null;
   rangeWindow: string | null;
 }
 
@@ -64,7 +65,7 @@ const STR = {
     medium: "媒介 (Medium)", source: "來源 (Source)", topLinks: "連結排行", link: "連結", clicks: "點擊",
     devices: "裝置", browsers: "瀏覽器", countries: "國家", noData: "沒有資料",
     pwTitle: "需要密碼", pwDesc: "請輸入密碼查看這份報告", pwPlaceholder: "輸入密碼", verifying: "驗證中…", view: "查看報告",
-    loadFail: "無法載入報告", realOnly: "僅計算真實流量，不含內部測試點擊", lang: "EN",
+    loadFail: "無法載入報告", realOnly: "僅計算真實流量，不含內部測試點擊與疑似郵件掃描點擊", owner: (n: string) => `負責人：${n}`, lang: "EN",
   },
   en: {
     shared: "Shared report", linkReport: "Link performance", campaignReport: "Campaign performance", workspaceReport: "Overall performance",
@@ -73,7 +74,7 @@ const STR = {
     medium: "Medium", source: "Source", topLinks: "Top links", link: "Link", clicks: "Clicks",
     devices: "Devices", browsers: "Browsers", countries: "Countries", noData: "No data",
     pwTitle: "Password protected", pwDesc: "Enter the password to view this report", pwPlaceholder: "Password", verifying: "Verifying…", view: "View report",
-    loadFail: "Unable to load report", realOnly: "Real traffic only — internal test clicks excluded", lang: "中文",
+    loadFail: "Unable to load report", realOnly: "Real traffic only — internal test clicks and suspected email-scanner clicks excluded", owner: (n: string) => `Owner: ${n}`, lang: "中文",
   },
 };
 type Lang = keyof typeof STR;
@@ -92,7 +93,10 @@ function describeScope(s: (typeof STR)[Lang], scope?: ScopeDescriptor, fallback?
     return { title: scope.shortLinkTitle || `/${scope.shortLinkCode ?? ""}`, subtitle: `${s.linkReport} · ${period}` };
   }
   if (scope.type === "campaign") {
-    return { title: scope.campaignName ?? s.campaignReport, subtitle: `${s.campaignReport} · ${period}` };
+    return {
+      title: scope.campaignName ?? s.campaignReport,
+      subtitle: `${s.campaignReport} · ${period}${scope.ownerName ? ` · ${s.owner(scope.ownerName)}` : ""}`,
+    };
   }
   return { title: s.workspaceReport, subtitle: period };
 }

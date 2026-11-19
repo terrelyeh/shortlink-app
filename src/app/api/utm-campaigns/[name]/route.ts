@@ -26,6 +26,8 @@ const patchSchema = z
     // Whole days in Taiwan time ("2027-01-05"), inclusive. null clears.
     startDate: z.string().regex(DAY_RE).nullable().optional(),
     endDate: z.string().regex(DAY_RE).nullable().optional(),
+    // KPI owner — must be a member of this workspace. null unassigns.
+    ownerId: z.string().min(1).max(64).nullable().optional(),
     // Only archive / unarchive is user-facing; other phases follow the dates.
     status: z.enum(["ACTIVE", "ARCHIVED"]).optional(),
   })
@@ -64,6 +66,8 @@ export async function GET(
         description: true,
         goalClicks: true,
         goalByMedium: true,
+        ownerId: true,
+        owner: { select: { id: true, name: true, email: true, image: true } },
         startDate: true,
         endDate: true,
         status: true,
@@ -248,6 +252,7 @@ export async function PATCH(
       startDate?: Date | null;
       endDate?: Date | null;
       status?: "ACTIVE" | "ARCHIVED";
+      ownerId?: string | null;
     } = {};
     if (parsed.goalByMedium) {
       data.goalByMedium = parsed.goalByMedium;
@@ -265,6 +270,21 @@ export async function PATCH(
       data.endDate = parsed.endDate ? dayToStoredDate(parsed.endDate) : null;
     }
     if (parsed.status !== undefined) data.status = parsed.status;
+    if (parsed.ownerId !== undefined) {
+      if (parsed.ownerId) {
+        // Only people in this workspace can own its campaigns.
+        const ok = workspaceId
+          ? await prisma.workspaceMember.findUnique({
+              where: { workspaceId_userId: { workspaceId, userId: parsed.ownerId } },
+              select: { userId: true },
+            })
+          : parsed.ownerId === session.user.id;
+        if (!ok) {
+          return NextResponse.json({ error: "Owner must be a member of this workspace" }, { status: 400 });
+        }
+      }
+      data.ownerId = parsed.ownerId;
+    }
 
     // Find or create Campaign record
     let campaign = await prisma.campaign.findFirst({
@@ -308,7 +328,12 @@ export async function PATCH(
 
     // Period and archive changes affect what everyone sees — log them.
     // (Goal edits never were logged; kept that way.)
-    if (data.startDate !== undefined || data.endDate !== undefined || data.status !== undefined) {
+    if (
+      data.startDate !== undefined ||
+      data.endDate !== undefined ||
+      data.status !== undefined ||
+      data.ownerId !== undefined
+    ) {
       await prisma.auditLog.create({
         data: {
           userId: session.user.id,
@@ -323,6 +348,7 @@ export async function PATCH(
       success: true,
       goalClicks: campaign.goalClicks,
       goalByMedium: campaign.goalByMedium,
+      ownerId: campaign.ownerId,
       startDate: campaign.startDate,
       endDate: campaign.endDate,
       status: campaign.status,

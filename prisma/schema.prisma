@@ -38,6 +38,7 @@ model User {
   workspaceMembers    WorkspaceMember[]
   sentInvitations     WorkspaceInvitation[] @relation("InvitedBy")
   auditLogs           AuditLog[]
+  ownedCampaigns      Campaign[]            @relation("CampaignOwner")
 
   @@map("users")
 }
@@ -437,11 +438,15 @@ model Campaign {
   // Metadata (optional for migration)
   workspaceId String?  @map("workspace_id")
   createdById String?  @map("created_by_id") // User who created the campaign
+  // Person accountable for the campaign's results (KPI owner). Set
+  // explicitly — the creator is often just whoever made the first link.
+  ownerId     String?  @map("owner_id")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
   workspace Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner     User?           @relation("CampaignOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   links     ShortLink[]
   tags      TagOnCampaign[]
 
@@ -454,6 +459,7 @@ model Campaign {
   @@unique([workspaceId, name])
   @@index([workspaceId])
   @@index([status])
+  @@index([ownerId])
   @@map("campaigns")
 }
 

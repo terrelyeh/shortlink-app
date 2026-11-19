@@ -67,6 +67,8 @@
 
 24. **依通路的點擊目標** — `Campaign.goalByMedium`（Json，`{ "<utm_medium>": clicks }`，可為空）；有設時 API 會讓 `goalClicks` = 加總，所以活動列表 / 比較頁照舊只讀 `goalClicks`。只存總數或清除目標時 API 會把 `goalByMedium` 設回 DbNull，避免拆分跟總數對不上。進度參考線（`lib/campaign-goal.ts` 的 `goalPaceFraction`）= 活動期間已經過的比例 × 目標，只在「進行中且有開始與結束日」時顯示；第一版是線性。目標卡在 `components/campaigns/CampaignGoalCard.tsx`。活動規劃 skill 的 `plan-template.md` 目標表也改成依 utm_medium 一列
 
+25. **活動負責人** — `Campaign.ownerId`（FK → users，`onDelete: SetNull`，有 `@@index`）是**明確指派**的 KPI 負責人，不要拿 `createdById` 代替（活動多半是第一條連結自動建出來的）。指派走 `PATCH /api/utm-campaigns/[name]` 的 `ownerId`，API 會檢查對方是該 workspace 成員，並寫進稽核紀錄。成員清單用 `components/campaigns/CampaignOwner.tsx` 的 `useWorkspaceMembers()`——它跟 設定 → 成員 **共用 query key `["workspace-members", wsId]` 與快取形狀 `{ members }`**，只用 `select` 轉換，不要改成存陣列。活動列表的負責人摘要卡**刻意不加總點擊**（不同活動量級差百倍），只算進行中 / 達標 / 落後進度幾檔。公開分享報告只露出負責人名字
+
 ## Conventions
 
 ### Server / Client split 命名
