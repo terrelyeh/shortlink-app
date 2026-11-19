@@ -1495,27 +1495,30 @@ export default function CampaignDetailPage() {
             </div>
           ) : (
             <div className="table-scroll">
-            <table className="data" style={{ tableLayout: "fixed", minWidth: 1080 }}>
+            {/* Fixed layout: every column except 連結 has a set width (including
+                its padding) and 連結 takes the rest, so the title / destination
+                can use the whole column instead of leaving it half empty. */}
+            <table className="data campaign-links-table" style={{ tableLayout: "fixed", minWidth: 1120 }}>
               <thead>
                 <tr>
-                  <th style={{ width: 28 }}></th>
+                  <th style={{ width: 44 }}></th>
                   <th>{t("colLink")}</th>
-                  <th style={{ width: 210, whiteSpace: "normal", lineHeight: 1.3 }}>{t("colSourceMediumContent")}</th>
-                  <th style={{ width: 96 }}>{tCampaigns("colStatus")}</th>
-                  <th className="num" style={{ width: 72 }}>
+                  <th style={{ width: 236, whiteSpace: "normal", lineHeight: 1.3 }}>{t("colSourceMediumContent")}</th>
+                  <th style={{ width: 100 }}>{tCampaigns("colStatus")}</th>
+                  <th className="num" style={{ width: 80 }}>
                     {tCampaigns("colClicks")}
                   </th>
-                  <th className="num" style={{ width: 64 }} title={t("colUniqueTooltip")}>
+                  <th className="num" style={{ width: 76 }} title={t("colUniqueTooltip")}>
                     {t("colUnique")}
                   </th>
-                  <th className="num" style={{ width: 60 }} title={t("colShareTooltip")}>
+                  <th className="num" style={{ width: 72 }} title={t("colShareTooltip")}>
                     {t("colShare")}
                   </th>
-                  <th style={{ width: 124 }} title={t("colLifetimeTooltip")}>
+                  <th style={{ width: 160 }} title={t("colLifetimeTooltip")}>
                     {t("colLifetime")}
                   </th>
-                  <th style={{ width: 88 }}>{t("colLastClick")}</th>
-                  <th style={{ width: 56 }}></th>
+                  <th style={{ width: 100 }}>{t("colLastClick")}</th>
+                  <th style={{ width: 92 }}>{tCommon("actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1564,7 +1567,7 @@ export default function CampaignDetailPage() {
                               fontSize: 13.5,
                               fontWeight: 500,
                               color: "var(--ink-100)",
-                              maxWidth: 230,
+                              maxWidth: "100%",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
                               whiteSpace: "nowrap",
@@ -1645,7 +1648,7 @@ export default function CampaignDetailPage() {
                       <td>
                         {m && m.peak ? (
                           <div className="lifetime-cell">
-                            <MiniSpark values={m.lifetime} max={perLinkMetrics.sparkMax} width={100} height={22} />
+                            <MiniSpark values={m.lifetime} max={perLinkMetrics.sparkMax} width={132} height={22} />
                             <span>
                               {t("peakDay", {
                                 date: `${m.peak.date.slice(0, 4) === String(new Date().getFullYear()) ? "" : `${m.peak.date.slice(0, 4)}/`}${Number(m.peak.date.slice(5, 7))}/${Number(m.peak.date.slice(8, 10))}`,
@@ -1670,22 +1673,22 @@ export default function CampaignDetailPage() {
                         )}
                       </td>
                       <td onClick={(e) => e.stopPropagation()}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div className="row-actions">
                           <Link
                             href={`/links/${link.id}?returnTo=${encodeURIComponent(campaignReturnTo(campaignName))}`}
                             title={t("actionEditSettings")}
-                            style={{ color: "var(--ink-500)", display: "inline-flex" }}
+                            aria-label={t("actionEditSettings")}
                           >
-                            <Settings2 size={13} />
+                            <Settings2 size={14} />
                           </Link>
                           <a
                             href={shortUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             title={t("actionOpenShortUrl")}
-                            style={{ color: "var(--ink-500)", display: "inline-flex" }}
+                            aria-label={t("actionOpenShortUrl")}
                           >
-                            <ExternalLink size={12} />
+                            <ExternalLink size={14} />
                           </a>
                         </div>
                       </td>
