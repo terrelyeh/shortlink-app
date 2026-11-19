@@ -65,6 +65,8 @@
 
 23. **活動頁下鑽** — 流量分頁的每個清單（source / medium / content / 連結 / 國家 / 來源網站）都是篩選器，走 `computeAnalytics` 的 `source/medium/content`（連結層）與 `country/referrer`（點擊層）；`linkId` 也必須符合 campaign / tag 範圍（`/analytics` 選連結時會自動拿掉不符的篩選）。來源網站依網站合併在 `lib/analytics/referrer.ts`（品牌族群表、`android-app://` 套件名、共用網域如 `github.io` 保留子網域），`NO_REFERRER` 代表無 referrer。連結分頁點一列就地展開 `CampaignLinkDetail`；從活動頁編輯連結帶 `?returnTo=/campaigns/<name>`（編輯頁只接受這個格式，存檔後回到連結**目前**所屬的活動）。比較頁「對齊開始日」以日期差算第 0 天（開始日前為負天數），時間軸是 UTC 日、開始日是台灣日，差 8 小時屬已知近似
 
+24. **依通路的點擊目標** — `Campaign.goalByMedium`（Json，`{ "<utm_medium>": clicks }`，可為空）；有設時 API 會讓 `goalClicks` = 加總，所以活動列表 / 比較頁照舊只讀 `goalClicks`。只存總數或清除目標時 API 會把 `goalByMedium` 設回 DbNull，避免拆分跟總數對不上。進度參考線（`lib/campaign-goal.ts` 的 `goalPaceFraction`）= 活動期間已經過的比例 × 目標，只在「進行中且有開始與結束日」時顯示；第一版是線性。目標卡在 `components/campaigns/CampaignGoalCard.tsx`。活動規劃 skill 的 `plan-template.md` 目標表也改成依 utm_medium 一列
+
 ## Conventions
 
 ### Server / Client split 命名

@@ -426,6 +426,9 @@ model Campaign {
 
   // KPI goal tracking
   goalClicks  Int?           @map("goal_clicks")
+  // Optional per-channel split of the goal: { "<utm_medium>": clicks }.
+  // When set, goalClicks is kept equal to the sum (so the list keeps working).
+  goalByMedium Json?         @map("goal_by_medium")
 
   // Default UTM values for links in this campaign
   defaultSource String?      @map("default_source")

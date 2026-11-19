@@ -5,12 +5,24 @@ import { prisma } from "@/lib/prisma";
 import { resolveWorkspaceScope } from "@/lib/workspace";
 import { z } from "zod";
 import { DAY_RE, dayToStoredDate } from "@/lib/campaign-period";
+import { MAX_GOAL_CHANNELS, sumGoal } from "@/lib/campaign-goal";
+import { Prisma } from "@prisma/client";
 
 // Every field is optional so the goal editor, the period editor and the
 // archive button can each send only what they change.
 const patchSchema = z
   .object({
     goalClicks: z.number().int().min(1).nullable().optional(),
+    // Per-channel split, keyed by utm_medium. When given, goalClicks is
+    // set to its sum; null removes the split (total-only goal).
+    goalByMedium: z
+      .record(z.string().min(1).max(64), z.number().int().min(1))
+      .refine((m) => {
+        const n = Object.keys(m).length;
+        return n > 0 && n <= MAX_GOAL_CHANNELS;
+      }, "goalByMedium needs 1–20 channels")
+      .nullable()
+      .optional(),
     // Whole days in Taiwan time ("2027-01-05"), inclusive. null clears.
     startDate: z.string().regex(DAY_RE).nullable().optional(),
     endDate: z.string().regex(DAY_RE).nullable().optional(),
@@ -51,6 +63,7 @@ export async function GET(
         displayName: true,
         description: true,
         goalClicks: true,
+        goalByMedium: true,
         startDate: true,
         endDate: true,
         status: true,
@@ -231,11 +244,20 @@ export async function PATCH(
     const parsed = patchSchema.parse(body);
     const data: {
       goalClicks?: number | null;
+      goalByMedium?: Prisma.InputJsonValue | typeof Prisma.DbNull;
       startDate?: Date | null;
       endDate?: Date | null;
       status?: "ACTIVE" | "ARCHIVED";
     } = {};
-    if (parsed.goalClicks !== undefined) data.goalClicks = parsed.goalClicks;
+    if (parsed.goalByMedium) {
+      data.goalByMedium = parsed.goalByMedium;
+      data.goalClicks = sumGoal(parsed.goalByMedium);
+    } else if (parsed.goalByMedium === null || parsed.goalClicks !== undefined) {
+      // Explicitly removed, or a total-only goal was saved / cleared —
+      // a stale split must not survive next to a different total.
+      data.goalByMedium = Prisma.DbNull;
+      if (parsed.goalClicks !== undefined) data.goalClicks = parsed.goalClicks;
+    }
     if (parsed.startDate !== undefined) {
       data.startDate = parsed.startDate ? dayToStoredDate(parsed.startDate) : null;
     }
@@ -300,6 +322,7 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       goalClicks: campaign.goalClicks,
+      goalByMedium: campaign.goalByMedium,
       startDate: campaign.startDate,
       endDate: campaign.endDate,
       status: campaign.status,
