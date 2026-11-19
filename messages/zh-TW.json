@@ -859,7 +859,11 @@
       "goalPaceLegend": "灰色直線 = 照時間平均分配，今天應該到的位置",
       "goalPaceHint": "設定活動期間的開始日與結束日，就會出現進度參考線（今天應該到哪裡）。",
       "goalUnassigned": "未設目標的通路（點擊仍算進總數）：{list}",
-      "goalTotalLabel": "總計"
+      "goalTotalLabel": "總計",
+      "ownerLabel": "負責人",
+      "ownerChange": "變更負責人",
+      "ownerSaved": "負責人已更新",
+      "ownerCleared": "已取消指派負責人"
     },
     "allTime": "全部期間",
     "clicksAllTime": "點擊數（全部期間）",
@@ -871,7 +875,16 @@
     "clicksIn": "點擊數（{window}）",
     "periodOngoing": "持續中",
     "goalBasisTooltip": "目標進度一律以活動期間計算（沒設期間就是全部期間），不受上方期間切換影響",
-    "goalPaceTooltip": "照進度今天應達 {pct}%（灰色直線）"
+    "goalPaceTooltip": "照進度今天應達 {pct}%（灰色直線）",
+    "ownerUnassigned": "未指派",
+    "colOwner": "負責人",
+    "ownerFilterAll": "所有負責人",
+    "ownerFilterMine": "我的活動",
+    "ownerMe": "（我）",
+    "ownerCardRunning": "進行中 {n} 檔 · 共 {total} 檔",
+    "ownerCardReached": "達標 {n} / {total}",
+    "ownerCardBehind": "落後進度 {n} 檔",
+    "ownerCardNoGoal": "還沒有設目標"
   },
   "compare": {
     "title": "比較 {n} 個活動",

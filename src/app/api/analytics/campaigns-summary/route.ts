@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     // so v3 cached payloads (which mixed test clicks into the totals)
     // don't haunt the leaderboard for up to 60s.
     const key = cacheKey(
-      "campaigns-summary-v7",
+      "campaigns-summary-v8",
       session.user.id,
       scope.workspaceId ?? "_",
       days,
@@ -101,6 +101,7 @@ export async function GET(request: NextRequest) {
               defaultMedium: true,
               startDate: true,
               endDate: true,
+              owner: { select: { id: true, name: true, email: true, image: true } },
             },
           },
           clickCount: true,
@@ -269,6 +270,7 @@ export async function GET(request: NextRequest) {
         hasActiveLink: boolean;
         startDate: Date | null;
         endDate: Date | null;
+        owner: { id: string; name: string | null; email: string; image: string | null } | null;
         // Clicks inside the campaign's own period (all time if unset) —
         // independent of the `days` window. Goal progress uses this.
         periodClicks: number;
@@ -295,6 +297,7 @@ export async function GET(request: NextRequest) {
             defaultMedium: cRow?.defaultMedium ?? null,
             startDate: cRow?.startDate ?? null,
             endDate: cRow?.endDate ?? null,
+            owner: cRow?.owner ?? null,
             periodClicks: 0,
             linkCount: 0,
             clicks: 0,
@@ -344,6 +347,7 @@ export async function GET(request: NextRequest) {
           startDate: b.startDate?.toISOString() ?? null,
           endDate: b.endDate?.toISOString() ?? null,
           phase: campaignPhase(b),
+          owner: b.owner,
           periodClicks: b.periodClicks,
           // Goal progress always uses the campaign period (all time when
           // no dates are set) — the same denominator as the campaign page,

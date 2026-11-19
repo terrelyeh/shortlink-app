@@ -167,6 +167,18 @@ export async function POST(
       .map(([date, count]) => ({ date, clicks: count }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
+    // Campaign reports name the campaign's owner (name only — the report
+    // is public, so no email / avatar).
+    const ownerName =
+      shareToken.campaignName && shareToken.workspaceId
+        ? (
+            await prisma.campaign.findFirst({
+              where: { name: shareToken.campaignName, workspaceId: shareToken.workspaceId },
+              select: { owner: { select: { name: true } } },
+            })
+          )?.owner?.name ?? null
+        : null;
+
     // Build a scope descriptor so the client can render the right
     // title ("This link" vs "Campaign X" vs "Last 30 days").
     const scope = {
@@ -179,6 +191,7 @@ export async function POST(
       shortLinkTitle: shareToken.shortLink?.title ?? null,
       shortLinkCreatedAt: shareToken.shortLink?.createdAt ?? null,
       campaignName: shareToken.campaignName,
+      ownerName,
       rangeWindow: shareToken.rangeWindow,
     } as const;
 

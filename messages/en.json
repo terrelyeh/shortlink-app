@@ -859,7 +859,11 @@
       "goalPaceLegend": "Grey line = where an even pace over the campaign period would be today",
       "goalPaceHint": "Set the campaign's start and end dates to get a pace line (where you should be today).",
       "goalUnassigned": "Channels without a goal (still counted in the total): {list}",
-      "goalTotalLabel": "Total"
+      "goalTotalLabel": "Total",
+      "ownerLabel": "Owner",
+      "ownerChange": "Change owner",
+      "ownerSaved": "Owner updated",
+      "ownerCleared": "Owner removed"
     },
     "allTime": "All time",
     "clicksAllTime": "Clicks (all time)",
@@ -871,7 +875,16 @@
     "clicksIn": "Clicks ({window})",
     "periodOngoing": "ongoing",
     "goalBasisTooltip": "Goal progress always counts the campaign period (all time if none is set), regardless of the window selected above",
-    "goalPaceTooltip": "Even pace would be {pct}% today (grey line)"
+    "goalPaceTooltip": "Even pace would be {pct}% today (grey line)",
+    "ownerUnassigned": "Unassigned",
+    "colOwner": "Owner",
+    "ownerFilterAll": "All owners",
+    "ownerFilterMine": "My campaigns",
+    "ownerMe": "(me)",
+    "ownerCardRunning": "{n} running · {total} total",
+    "ownerCardReached": "{n} / {total} reached goal",
+    "ownerCardBehind": "{n} behind pace",
+    "ownerCardNoGoal": "No goals set yet"
   },
   "compare": {
     "title": "Compare {n} campaigns",
