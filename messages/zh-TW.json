@@ -881,9 +881,9 @@
     "me": "（我）",
     "ownerHint": "這檔活動的成效算在誰的 KPI 上。",
     "landingLabel": "主要目的網址",
-    "urlInvalid": "網址要以 https:// 開頭。",
+    "urlInvalid": "網址要以 http:// 或 https:// 開頭。",
     "pagePending": "活動頁還沒上線",
-    "pagePendingHint": "先填官網首頁也沒關係，這些連結會加上「待換活動頁」標籤，等頁面上線後在連結列表篩選出來一次改好，短網址不會變。",
+    "pagePendingHint": "先填官網首頁也沒關係，這些連結會加上「{tag}」標籤，等頁面上線後在連結列表篩選出來一次改好，短網址不會變。",
     "pagePendingTag": "待換活動頁",
     "phase": {
       "pre": "展前宣傳",
@@ -934,7 +934,7 @@
     "qrGoesTo": "這個 QR 導去",
     "willCreate": "將建立 {n} 條連結",
     "goalPieces": "{n} 則",
-    "goalRef": "參考：過去每則平均 {avg} 次 × {n} 則 ≈ {sug}",
+    "goalRef": "參考：過去 {links} 條同通路連結平均每則 {avg} 次 × {n} 則 ≈ {sug}",
     "goalNoRef": "過去沒有這個通路的資料",
     "useSuggestions": "全部套用參考值",
     "goalTotal": "總目標 {n}",
@@ -971,6 +971,21 @@
     "startOver": "再建一個活動",
     "settingsSaveFailed": "連結已建立，但活動期間 / 負責人 / 目標沒有存成功，請到活動頁再設定一次。",
     "goalRefLoading": "計算參考值中…",
-    "rowsNeedFix": "還有 {n} 條需要修正（紅框處）才能建立。"
+    "rowsNeedFix": "還有 {n} 條需要修正（紅框處）才能建立。",
+    "lockedAfterCreate": "已經建立了部分連結，活動名稱不能再改（避免剩下的連結建到另一個活動）。",
+    "nameNeedsLatin": "名稱只有中文或太短時無法自動產生追蹤名稱，請按「修改」填英文，例如 ise_2027。",
+    "ownerUnassigned": "未指派",
+    "createdThisRun": "已建立",
+    "totalOnlyWarning": "這個活動目前設的是總目標 {n}。在這裡填通路目標，會改成依通路計算（總目標 = 各通路加總）；不填就維持原本的總目標。",
+    "goalRefExisting": "參考：目前目標 {cur} + 新增 {n} 則 × 過去平均 {avg}（{links} 條）≈ {sug}",
+    "goalRefNote": "參考值只是起點：它平均了過去所有活動的同通路連結，不分活動類型。",
+    "prefixLabel": "短碼前綴",
+    "contentDuplicate": "跟這次的另一列重複，報表會分不出來",
+    "contentExists": "活動裡已經有同樣的通路 + 內容",
+    "codeChecking": "檢查中…",
+    "failedRow": "{title}：{error}",
+    "errNoResult": "沒有收到結果",
+    "errHttp": "伺服器回應錯誤（{status}）",
+    "doneSubLinksOnly": "連結都建好了。活動 {campaign} 的期間、負責人或目標沒有變更。"
   }
 }

@@ -26,6 +26,8 @@ const patchSchema = z
     // Whole days in Taiwan time ("2027-01-05"), inclusive. null clears.
     startDate: z.string().regex(DAY_RE).nullable().optional(),
     endDate: z.string().regex(DAY_RE).nullable().optional(),
+    // Human-readable name shown in lists ("ISE 2027"); null clears.
+    displayName: z.string().trim().max(100).nullable().optional(),
     // KPI owner — must be a member of this workspace. null unassigns.
     ownerId: z.string().min(1).max(64).nullable().optional(),
     // Only archive / unarchive is user-facing; other phases follow the dates.
@@ -253,6 +255,7 @@ export async function PATCH(
       endDate?: Date | null;
       status?: "ACTIVE" | "ARCHIVED";
       ownerId?: string | null;
+      displayName?: string | null;
     } = {};
     if (parsed.goalByMedium) {
       data.goalByMedium = parsed.goalByMedium;
@@ -270,6 +273,7 @@ export async function PATCH(
       data.endDate = parsed.endDate ? dayToStoredDate(parsed.endDate) : null;
     }
     if (parsed.status !== undefined) data.status = parsed.status;
+    if (parsed.displayName !== undefined) data.displayName = parsed.displayName || null;
     if (parsed.ownerId !== undefined) {
       if (parsed.ownerId) {
         // Only people in this workspace can own its campaigns.

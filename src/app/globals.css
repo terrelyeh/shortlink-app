@@ -1139,7 +1139,7 @@ table.data.campaign-links-table tbody td { padding-left: 12px; padding-right: 12
   height: 26px;
   border-radius: 50%;
   border: 2px solid var(--border);
-  background: #fff;
+  background: var(--bg-card);
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -1167,7 +1167,7 @@ table.data.campaign-links-table tbody td { padding-left: 12px; padding-right: 12
   justify-items: start;
   padding: 20px;
   text-align: left;
-  background: #fff;
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 14px;
   cursor: pointer;
@@ -1192,7 +1192,7 @@ table.data.campaign-links-table tbody td { padding-left: 12px; padding-right: 12
 .ks-field-row .ks-field { margin-bottom: 0; }
 .ks-derived { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-400); }
 .ks-derived code { font-family: var(--font-mono); font-size: 13px; color: var(--ink-100); background: var(--bg-subtle); padding: 2px 8px; border-radius: 6px; }
-.ks-check { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: #fff; cursor: pointer; font-size: 13.5px; color: var(--ink-200); }
+.ks-check { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-card); cursor: pointer; font-size: 13.5px; color: var(--ink-200); }
 .ks-check input { margin-top: 3px; }
 
 .ks-phase { margin-bottom: 18px; }
@@ -1207,9 +1207,9 @@ table.data.campaign-links-table tbody td { padding-left: 12px; padding-right: 12
   margin-bottom: 6px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--bg-card);
 }
-.ks-row.on { border-color: #BAE6FD; background: #F8FCFF; }
+.ks-row.on { border-color: var(--brand-100); background: var(--brand-50); }
 .ks-row-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; cursor: pointer; font-size: 14px; color: var(--ink-200); min-width: 0; }
 .ks-row-label { font-weight: 500; color: var(--ink-100); }
 .ks-row-tools { display: flex; justify-content: flex-end; }
@@ -1227,18 +1227,18 @@ table.data.campaign-links-table tbody td { padding-left: 12px; padding-right: 12
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--bg-card);
 }
 .ks-goal .pill { justify-self: start; }
 .ks-goal .input { height: 36px; }
 .ks-goal-n { font-size: 12.5px; }
 .ks-goal-ref { margin: 0; }
 
-.ks-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 0 0 18px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.ks-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 0 0 18px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); }
 .ks-summary dt { font-size: 12px; color: var(--ink-500); margin-bottom: 2px; }
 .ks-summary dd { margin: 0; font-size: 13.5px; color: var(--ink-100); font-variant-numeric: tabular-nums; }
 .ks-summary code { font-family: var(--font-mono); }
-.ks-review-table { border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.ks-review-table { border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); }
 .ks-review-table table.data thead th, .ks-review-table table.data tbody td { padding: 10px 10px; vertical-align: top; }
 .ks-cell { height: 32px; width: 100%; font-size: 13px; }
 .ks-cell-bad { border-color: var(--err-fg) !important; }
@@ -1261,7 +1261,7 @@ table.data.campaign-links-table tbody td { padding-left: 12px; padding-right: 12
 
 .ks-done { display: grid; justify-items: center; gap: 6px; text-align: center; margin: 24px 0 24px; }
 .ks-done h1 { font-size: 26px; font-weight: 600; margin: 6px 0 0; color: var(--ink-100); }
-.ks-card { padding: 16px 18px; margin-bottom: 14px; border: 1px solid var(--border); border-radius: 12px; background: #fff; font-size: 13.5px; }
+.ks-card { padding: 16px 18px; margin-bottom: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); font-size: 13.5px; }
 .ks-created { list-style: none; margin: 0; padding: 0; }
 .ks-created li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); }
 .ks-created-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-200); }

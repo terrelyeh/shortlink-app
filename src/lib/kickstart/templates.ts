@@ -78,6 +78,21 @@ const LAUNCH: CampaignTemplate = {
   ],
 };
 
+/**
+ * Link tags the wizard adds. Fixed strings (not translated) — tags are
+ * shared data, and a zh user and an en user must produce the same tag
+ * or the "filter by tag" workflow breaks. Same names as the skill
+ * (references/utm-rules.md → tags).
+ */
+export const PHASE_TAGS: Partial<Record<Phase, string>> = {
+  pre: "展前",
+  live: "現場QR",
+  post: "展後",
+  launch: "發表",
+  follow: "追蹤",
+};
+export const PAGE_PENDING_TAG = "待換活動頁";
+
 export const TEMPLATES: Record<CampaignType, CampaignTemplate> = {
   exhibition: EXHIBITION,
   launch: LAUNCH,

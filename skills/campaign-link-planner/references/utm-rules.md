@@ -65,7 +65,7 @@ Optional but recommended: people paste these into posts and print them on poster
 
 ## tags — filters in the tool
 
-Comma-separated. Always include the market code in capitals when there is more than one market (`US`, `DE`). Optionally one campaign-wide tag (e.g. `computex2026`) — but don't duplicate the campaign name endlessly; the campaign filter already does that.
+Comma-separated. Always include the market code in capitals when there is more than one market (`US`, `DE`). Add the phase tag the tool's 活動啟動器 uses, so campaigns built either way filter alike: `展前` / `現場QR` / `展後` (exhibitions), `發表` / `追蹤` (launches); add `待換活動頁` to links that temporarily point at the homepage because the campaign page isn't live yet. Optionally one campaign-wide tag (e.g. `computex2026`) — but don't duplicate the campaign name endlessly; the campaign filter already does that.
 
 ## Things to leave alone unless asked
 

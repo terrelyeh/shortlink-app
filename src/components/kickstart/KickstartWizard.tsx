@@ -8,17 +8,22 @@
  *
  * Creation goes through the CSV import endpoint (/api/links/batch-csv) in
  * one request — it already handles tags by name, custom codes and the UTM
- * whitelist per row — then the campaign's period / owner / goals are set
- * with PATCH /api/utm-campaigns/[name].
+ * whitelist per row — then the campaign's name / period / owner / goals
+ * are set with PATCH /api/utm-campaigns/[name].
+ *
+ * Partial failures: created rows drop out of the plan, the rest stay for
+ * a retry, and the campaign identity (name / mode) is locked once anything
+ * was created so a retry can't land under a different utm_campaign.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import { useTranslations } from "next-intl";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import Link from "next/link";
+import { Link } from "@/i18n/routing";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Check,
@@ -30,17 +35,34 @@ import {
   Presentation,
   Rocket,
   X,
-  AlertTriangle,
 } from "lucide-react";
-import { TEMPLATES, type CampaignType, type Phase, type TemplateChannel } from "@/lib/kickstart/templates";
-import { CODE_RE, cleanCampaign, cleanCode, codePrefix, suggestCampaign } from "@/lib/kickstart/naming";
+import {
+  PAGE_PENDING_TAG,
+  PHASE_TAGS,
+  TEMPLATES,
+  type CampaignType,
+  type Phase,
+  type TemplateChannel,
+} from "@/lib/kickstart/templates";
+import {
+  CODE_RE,
+  cleanCampaign,
+  cleanCode,
+  codePrefix,
+  looseCampaign,
+  looseCode,
+  suggestCampaign,
+} from "@/lib/kickstart/naming";
 import { storedDateToDay } from "@/lib/campaign-period";
 import { parseGoalByMedium } from "@/lib/campaign-goal";
+import { invalidateAfterLinksCreated } from "@/lib/query/invalidate-links";
 import { ownerLabel, useWorkspaceMembers, type OwnerInfo } from "@/components/campaigns/CampaignOwner";
 import type { RawAnalyticsData } from "@/lib/analytics/compute";
 
 type StepId = "type" | "basics" | "destination" | "channels" | "goals" | "review";
 const STEPS: StepId[] = ["type", "basics", "destination", "channels", "goals", "review"];
+/** Owner select value meaning "the signed-in user" (new campaigns). */
+const ME = "__me__";
 
 interface PlanRow {
   id: string;
@@ -48,7 +70,7 @@ interface PlanRow {
   /** 1 for the template row, 2+ for "add another" copies. */
   n: number;
   include: boolean;
-  /** Overrides; null / "" = use the generated value. */
+  /** Overrides as typed (loose); null = use the generated value. */
   title: string | null;
   content: string | null;
   code: string | null;
@@ -58,6 +80,7 @@ interface PlanRow {
 interface SummaryCampaign {
   id: string | null;
   name: string;
+  displayName: string | null;
   startDate: string | null;
   endDate: string | null;
   owner: OwnerInfo | null;
@@ -77,18 +100,7 @@ const todayDay = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-function buildRows(type: CampaignType): PlanRow[] {
-  return TEMPLATES[type].channels.map((c) => ({
-    id: c.key,
-    channel: c,
-    n: 1,
-    include: c.on,
-    title: null,
-    content: null,
-    code: null,
-    url: "",
-  }));
-}
+const urlOk = (u: string) => /^https?:\/\/\S+\.\S+/i.test(u.trim());
 
 export function KickstartWizard() {
   const t = useTranslations("kickstart");
@@ -100,6 +112,9 @@ export function KickstartWizard() {
 
   const [step, setStep] = useState<StepId>("type");
   const stepIdx = STEPS.indexOf(step);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const rowSeq = useRef(0);
+  const pickSeq = useRef(0);
 
   // --- answers ---
   const [type, setType] = useState<CampaignType | null>(null);
@@ -109,21 +124,32 @@ export function KickstartWizard() {
   const [existingName, setExistingName] = useState("");
   const [startDay, setStartDay] = useState("");
   const [endDay, setEndDay] = useState("");
-  const [ownerId, setOwnerId] = useState<string | null>(null); // null = default (me)
+  const [ownerSel, setOwnerSel] = useState<string>(ME); // ME | user id | "" (unassigned)
+  const [ownerInitial, setOwnerInitial] = useState<string>(ME);
   const [landingUrl, setLandingUrl] = useState("");
   const [pagePending, setPagePending] = useState(false);
   const [rows, setRows] = useState<PlanRow[]>([]);
   const [goals, setGoals] = useState<Record<string, string>>({});
+  /** Existing campaign's per-channel goals / total-only goal (to preserve). */
+  const [initialGoals, setInitialGoals] = useState<Record<string, number>>({});
+  const [totalOnlyGoal, setTotalOnlyGoal] = useState<number | null>(null);
+  const [prefixOverride, setPrefixOverride] = useState<string | null>(null);
 
   // --- create ---
   const [creating, setCreating] = useState(false);
   const [results, setResults] = useState<CreateResult[] | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [settingsSaved, setSettingsSaved] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
-  const effectiveOwner = ownerId ?? myId;
+  const created = (results ?? []).filter((r) => r.ok);
+  const failed = (results ?? []).filter((r) => !r.ok);
+  /** Once anything is created the campaign identity can't change. */
+  const locked = created.length > 0;
 
-  // Existing campaigns — same key / fetch as the campaign list's default view.
+  // Existing campaigns: the summary (has period / owner / display name) plus
+  // the plain campaign list (also has campaigns without links). Same keys /
+  // URLs as the campaign list and the UTM builder.
   const { data: summary } = useQuery<{ campaigns: SummaryCampaign[] }>({
     queryKey: ["campaigns-summary", "period"],
     queryFn: async () => {
@@ -132,22 +158,43 @@ export function KickstartWizard() {
       return res.json();
     },
   });
-  const existingCampaigns = useMemo(
-    () => (summary?.campaigns ?? []).filter((c) => c.id).sort((a, b) => a.name.localeCompare(b.name)),
-    [summary],
-  );
+  const { data: campaignList } = useQuery<{ campaigns: { name: string; displayName: string | null }[] }>({
+    queryKey: ["utm-campaigns"],
+    queryFn: async () => {
+      const res = await fetch("/api/campaigns");
+      if (!res.ok) return { campaigns: [] };
+      return res.json();
+    },
+  });
+  const existingCampaigns = useMemo(() => {
+    const m = new Map<string, SummaryCampaign>();
+    for (const c of summary?.campaigns ?? []) if (c.id) m.set(c.name, c);
+    for (const c of campaignList?.campaigns ?? []) {
+      if (!m.has(c.name)) {
+        m.set(c.name, { id: c.name, name: c.name, displayName: c.displayName, startDate: null, endDate: null, owner: null });
+      }
+    }
+    return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [summary, campaignList]);
 
   const campaign =
     mode === "existing"
       ? existingName
-      : (campaignOverride ?? (type ? suggestCampaign(type, displayName, startDay || null) : ""));
-  const nameTaken = mode === "new" && existingCampaigns.some((c) => c.name === campaign);
-  const prefix = codePrefix(campaign || "c");
+      : campaignOverride !== null
+        ? cleanCampaign(campaignOverride)
+        : type
+          ? suggestCampaign(type, displayName, startDay || null)
+          : "";
+  const nameTaken = mode === "new" && !locked && existingCampaigns.some((c) => c.name === campaign);
+  const prefix = prefixOverride !== null ? cleanCode(prefixOverride) : codePrefix(campaign || "c");
   const label = displayName.trim() || campaign;
+  const ownerResolved = ownerSel === ME ? myId : ownerSel;
 
   // Links already in an existing campaign (skip their channel combos).
-  // Same key / shape as the campaign page's Links tab.
-  const { data: existingLinks } = useQuery<{ id: string; code: string; utmSource: string | null; utmMedium: string | null; utmContent: string | null }[]>({
+  // Same key / request / shape as the campaign page's Links tab.
+  const { data: existingLinks } = useQuery<
+    { id: string; code: string; utmSource: string | null; utmMedium: string | null; utmContent: string | null }[]
+  >({
     queryKey: ["campaign-links", existingName, "real-only"],
     enabled: mode === "existing" && Boolean(existingName),
     queryFn: async () => {
@@ -165,25 +212,32 @@ export function KickstartWizard() {
   }, [existingLinks, mode]);
 
   // --- derived row values ---
-  const rowContent = (r: PlanRow) => r.content?.trim() || (r.n > 1 ? `${r.channel.content}_${r.n}` : r.channel.content);
+  const rowContent = (r: PlanRow) =>
+    (r.content !== null ? cleanCampaign(r.content) : "") ||
+    (r.n > 1 ? `${r.channel.content}_${r.n}` : r.channel.content);
   const rowCode = (r: PlanRow) =>
-    r.code !== null ? r.code : `${prefix}-${r.channel.code}${r.n > 1 ? `-${r.n}` : ""}`;
+    r.code !== null ? cleanCode(r.code) : `${prefix}-${r.channel.code}${r.n > 1 ? `-${r.n}` : ""}`;
   const rowTitle = (r: PlanRow) =>
     r.title?.trim() || `${label}｜${t(`channels.${r.channel.key}`)}${r.n > 1 ? ` #${r.n}` : ""}`;
   const rowUrl = (r: PlanRow) => r.url.trim() || landingUrl.trim();
   const rowExisting = (r: PlanRow) => existingCombo.get(`${r.channel.source}|${r.channel.medium}|${rowContent(r)}`);
   const rowTags = (r: PlanRow) => {
     const tags: string[] = [];
-    if (r.channel.phase !== "extra") tags.push(t(`phaseTag.${r.channel.phase}`));
-    if (pagePending && !r.url.trim()) tags.push(t("pagePendingTag"));
+    const ph = PHASE_TAGS[r.channel.phase];
+    if (ph) tags.push(ph);
+    if (pagePending && !r.url.trim()) tags.push(PAGE_PENDING_TAG);
     return tags;
   };
 
-  const planRows = rows.filter((r) => r.include && !rowExisting(r) && !results?.some((x) => x.rowId === r.id && x.ok));
-  const mediums = Array.from(new Set(planRows.map((r) => r.channel.medium)));
+  /** Ticked rows this run is about (incl. ones already created this session). */
+  const chosenRows = rows.filter((r) => r.include && !rowExisting(r));
+  /** Rows still to create. */
+  const planRows = chosenRows.filter((r) => !created.some((x) => x.rowId === r.id));
+  /** Goal channels follow everything chosen, so a retry can't shrink them. */
+  const goalMediums = Array.from(new Set(chosenRows.map((r) => r.channel.medium)));
 
   // Reference for goals: average clicks per link, per medium, across the
-  // workspace's other campaigns (same raw payload the dashboards use).
+  // workspace's other campaigns (real clicks — same payload as dashboards).
   const { data: raw, isLoading: rawLoading } = useQuery<RawAnalyticsData>({
     queryKey: ["analytics-raw", "real-only"],
     enabled: step === "goals",
@@ -194,7 +248,7 @@ export function KickstartWizard() {
     },
   });
   const perLinkAvg = useMemo(() => {
-    const out: Record<string, number> = {};
+    const out: Record<string, { avg: number; links: number }> = {};
     if (!raw) return out;
     const clicks = new Map<string, number>();
     for (const c of raw.clicks) clicks.set(c.shortLinkId, (clicks.get(c.shortLinkId) ?? 0) + 1);
@@ -205,90 +259,137 @@ export function KickstartWizard() {
       s.clicks += clicks.get(l.id) ?? 0;
       s.links += 1;
     }
-    for (const [m, s] of Object.entries(sum)) if (s.links > 0) out[m] = Math.round(s.clicks / s.links);
+    for (const [m, s] of Object.entries(sum)) {
+      if (s.links > 0 && s.clicks > 0) out[m] = { avg: Math.max(1, Math.round(s.clicks / s.links)), links: s.links };
+    }
     return out;
   }, [raw, campaign]);
+  const newPieces = (m: string) => chosenRows.filter((r) => r.channel.medium === m).length;
   const suggestedGoal = (m: string) => {
-    const avg = perLinkAvg[m];
-    const n = planRows.filter((r) => r.channel.medium === m).length;
-    return avg ? avg * n : null;
+    const ref = perLinkAvg[m];
+    if (!ref) return null;
+    // Existing campaign: its current goal covers the links it already has.
+    return (mode === "existing" ? (initialGoals[m] ?? 0) : 0) + ref.avg * newPieces(m);
   };
 
-  // Short-code availability (review step) — one request per unique code.
-  const codes = step === "review" ? Array.from(new Set(planRows.map(rowCode).filter((c) => CODE_RE.test(c)))).sort() : [];
-  const { data: codeStatus } = useQuery<Record<string, boolean>>({
-    queryKey: ["kickstart-code-check", codes],
-    enabled: codes.length > 0,
-    staleTime: 30_000,
-    queryFn: async () => {
-      const entries = await Promise.all(
-        codes.map(async (c) => {
-          const res = await fetch(`/api/links/check-code?code=${encodeURIComponent(c)}`);
-          const d = await res.json().catch(() => ({}));
-          return [c, d.available !== false] as const;
-        }),
-      );
-      return Object.fromEntries(entries);
-    },
+  // Short-code availability — one cached query per code, so typing in one
+  // field doesn't re-check every row.
+  const codes =
+    step === "review" ? Array.from(new Set(planRows.map(rowCode).filter((c) => CODE_RE.test(c)))) : [];
+  const codeQueries = useQueries({
+    queries: codes.map((c) => ({
+      queryKey: ["check-code", c],
+      staleTime: 60_000,
+      queryFn: async () => {
+        const res = await fetch(`/api/links/check-code?code=${encodeURIComponent(c)}`);
+        const d = await res.json().catch(() => ({}));
+        return d.available !== false;
+      },
+    })),
   });
+  const codeStatus: Record<string, boolean | undefined> = Object.fromEntries(
+    codes.map((c, i) => [c, codeQueries[i]?.data as boolean | undefined]),
+  );
 
-  // --- validation per step ---
-  const urlOk = (u: string) => /^https?:\/\/\S+\.\S+/i.test(u.trim());
+  // --- validation ---
   const datesOk = !startDay || !endDay || startDay <= endDay;
+  const nameNeedsLatin = mode === "new" && Boolean(displayName.trim()) && campaign.length < 3;
   const canNext: Record<StepId, boolean> = {
     type: Boolean(type),
-    basics: campaign.length >= 3 && !nameTaken && datesOk && (mode === "new" ? Boolean(displayName.trim()) : Boolean(existingName)),
+    basics:
+      campaign.length >= 3 &&
+      !nameTaken &&
+      datesOk &&
+      (mode === "new" ? Boolean(displayName.trim()) : Boolean(existingName)),
     destination: urlOk(landingUrl),
     channels: planRows.length > 0 && planRows.every((r) => !r.url.trim() || urlOk(r.url)),
     goals: true,
     review: false,
   };
   const codeCounts = new Map<string, number>();
+  const comboCounts = new Map<string, number>();
   for (const r of planRows) {
     const c = rowCode(r);
     if (c) codeCounts.set(c, (codeCounts.get(c) ?? 0) + 1);
+    const k = `${r.channel.source}|${r.channel.medium}|${rowContent(r)}`;
+    comboCounts.set(k, (comboCounts.get(k) ?? 0) + 1);
   }
+  const rowContentProblem = (r: PlanRow): string | null => {
+    const k = `${r.channel.source}|${r.channel.medium}|${rowContent(r)}`;
+    if ((comboCounts.get(k) ?? 0) > 1) return t("contentDuplicate");
+    if (existingCombo.has(k)) return t("contentExists");
+    return null;
+  };
   const rowCodeProblem = (r: PlanRow): string | null => {
     const c = rowCode(r);
     if (!c) return null; // random code
     if (!CODE_RE.test(c)) return t("codeInvalid");
     if ((codeCounts.get(c) ?? 0) > 1) return t("codeDuplicate");
-    if (codeStatus && codeStatus[c] === false) return t("codeTaken");
+    if (codeStatus[c] === false) return t("codeTaken");
     return null;
   };
-  const canCreate =
-    !creating &&
-    planRows.length > 0 &&
-    planRows.every((r) => urlOk(rowUrl(r)) && !rowCodeProblem(r));
+  const codesPending = codes.some((c) => codeStatus[c] === undefined);
+  const badRows = planRows.filter((r) => rowCodeProblem(r) || rowContentProblem(r) || !urlOk(rowUrl(r))).length;
+  const canCreate = !creating && planRows.length > 0 && badRows === 0 && !codesPending;
 
   const go = (s: StepId) => {
     setStep(s);
     window.scrollTo({ top: 0, behavior: "smooth" });
+    // Move focus to the new question for keyboard / screen-reader users.
+    requestAnimationFrame(() => headingRef.current?.focus({ preventScroll: true }));
   };
 
   // --- handlers ---
   const chooseType = (tp: CampaignType) => {
     if (tp !== type) {
       setType(tp);
-      setRows(buildRows(tp));
-      setGoals({});
+      setRows(
+        TEMPLATES[tp].channels.map((c) => ({
+          id: `${c.key}-${++rowSeq.current}`,
+          channel: c,
+          n: 1,
+          include: c.on,
+          title: null,
+          content: null,
+          code: null,
+          url: "",
+        })),
+      );
     }
     go("basics");
   };
 
   const chooseExisting = async (name: string) => {
+    const seq = ++pickSeq.current;
     setExistingName(name);
     const c = existingCampaigns.find((x) => x.name === name);
+    setDisplayName(c ? c.displayName || c.name : "");
     setStartDay(storedDateToDay(c?.startDate) ?? "");
     setEndDay(storedDateToDay(c?.endDate) ?? "");
-    setOwnerId(c?.owner?.id ?? null);
-    if (!displayName.trim()) setDisplayName(name);
-    // Prefill per-channel goals from the campaign record.
-    if (name) {
-      const res = await fetch(`/api/utm-campaigns/${encodeURIComponent(name)}`).catch(() => null);
-      const d = res?.ok ? await res.json() : null;
-      const g = parseGoalByMedium(d?.campaignRecord?.goalByMedium);
-      setGoals(g ? Object.fromEntries(Object.entries(g).map(([m, n]) => [m, String(n)])) : {});
+    const owner = c?.owner?.id ?? "";
+    setOwnerSel(owner);
+    setOwnerInitial(owner);
+    setGoals({});
+    setInitialGoals({});
+    setTotalOnlyGoal(null);
+    setPrefixOverride(null);
+    if (!name) return;
+    const res = await fetch(`/api/utm-campaigns/${encodeURIComponent(name)}`).catch(() => null);
+    const d = res?.ok ? await res.json() : null;
+    if (seq !== pickSeq.current) return; // a later pick won
+    const g = parseGoalByMedium(d?.campaignRecord?.goalByMedium);
+    if (g) {
+      setInitialGoals(g);
+      setGoals(Object.fromEntries(Object.entries(g).map(([m, n]) => [m, String(n)])));
+    } else if (d?.goalClicks) {
+      setTotalOnlyGoal(d.goalClicks);
+    }
+    if (d?.campaignRecord) {
+      setStartDay(storedDateToDay(d.campaignRecord.startDate) ?? "");
+      setEndDay(storedDateToDay(d.campaignRecord.endDate) ?? "");
+      const o = d.campaignRecord.ownerId ?? "";
+      setOwnerSel(o);
+      setOwnerInitial(o);
     }
   };
 
@@ -298,7 +399,15 @@ export function KickstartWizard() {
   const addAnother = (r: PlanRow) =>
     setRows((rs) => {
       const n = Math.max(...rs.filter((x) => x.channel.key === r.channel.key).map((x) => x.n)) + 1;
-      const copy: PlanRow = { ...r, id: `${r.channel.key}-${n}`, n, include: true, title: null, content: null, code: null };
+      const copy: PlanRow = {
+        ...r,
+        id: `${r.channel.key}-${++rowSeq.current}`,
+        n,
+        include: true,
+        title: null,
+        content: null,
+        code: null,
+      };
       const last = rs.map((x) => x.channel.key).lastIndexOf(r.channel.key);
       return [...rs.slice(0, last + 1), copy, ...rs.slice(last + 1)];
     });
@@ -326,43 +435,57 @@ export function KickstartWizard() {
       fd.append("file", new Blob([csv], { type: "text/csv" }), `${campaign}.csv`);
       const res = await fetch("/api/links/batch-csv", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : `HTTP ${res.status}`);
+      if (!res.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : t("errHttp", { status: res.status }));
+      }
       const byRow = new Map<number, { ok: boolean; code?: string; error?: string }>(
         (data.results ?? []).map((x: { row: number; ok: boolean; code?: string; error?: string }) => [x.row, x]),
       );
       const out: CreateResult[] = batch.map((r, i) => {
         const x = byRow.get(i + 2); // row 1 is the header
-        return x ? { rowId: r.id, ok: x.ok, code: x.code, error: x.error } : { rowId: r.id, ok: false, error: "No result" };
+        return x
+          ? { rowId: r.id, ok: x.ok, code: x.code, error: x.error }
+          : { rowId: r.id, ok: false, error: t("errNoResult") };
       });
-      setResults((prev) => [...(prev ?? []).filter((p) => p.ok), ...out]);
+      const allCreated = [...created, ...out.filter((x) => x.ok)];
+      setResults([...created, ...out]);
 
-      // Campaign settings — only what was answered, so an existing
-      // campaign's goal isn't wiped by an empty goal step.
-      // New campaign: only channels in this plan. Existing campaign: keep
-      // the goals it already had for channels not touched here.
-      const goalByMedium = Object.fromEntries(
-        Object.entries(goals)
-          .filter(([m]) => mode === "existing" || mediums.includes(m))
-          .map(([m, v]) => [m, parseInt(v, 10)] as const)
-          .filter(([, n]) => Number.isInteger(n) && n > 0),
-      );
-      const patch: Record<string, unknown> = {};
-      if (startDay) patch.startDate = startDay;
-      if (endDay) patch.endDate = endDay;
-      if (effectiveOwner) patch.ownerId = effectiveOwner;
-      if (Object.keys(goalByMedium).length > 0) patch.goalByMedium = goalByMedium;
-      if (out.some((x) => x.ok) && Object.keys(patch).length > 0) {
+      if (allCreated.length > 0) {
+        // Campaign settings. New campaign: what was answered. Existing:
+        // dates as shown (cleared = null), owner / goals only if changed,
+        // so nothing the user didn't touch is overwritten.
+        const goalByMedium = Object.fromEntries(
+          Object.entries(goals)
+            .filter(([m]) => mode === "existing" || goalMediums.includes(m))
+            .map(([m, v]) => [m, parseInt(v, 10)] as const)
+            .filter(([, n]) => Number.isInteger(n) && n > 0),
+        );
+        const goalsChanged =
+          Object.keys(goalByMedium).length > 0 &&
+          JSON.stringify(Object.entries(goalByMedium).sort()) !== JSON.stringify(Object.entries(initialGoals).sort());
+        const patch: Record<string, unknown> = {};
+        if (mode === "new") {
+          if (displayName.trim()) patch.displayName = displayName.trim();
+          if (startDay) patch.startDate = startDay;
+          if (endDay) patch.endDate = endDay;
+          if (ownerResolved) patch.ownerId = ownerResolved;
+        } else {
+          patch.startDate = startDay || null;
+          patch.endDate = endDay || null;
+          if (ownerSel !== ownerInitial) patch.ownerId = ownerResolved || null;
+        }
+        if (goalsChanged) patch.goalByMedium = goalByMedium;
         const pr = await fetch(`/api/utm-campaigns/${encodeURIComponent(campaign)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patch),
         });
+        setSettingsSaved(pr.ok);
         if (!pr.ok) setCreateError(t("settingsSaveFailed"));
       }
 
-      for (const key of ["links", "campaign-links", "campaigns-summary", "analytics-raw", "utm-campaigns", "campaign-goal", "links-trash"]) {
-        qc.invalidateQueries({ queryKey: [key], refetchType: "all" });
-      }
+      invalidateAfterLinksCreated(qc);
+      qc.invalidateQueries({ queryKey: ["campaign-goal"], refetchType: "all" });
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -376,19 +499,43 @@ export function KickstartWizard() {
     setTimeout(() => setCopied(null), 1500);
   };
 
-  // ================= render =================
-  const created = (results ?? []).filter((r) => r.ok);
-  const failed = (results ?? []).filter((r) => !r.ok);
-  const done = results !== null && created.length > 0 && failed.length === 0;
+  const startOver = () => {
+    setResults(null);
+    setCreateError(null);
+    setSettingsSaved(false);
+    setType(null);
+    setRows([]);
+    setDisplayName("");
+    setCampaignOverride(null);
+    setExistingName("");
+    setMode("new");
+    setStartDay("");
+    setEndDay("");
+    setOwnerSel(ME);
+    setOwnerInitial(ME);
+    setLandingUrl("");
+    setPagePending(false);
+    setGoals({});
+    setInitialGoals({});
+    setTotalOnlyGoal(null);
+    setPrefixOverride(null);
+    go("type");
+  };
+
   const rowById = (id: string) => rows.find((r) => r.id === id);
 
-  if (done) {
+  // ================= done =================
+  if (results !== null && created.length > 0 && failed.length === 0) {
     return (
       <div className="ks-shell">
         <div className="ks-done">
           <CheckCircle2 size={40} style={{ color: "var(--ok-fg)" }} />
-          <h1>{t("doneTitle", { n: created.length })}</h1>
-          <p className="muted">{t("doneSub", { campaign })}</p>
+          <h1 ref={headingRef} tabIndex={-1}>
+            {t("doneTitle", { n: created.length })}
+          </h1>
+          <p className="muted">
+            {settingsSaved ? t("doneSub", { campaign }) : t("doneSubLinksOnly", { campaign })}
+          </p>
           {createError && (
             <p className="ks-warn">
               <AlertTriangle size={14} /> {createError}
@@ -414,7 +561,12 @@ export function KickstartWizard() {
                 <li key={c.rowId}>
                   <span className="ks-created-title">{r ? rowTitle(r) : c.code}</span>
                   <span className="ks-created-url">{url}</span>
-                  <button className="btn btn-ghost" style={{ padding: 4 }} onClick={() => copy(url, c.rowId)} aria-label={tCommon("copy")}>
+                  <button
+                    className="btn btn-ghost"
+                    style={{ padding: 4 }}
+                    onClick={() => copy(url, c.rowId)}
+                    aria-label={`${tCommon("copy")} ${url}`}
+                  >
                     {copied === c.rowId ? <Check size={13} /> : <Copy size={13} />}
                   </button>
                 </li>
@@ -436,25 +588,7 @@ export function KickstartWizard() {
           <Link href={`/campaigns/${encodeURIComponent(campaign)}`} className="btn btn-primary">
             {t("goToCampaign")} <ArrowRight size={13} />
           </Link>
-          <button
-            className="btn btn-secondary"
-            onClick={() => {
-              setResults(null);
-              setType(null);
-              setRows([]);
-              setDisplayName("");
-              setCampaignOverride(null);
-              setExistingName("");
-              setMode("new");
-              setStartDay("");
-              setEndDay("");
-              setOwnerId(null);
-              setLandingUrl("");
-              setPagePending(false);
-              setGoals({});
-              go("type");
-            }}
-          >
+          <button className="btn btn-secondary" onClick={startOver}>
             {t("startOver")}
           </button>
         </div>
@@ -463,6 +597,12 @@ export function KickstartWizard() {
   }
 
   const tpl = type ? TEMPLATES[type] : null;
+  const ownerOptions = (members ?? []).map((m) => (
+    <option key={m.id} value={mode === "new" && m.id === myId ? ME : m.id}>
+      {ownerLabel(m)}
+      {m.id === myId ? ` ${t("me")}` : ""}
+    </option>
+  ));
 
   return (
     <div className={`ks-shell ${step === "review" ? "ks-wide" : ""}`}>
@@ -479,12 +619,17 @@ export function KickstartWizard() {
             <li key={s} className={i < stepIdx ? "done" : i === stepIdx ? "current" : ""}>
               <button
                 type="button"
-                disabled={i > stepIdx}
+                disabled={i > stepIdx || creating}
                 onClick={() => i < stepIdx && go(s)}
                 aria-current={i === stepIdx ? "step" : undefined}
+                aria-label={`${i + 1}. ${t(`step.${s}`)}`}
               >
-                <span className="ks-dot">{i < stepIdx ? <Check size={11} /> : i + 1}</span>
-                <span className="ks-step-label">{t(`step.${s}`)}</span>
+                <span className="ks-dot" aria-hidden>
+                  {i < stepIdx ? <Check size={11} /> : i + 1}
+                </span>
+                <span className="ks-step-label" aria-hidden>
+                  {t(`step.${s}`)}
+                </span>
               </button>
             </li>
           ))}
@@ -495,7 +640,9 @@ export function KickstartWizard() {
       {/* ---------- Step: type ---------- */}
       {step === "type" && (
         <section className="ks-step">
-          <h1>{t("q.type")}</h1>
+          <h1 ref={headingRef} tabIndex={-1}>
+            {t("q.type")}
+          </h1>
           <p className="ks-sub">{t("q.typeSub")}</p>
           <div className="ks-type-grid">
             {(["exhibition", "launch"] as CampaignType[]).map((tp) => (
@@ -504,6 +651,8 @@ export function KickstartWizard() {
                 type="button"
                 className={`ks-type ${type === tp ? "active" : ""}`}
                 onClick={() => chooseType(tp)}
+                disabled={locked && tp !== type}
+                aria-pressed={type === tp}
               >
                 {tp === "exhibition" ? <Presentation size={22} /> : <Megaphone size={22} />}
                 <strong>{t(`type.${tp}`)}</strong>
@@ -511,11 +660,11 @@ export function KickstartWizard() {
                 <span className="ks-type-eg">{t(`type.${tp}Eg`)}</span>
               </button>
             ))}
-            <div className="ks-type ks-type-soon" aria-disabled>
+            <button type="button" className="ks-type ks-type-soon" disabled>
               <Rocket size={22} />
               <strong>{t("type.ecommerce")}</strong>
               <span>{t("type.ecommerceSoon")}</span>
-            </div>
+            </button>
           </div>
         </section>
       )}
@@ -523,17 +672,32 @@ export function KickstartWizard() {
       {/* ---------- Step: basics ---------- */}
       {step === "basics" && (
         <section className="ks-step">
-          <h1>{t("q.basics")}</h1>
+          <h1 ref={headingRef} tabIndex={-1}>
+            {t("q.basics")}
+          </h1>
           <p className="ks-sub">{t("q.basicsSub")}</p>
+          {locked && (
+            <p className="ks-warn" style={{ marginBottom: 12 }}>
+              <AlertTriangle size={14} /> {t("lockedAfterCreate")}
+            </p>
+          )}
 
           <div className="segmented" style={{ marginBottom: 16 }}>
-            <button className={mode === "new" ? "active" : ""} onClick={() => setMode("new")}>
+            <button
+              className={mode === "new" ? "active" : ""}
+              onClick={() => {
+                setMode("new");
+                setOwnerSel(ME);
+                setOwnerInitial(ME);
+              }}
+              disabled={locked}
+            >
               {t("modeNew")}
             </button>
             <button
               className={mode === "existing" ? "active" : ""}
               onClick={() => setMode("existing")}
-              disabled={existingCampaigns.length === 0}
+              disabled={locked || existingCampaigns.length === 0}
             >
               {t("modeExisting")}
             </button>
@@ -548,28 +712,36 @@ export function KickstartWizard() {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder={t(type === "launch" ? "namePlaceholderLaunch" : "namePlaceholderExhibition")}
-                autoFocus
+                disabled={locked}
               />
               <div className="ks-derived">
                 {t("campaignLabel")}{" "}
                 {campaignOverride === null ? (
                   <>
                     <code>{campaign || "—"}</code>{" "}
-                    <button type="button" className="ks-link" onClick={() => setCampaignOverride(campaign)}>
-                      {t("edit")}
-                    </button>
+                    {!locked && (
+                      <button type="button" className="ks-link" onClick={() => setCampaignOverride(campaign)}>
+                        {t("edit")}
+                      </button>
+                    )}
                   </>
                 ) : (
                   <input
                     className="input"
                     style={{ height: 28, maxWidth: 280, fontFamily: "var(--font-mono)" }}
                     value={campaignOverride}
-                    onChange={(e) => setCampaignOverride(cleanCampaign(e.target.value))}
+                    onChange={(e) => setCampaignOverride(looseCampaign(e.target.value))}
                     aria-label={t("campaignLabel")}
+                    disabled={locked}
                   />
                 )}
               </div>
               <p className="ks-hint">{t("campaignHint")}</p>
+              {nameNeedsLatin && (
+                <p className="ks-warn">
+                  <AlertTriangle size={14} /> {t("nameNeedsLatin")}
+                </p>
+              )}
               {nameTaken && (
                 <p className="ks-warn">
                   <AlertTriangle size={14} /> {t("nameTaken")}{" "}
@@ -594,11 +766,12 @@ export function KickstartWizard() {
                 className="input"
                 value={existingName}
                 onChange={(e) => chooseExisting(e.target.value)}
+                disabled={locked}
               >
                 <option value="">{t("existingPick")}</option>
                 {existingCampaigns.map((c) => (
                   <option key={c.name} value={c.name}>
-                    {c.name}
+                    {c.displayName && c.displayName !== c.name ? `${c.displayName}（${c.name}）` : c.name}
                   </option>
                 ))}
               </select>
@@ -609,11 +782,25 @@ export function KickstartWizard() {
           <div className="ks-field-row">
             <div className="ks-field">
               <label htmlFor="ks-start">{t("startLabel")}</label>
-              <input id="ks-start" type="date" className="input" value={startDay} max={endDay || undefined} onChange={(e) => setStartDay(e.target.value)} />
+              <input
+                id="ks-start"
+                type="date"
+                className="input"
+                value={startDay}
+                max={endDay || undefined}
+                onChange={(e) => setStartDay(e.target.value)}
+              />
             </div>
             <div className="ks-field">
               <label htmlFor="ks-end">{t("endLabel")}</label>
-              <input id="ks-end" type="date" className="input" value={endDay} min={startDay || undefined} onChange={(e) => setEndDay(e.target.value)} />
+              <input
+                id="ks-end"
+                type="date"
+                className="input"
+                value={endDay}
+                min={startDay || undefined}
+                onChange={(e) => setEndDay(e.target.value)}
+              />
             </div>
           </div>
           <p className="ks-hint">{t(type === "exhibition" ? "periodHintExhibition" : "periodHintLaunch")}</p>
@@ -628,15 +815,11 @@ export function KickstartWizard() {
             </p>
           )}
 
-          <div className="ks-field">
+          <div className="ks-field" style={{ marginTop: 18 }}>
             <label htmlFor="ks-owner">{t("ownerLabel")}</label>
-            <select id="ks-owner" className="input" value={effectiveOwner} onChange={(e) => setOwnerId(e.target.value)}>
-              {(members ?? []).map((m) => (
-                <option key={m.id} value={m.id}>
-                  {ownerLabel(m)}
-                  {m.id === myId ? ` ${t("me")}` : ""}
-                </option>
-              ))}
+            <select id="ks-owner" className="input" value={ownerSel} onChange={(e) => setOwnerSel(e.target.value)}>
+              <option value="">{t("ownerUnassigned")}</option>
+              {ownerOptions}
             </select>
             <p className="ks-hint">{t("ownerHint")}</p>
           </div>
@@ -646,8 +829,12 @@ export function KickstartWizard() {
       {/* ---------- Step: destination ---------- */}
       {step === "destination" && (
         <section className="ks-step">
-          <h1>{t("q.destination")}</h1>
-          <p className="ks-sub">{t(type === "exhibition" ? "q.destinationSubExhibition" : "q.destinationSubLaunch")}</p>
+          <h1 ref={headingRef} tabIndex={-1}>
+            {t("q.destination")}
+          </h1>
+          <p className="ks-sub">
+            {t(type === "exhibition" ? "q.destinationSubExhibition" : "q.destinationSubLaunch")}
+          </p>
           <div className="ks-field">
             <label htmlFor="ks-url">{t("landingLabel")}</label>
             <input
@@ -657,7 +844,6 @@ export function KickstartWizard() {
               value={landingUrl}
               onChange={(e) => setLandingUrl(e.target.value)}
               placeholder="https://www.engeniustech.com/…"
-              autoFocus
             />
             {landingUrl.trim() && !urlOk(landingUrl) && <p className="ks-warn">{t("urlInvalid")}</p>}
           </div>
@@ -666,7 +852,7 @@ export function KickstartWizard() {
             <span>
               <strong>{t("pagePending")}</strong>
               <span className="ks-hint" style={{ display: "block" }}>
-                {t("pagePendingHint")}
+                {t("pagePendingHint", { tag: PAGE_PENDING_TAG })}
               </span>
             </span>
           </label>
@@ -676,7 +862,9 @@ export function KickstartWizard() {
       {/* ---------- Step: channels ---------- */}
       {step === "channels" && tpl && (
         <section className="ks-step">
-          <h1>{t("q.channels")}</h1>
+          <h1 ref={headingRef} tabIndex={-1}>
+            {t("q.channels")}
+          </h1>
           <p className="ks-sub">{t("q.channelsSub")}</p>
           {tpl.phases.map((ph: Phase) => {
             const phRows = rows.filter((r) => r.channel.phase === ph);
@@ -689,13 +877,15 @@ export function KickstartWizard() {
                 </div>
                 {phRows.map((r) => {
                   const existing = rowExisting(r);
+                  const done = created.some((x) => x.rowId === r.id);
+                  const active = r.include && !existing && !done;
                   return (
-                    <div key={r.id} className={`ks-row ${r.include && !existing ? "on" : ""}`}>
+                    <div key={r.id} className={`ks-row ${active ? "on" : ""}`}>
                       <label className="ks-row-main">
                         <input
                           type="checkbox"
                           checked={r.include && !existing}
-                          disabled={Boolean(existing)}
+                          disabled={Boolean(existing) || done}
                           onChange={(e) => updateRow(r.id, { include: e.target.checked })}
                         />
                         <span className="ks-row-label">
@@ -705,32 +895,39 @@ export function KickstartWizard() {
                         <span className="pill pill-medium">{r.channel.medium}</span>
                         <span className="pill pill-source">{r.channel.source}</span>
                         {existing && <span className="ks-existing">{t("alreadyCreated", { code: existing })}</span>}
+                        {done && <span className="ks-existing">{t("createdThisRun")}</span>}
                       </label>
-                      {!existing && (
-                        <div className="ks-row-tools">
-                          {r.n > 1 ? (
-                            <button className="btn btn-ghost" style={{ padding: 4 }} onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))} aria-label={tCommon("remove")}>
-                              <X size={13} />
+                      <div className="ks-row-tools">
+                        {r.n > 1 && !done ? (
+                          <button
+                            className="btn btn-ghost"
+                            style={{ padding: 4 }}
+                            onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}
+                            aria-label={`${tCommon("remove")} ${t(`channels.${r.channel.key}`)} #${r.n}`}
+                          >
+                            <X size={13} />
+                          </button>
+                        ) : (
+                          r.n === 1 &&
+                          (r.include || existing) && (
+                            <button className="ks-link" onClick={() => addAnother(r)}>
+                              <Plus size={12} /> {t("addAnother")}
                             </button>
-                          ) : (
-                            r.include && (
-                              <button className="ks-link" onClick={() => addAnother(r)}>
-                                <Plus size={12} /> {t("addAnother")}
-                              </button>
-                            )
-                          )}
-                        </div>
-                      )}
-                      {r.include && !existing && r.channel.ownUrl && (
+                          )
+                        )}
+                      </div>
+                      {active && r.channel.ownUrl && (
                         <div className="ks-row-url">
                           <span className="muted">{t("qrGoesTo")}</span>
                           <input
-                            className="input"
+                            className={`input ${r.url.trim() && !urlOk(r.url) ? "ks-cell-bad" : ""}`}
                             type="url"
                             value={r.url}
                             onChange={(e) => updateRow(r.id, { url: e.target.value })}
                             placeholder={landingUrl || "https://"}
+                            aria-label={`${t("qrGoesTo")} — ${t(`channels.${r.channel.key}`)}`}
                           />
+                          {r.url.trim() && !urlOk(r.url) && <span className="ks-warn">{t("urlInvalid")}</span>}
                         </div>
                       )}
                     </div>
@@ -746,12 +943,20 @@ export function KickstartWizard() {
       {/* ---------- Step: goals ---------- */}
       {step === "goals" && (
         <section className="ks-step">
-          <h1>{t("q.goals")}</h1>
+          <h1 ref={headingRef} tabIndex={-1}>
+            {t("q.goals")}
+          </h1>
           <p className="ks-sub">{t("q.goalsSub")}</p>
+          {totalOnlyGoal !== null && (
+            <p className="ks-warn" style={{ marginBottom: 12 }}>
+              <AlertTriangle size={14} /> {t("totalOnlyWarning", { n: totalOnlyGoal.toLocaleString() })}
+            </p>
+          )}
           <div className="ks-goals">
-            {mediums.map((m) => {
+            {goalMediums.map((m) => {
               const sug = suggestedGoal(m);
-              const n = planRows.filter((r) => r.channel.medium === m).length;
+              const n = newPieces(m);
+              const ref = perLinkAvg[m];
               return (
                 <div key={m} className="ks-goal">
                   <span className="pill pill-medium">{m}</span>
@@ -763,11 +968,13 @@ export function KickstartWizard() {
                     value={goals[m] ?? ""}
                     onChange={(e) => setGoals((g) => ({ ...g, [m]: e.target.value }))}
                     placeholder={sug ? String(sug) : ""}
-                    aria-label={m}
+                    aria-label={`${t("goalLabel")} — ${m}`}
                   />
                   <span className="ks-hint ks-goal-ref">
-                    {perLinkAvg[m]
-                      ? t("goalRef", { avg: perLinkAvg[m], n, sug: sug ?? 0 })
+                    {ref
+                      ? mode === "existing" && initialGoals[m]
+                        ? t("goalRefExisting", { cur: initialGoals[m], avg: ref.avg, n, sug: sug ?? 0, links: ref.links })
+                        : t("goalRef", { avg: ref.avg, n, sug: sug ?? 0, links: ref.links })
                       : rawLoading
                         ? t("goalRefLoading")
                         : t("goalNoRef")}
@@ -779,11 +986,11 @@ export function KickstartWizard() {
           <div className="row" style={{ gap: 12, marginTop: 8, flexWrap: "wrap" }}>
             <button
               className="btn btn-secondary"
-              disabled={!mediums.some((m) => suggestedGoal(m))}
+              disabled={!goalMediums.some((m) => suggestedGoal(m))}
               onClick={() =>
                 setGoals((g) => {
                   const next = { ...g };
-                  for (const m of mediums) {
+                  for (const m of goalMediums) {
                     const s = suggestedGoal(m);
                     if (s) next[m] = String(s);
                   }
@@ -795,12 +1002,12 @@ export function KickstartWizard() {
             </button>
             <span className="ks-hint">
               {t("goalTotal", {
-                n: mediums.reduce((s, m) => s + (parseInt(goals[m] ?? "", 10) || 0), 0).toLocaleString(),
+                n: goalMediums.reduce((s, m) => s + (parseInt(goals[m] ?? "", 10) || 0), 0).toLocaleString(),
               })}
             </span>
           </div>
           <p className="ks-hint" style={{ marginTop: 12 }}>
-            {startDay && endDay ? t("goalPaceNote") : t("goalSkipNote")}
+            {t("goalRefNote")} {startDay && endDay ? t("goalPaceNote") : t("goalSkipNote")}
           </p>
         </section>
       )}
@@ -808,7 +1015,9 @@ export function KickstartWizard() {
       {/* ---------- Step: review ---------- */}
       {step === "review" && (
         <section className="ks-step">
-          <h1>{t("q.review")}</h1>
+          <h1 ref={headingRef} tabIndex={-1}>
+            {t("q.review")}
+          </h1>
           <p className="ks-sub">{t("q.reviewSub")}</p>
 
           <dl className="ks-summary">
@@ -825,17 +1034,35 @@ export function KickstartWizard() {
             </div>
             <div>
               <dt>{t("ownerLabel")}</dt>
-              <dd>{ownerLabel(members?.find((m) => m.id === effectiveOwner) ?? { id: "", name: null, image: null })}</dd>
+              <dd>
+                {ownerResolved
+                  ? ownerLabel(members?.find((m) => m.id === ownerResolved) ?? { id: "", name: null, image: null })
+                  : t("ownerUnassigned")}
+              </dd>
             </div>
             <div>
               <dt>{t("goalLabel")}</dt>
               <dd>
-                {mediums.filter((m) => parseInt(goals[m] ?? "", 10) > 0).length > 0
-                  ? mediums
+                {goalMediums.filter((m) => parseInt(goals[m] ?? "", 10) > 0).length > 0
+                  ? goalMediums
                       .filter((m) => parseInt(goals[m] ?? "", 10) > 0)
                       .map((m) => `${m} ${parseInt(goals[m], 10).toLocaleString()}`)
                       .join(" · ")
                   : t("notSet")}
+              </dd>
+            </div>
+            <div>
+              <dt>
+                <label htmlFor="ks-prefix">{t("prefixLabel")}</label>
+              </dt>
+              <dd>
+                <input
+                  id="ks-prefix"
+                  className="input"
+                  style={{ height: 30, maxWidth: 160, fontFamily: "var(--font-mono)" }}
+                  value={prefixOverride ?? prefix}
+                  onChange={(e) => setPrefixOverride(looseCode(e.target.value))}
+                />
               </dd>
             </div>
           </dl>
@@ -846,19 +1073,26 @@ export function KickstartWizard() {
                 <tr>
                   <th style={{ width: "26%" }}>{t("colTitle")}</th>
                   <th style={{ width: 150 }}>{t("colChannel")}</th>
-                  <th style={{ width: 150 }}>utm_content</th>
-                  <th style={{ width: 190 }}>{t("colCode")}</th>
+                  <th style={{ width: 160 }}>utm_content</th>
+                  <th style={{ width: 200 }}>{t("colCode")}</th>
                   <th>{t("colUrl")}</th>
                 </tr>
               </thead>
               <tbody>
                 {planRows.map((r) => {
-                  const problem = rowCodeProblem(r);
+                  const codeProblem = rowCodeProblem(r);
+                  const contentProblem = rowContentProblem(r);
                   const code = rowCode(r);
+                  const title = rowTitle(r);
                   return (
                     <tr key={r.id}>
                       <td>
-                        <input className="input ks-cell" value={r.title ?? rowTitle(r)} onChange={(e) => updateRow(r.id, { title: e.target.value })} aria-label={t("colTitle")} />
+                        <input
+                          className="input ks-cell"
+                          value={r.title ?? title}
+                          onChange={(e) => updateRow(r.id, { title: e.target.value })}
+                          aria-label={`${t("colTitle")} — ${title}`}
+                        />
                         <div className="ks-tags">
                           {rowTags(r).map((tg) => (
                             <span key={tg} className="pill pill-content">
@@ -873,24 +1107,26 @@ export function KickstartWizard() {
                       </td>
                       <td>
                         <input
-                          className="input ks-cell"
+                          className={`input ks-cell ${contentProblem ? "ks-cell-bad" : ""}`}
                           style={{ fontFamily: "var(--font-mono)" }}
                           value={r.content ?? rowContent(r)}
-                          onChange={(e) => updateRow(r.id, { content: cleanCampaign(e.target.value) })}
-                          aria-label="utm_content"
+                          onChange={(e) => updateRow(r.id, { content: looseCampaign(e.target.value) })}
+                          aria-label={`utm_content — ${title}`}
                         />
+                        {contentProblem && <div className="ks-code-status bad">{contentProblem}</div>}
                       </td>
                       <td>
                         <input
-                          className={`input ks-cell ${problem ? "ks-cell-bad" : ""}`}
+                          className={`input ks-cell ${codeProblem ? "ks-cell-bad" : ""}`}
                           style={{ fontFamily: "var(--font-mono)" }}
-                          value={code}
-                          onChange={(e) => updateRow(r.id, { code: cleanCode(e.target.value) })}
+                          value={r.code ?? code}
+                          onChange={(e) => updateRow(r.id, { code: looseCode(e.target.value) })}
                           placeholder={t("codeRandom")}
-                          aria-label={t("colCode")}
+                          aria-label={`${t("colCode")} — ${title}`}
                         />
-                        <div className={`ks-code-status ${problem ? "bad" : ""}`}>
-                          {problem ?? (code ? (codeStatus?.[code] ? `✓ ${t("codeOk")}` : "…") : t("codeRandomHint"))}
+                        <div className={`ks-code-status ${codeProblem ? "bad" : ""}`}>
+                          {codeProblem ??
+                            (code ? (codeStatus[code] ? `✓ ${t("codeOk")}` : t("codeChecking")) : t("codeRandomHint"))}
                         </div>
                       </td>
                       <td>
@@ -899,7 +1135,7 @@ export function KickstartWizard() {
                           value={r.url}
                           onChange={(e) => updateRow(r.id, { url: e.target.value })}
                           placeholder={landingUrl}
-                          aria-label={t("colUrl")}
+                          aria-label={`${t("colUrl")} — ${title}`}
                         />
                       </td>
                     </tr>
@@ -909,30 +1145,26 @@ export function KickstartWizard() {
             </table>
           </div>
 
-          {(() => {
-            const bad = planRows.filter((r) => rowCodeProblem(r) || !urlOk(rowUrl(r))).length;
-            return bad > 0 ? (
-              <p className="ks-warn" style={{ marginTop: 12 }}>
-                <AlertTriangle size={14} /> {t("rowsNeedFix", { n: bad })}
-              </p>
-            ) : null;
-          })()}
+          {badRows > 0 && (
+            <p className="ks-warn" style={{ marginTop: 12 }}>
+              <AlertTriangle size={14} /> {t("rowsNeedFix", { n: badRows })}
+            </p>
+          )}
           {failed.length > 0 && (
-            <div className="ks-warn-box">
+            <div className="ks-warn-box" role="alert">
               <strong>
                 <AlertTriangle size={14} /> {t("someFailed", { n: failed.length, ok: created.length })}
               </strong>
               <ul>
-                {failed.map((f) => (
-                  <li key={f.rowId}>
-                    {rowById(f.rowId) ? rowTitle(rowById(f.rowId)!) : f.rowId}：{f.error}
-                  </li>
-                ))}
+                {failed.map((f) => {
+                  const r = rowById(f.rowId);
+                  return <li key={f.rowId}>{t("failedRow", { title: r ? rowTitle(r) : f.rowId, error: f.error ?? "" })}</li>;
+                })}
               </ul>
             </div>
           )}
           {createError && (
-            <p className="ks-warn">
+            <p className="ks-warn" role="alert">
               <AlertTriangle size={14} /> {createError}
             </p>
           )}
@@ -950,12 +1182,12 @@ export function KickstartWizard() {
         )}
         {step === "review" ? (
           <button className="btn btn-primary" onClick={create} disabled={!canCreate}>
-            {creating ? <Loader2 size={13} className="animate-spin" /> : <Rocket size={13} />}{" "}
+            {creating || codesPending ? <Loader2 size={13} className="animate-spin" /> : <Rocket size={13} />}{" "}
             {failed.length > 0 ? t("retryFailed", { n: planRows.length }) : t("createN", { n: planRows.length })}
           </button>
         ) : step !== "type" ? (
           <button className="btn btn-primary" onClick={() => go(STEPS[stepIdx + 1])} disabled={!canNext[step]}>
-            {step === "goals" && mediums.every((m) => !goals[m]) ? t("skip") : t("next")} <ArrowRight size={13} />
+            {step === "goals" && goalMediums.every((m) => !goals[m]) ? t("skip") : t("next")} <ArrowRight size={13} />
           </button>
         ) : null}
       </div>
